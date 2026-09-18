@@ -16,6 +16,11 @@
 5. [Estrutura de Pastas](#5-estrutura-de-pastas)
 6. [Modelagem do Banco de Dados](#6-modelagem-do-banco-de-dados)
 7. [Fluxo de Autenticação](#7-fluxo-de-autenticação)
+   - [7.3 Estado Atual da Implementação (Pendência de Segurança)](#73-estado-atual-da-implementação-pendência-de-segurança)
+   - [10.2.1 Carrinho — Implementado × Planejado](#1021-carrinho--implementado--planejado-pendências-do-backend)
+   - [10.2.2 Lock de estoque](#1022-lock-de-estoque-select--for-update--implementado)
+   - [10.2.3 Baixa de estoque no checkout](#1023-baixa-de-estoque-no-checkout--implementado)
+   - [10.2.4 Limpeza do carrinho no checkout](#1024-limpeza-do-carrinho-no-checkout--implementado)
 8. [Fluxo de Compra (Checkout)](#8-fluxo-de-compra-checkout)
 9. [Regras de Negócio por Entidade](#9-regras-de-negócio-por-entidade)
 10. [Organização das Rotas da API](#10-organização-das-rotas-da-api)
@@ -1115,7 +1120,69 @@ bookcommerce/
 3. Remove cookie
 4. Retorna 204
 
-### 7.3 Middleware de Autorização
+### 7.3 Estado Atual da Implementação (Pendência de Segurança)
+
+> **Status:** divergência conhecida entre o plano e o código. Registrada em
+> 2025-09-12. **Bloqueia ir para produção.**
+
+O fluxo descrito em 7.1 e 7.2 é o **alvo**. A implementação atual é uma versão
+reduzida, consciente e temporária:
+
+| Item | Planejado (7.1/7.2) | Implementado hoje | Situação |
+|------|----------------------|-------------------|----------|
+| Access Token TTL | 15 min | **30 min** (`ACCESS_TOKEN_EXPIRE_MINUTES=30`) | Ajustar para 15 |
+| Refresh Token | JWT 7 dias, rotação + blacklist Redis | **não existe** | ❌ Implementar |
+| `POST /auth/refresh` | Sim | **não existe** | ❌ Implementar |
+| `POST /auth/logout` | Sim (204 + blacklist) | **não existe** | ❌ Implementar |
+| Storage do access token | Memória JS (estado React) | **`localStorage`** (`papiro.token`) | ❌ Migrar para memória |
+| Storage do refresh token | Cookie `httpOnly; Secure; SameSite=Strict; Path=/auth` | **n/a** | ❌ Implementar |
+| CRUD de usuários | Sim | Parcial | — |
+
+**Arquivos envolvidos:**
+
+- Frontend: `frontend/Papiro/src/api/client.js` (chaves `getToken`/`setToken`/
+  `clearToken` sobre `localStorage`), `src/api/auth.js`, `src/context/AuthContext.jsx`
+- Backend: `backend/app/api/v1/auth.py`, `backend/app/core/security.py`,
+  `backend/app/services/auth_service.py`
+
+#### Por que `localStorage` não serve para produção (e-commerce)
+
+Qualquer XSS na aplicação lê `localStorage.getItem('token')` e exfiltra a sessão
+inteira. Em e-commerce o impacto inclui dados de pagamento, endereços e histórico
+de compras. **Não há mitigação real** — o JavaScript da página sempre lê.
+
+A troca por cookie `httpOnly` é deliberada: ela **substitui um risco sem remédio
+(XSS + localStorage) por um risco com remédio (CSRF + cookie)**, mitigado com
+`SameSite` + token CSRF.
+
+#### Decisão de sequenciamento
+
+Manter `localStorage` **agora** (dev local, sem refresh/logout no backend). Migrar
+de forma atômica antes de produção, porque:
+
+1. O backend não expõe `/auth/refresh` nem `/auth/logout` — sem eles, um cookie
+   `httpOnly` não traz ganho de segurança (a sessão ainda não é revogável).
+2. Cookies com `Secure` não funcionam em `http://localhost` — testaríamos um fluxo
+   diferente do de produção.
+3. CORS com credenciais exige `allow_origins` explícito (já está, ver 13.3) e
+   `allow_credentials=True` — ou seja, **proibido usar `*`**.
+
+#### Checklist da migração (quando for feita)
+
+- [ ] Backend: adicionar refresh token em cookie `httpOnly; Secure; SameSite=Strict; Path=/auth`
+- [ ] Backend: `POST /auth/refresh` com rotação (um refresh token só pode ser usado uma vez)
+- [ ] Backend: `POST /auth/logout` adicionando o `jti` à blacklist e removendo o cookie
+- [ ] Backend: reduzir `ACCESS_TOKEN_EXPIRE_MINUTES` de 30 → 15
+- [ ] Backend: blacklist de `jti` (Redis com TTL = exp do token)
+- [ ] Frontend: guardar access token apenas em memória (estado React), remover `localStorage`
+- [ ] Frontend: interceptor de response em 401 chama `/auth/refresh` e repete a request
+- [ ] Frontend: `logout()` chama `POST /auth/logout` em vez de só limpar o token
+- [ ] Frontend: `withCredentials: true` no axios
+
+> **Risco se deixado como está:** token válido por 30 min sem revogação
+> possível, exposto a XSS. Aceitável em desenvolvimento, **não** em produção.
+
+### 7.4 Middleware de Autorização
 
 ```python
 # deps.py
@@ -1308,7 +1375,7 @@ Cliente          Frontend           Backend              Database
 | R29 | Quantidade máxima por item: 99 (evita abuso) |
 | R30 | Se `quantity` chega a 0, o CartItem é removido |
 | R31 | Ao adicionar ao carrinho, validar se produto existe e está ativo |
-| R32 | Ao adicionar ao carrinho, NÃO validar estoque (apenas no checkout) – UX melhor |
+| R32 | Ao adicionar ao carrinho, validar estoque também (com `FOR UPDATE`) – avisa o usuário cedo, em vez de só no checkout |
 | R33 | Carrinhos de usuários inativos há 30+ dias podem ser limpos (tarefa assíncrona) |
 
 ### 9.5 Order
@@ -1459,6 +1526,205 @@ Cliente          Frontend           Backend              Database
 | PUT | `/cart/items/{id}` | Sim | Atualizar quantidade |
 | DELETE | `/cart/items/{id}` | Sim | Remover item |
 | DELETE | `/cart` | Sim | Limpar carrinho |
+
+##### 10.2.1 Carrinho — Implementado × Planejado (Pendências do Backend)
+
+> **Status:** divergência conhecida. Registrada em 2025-09-12. O frontend do
+> carrinho **já está integrado** ao contrato atual (ver
+> `frontend/Papiro/src/api/cart.js`). Os itens abaixo são melhorias de contrato,
+> não bloqueiam a tela.
+
+O backend expõe as rotas com nomes e assinaturas diferentes do planejado, além
+de exigir `user_id` **como query param** em todas elas — inclusive quando o
+usuário já está autenticado por Bearer token.
+
+| Planejado | Implementado hoje | Observação |
+|-----------|-------------------|------------|
+| `GET /cart` | `GET /cart/list?user_id=` | — |
+| — | `POST /cart/create?user_id=` | Extra; necessário pois o carrinho não é criado no registro |
+| — | `GET /cart/get/{cart_id}?user_id=` | Extra |
+| — | `GET /cart/items/{cart_id}?user_id=` | Extra |
+| `POST /cart/items` | `POST /cart/{cart_id}/items/add?user_id=` | Body `{product_id, quantity}` |
+| `PUT /cart/items/{id}` | `PATCH /cart/{cart_id}/items/update/{item_id}?user_id=&quantity=` | ⚠️ Quantidade via **query**, não no body |
+| — | `PATCH /cart/{cart_id}/items/decrease/{item_id}?quantity=` | Extra |
+| `DELETE /cart/items/{id}` | `DELETE /cart/{cart_id}/items/delete/{item_id}?user_id=` | — |
+| `DELETE /cart` | `DELETE /cart/{cart_id}/items/clear?user_id=` | — |
+| — | `DELETE /cart/delete/{cart_id}?user_id=` | Extra |
+
+###### Endpoints/ajustes faltantes
+
+1. **`user_id` deveria vir do token, não da query.** Hoje qualquer cliente pode
+   ler e mutar o carrinho de outro usuário passando outro `user_id`. É uma falha
+   de autorização (IDOR). Deve usar `Depends(get_current_user)`.
+2. **Não há rota "meu carrinho" sem `cart_id`.** O frontend é obrigado a guardar
+   o `cart_id` e resolver via `/cart/list`. Falta um `GET /cart/me` (ou
+   `GET /cart`) que resolva o carrinho pelo usuário do token — e, idealmente,
+   **crie o carrinho automaticamente** se não existir.
+3. **`POST /cart/{id}/items/add` não aceita `quantity` no body de forma
+   consistente** — hoje aceita, mas o `PATCH update` exige via query. Padronizar
+   tudo no body.
+4. **Erros de domínio usam `ValueError` genérico**, não a hierarquia de
+   `BookCommerceException`. Resultado: o handler global não os formata e a API
+   devolve **500** em casos previsíveis (carrinho inexistente, produto sem
+   estoque, carrinho de outro usuário). Ver seção 11.1. Deveriam ser:
+   - carrinho inexistente → `CartNotFoundException` (404)
+   - produto inexistente → `ProductNotFoundException` (404)
+   - carrinho de outro usuário → `ForbiddenException` (403)
+   - estoque insuficiente → `InsufficientStockException` (409, **já existe** em
+     `api/exceptions.py` mas não é usada)
+5. **`decrease_item` pode deixar quantidade negativa ou zero.**
+   `CartItemRepository.decrease_quantity` faz `quantity -= n` sem validar o piso.
+   O item deveria ser removido ao chegar a 0.
+6. **Carrinho de visitante não existe no backend.** Toda rota exige `user_id`,
+   então a sacola de quem não está logado só vive em memória no frontend
+   (`CartContext`). Se quiser persistir, é preciso uma rota de carrinho anônimo
+   com cookie/cart token, mais um merge no login.
+7. ~~**Sem tratamento de concorrência no estoque.**~~ ✅ **RESOLVIDO** — ver
+   seção 10.2.2 abaixo. `add_item`, `update_item` e o checkout agora leem o
+   produto com `SELECT ... FOR UPDATE` via
+   `ProductRepository.get_by_id_for_update()`.
+
+**Arquivos envolvidos:** `backend/app/api/v1/cart.py`,
+`backend/app/services/cart_service.py`,
+`backend/app/repositories/cart_item_repo.py`,
+`backend/app/schemas/cart.py`.
+
+##### 10.2.2 Lock de estoque (`SELECT ... FOR UPDATE`) — Implementado
+
+> **Status:** implementado em 2025-09-12. Cobre a race condition
+> *check-then-act* descrita na seção 8.2.
+
+**O problema:** a validação `if product.stock_qty < quantity` é um
+*check-then-act* — entre ler o estoque e gravar, outro processo pode ler o
+mesmo valor. Com 1 exemplar em estoque e dois pedidos simultâneos, ambos leem
+`stock_qty = 1`, ambos passam na validação, e o livro é vendido duas vezes.
+
+**A solução:** `ProductRepository.get_by_id_for_update()` emite
+`SELECT ... FOR UPDATE`, que tranca a linha do produto até o commit da
+transação. O segundo processo **espera** o primeiro commitar e então relê o
+valor já atualizado.
+
+| Local | Método | Por quê |
+|-------|--------|---------|
+| `CartService.add_item` | `get_by_id_for_update` | Dois `add_item` simultâneos no último exemplar |
+| `CartService.update_item` | `get_by_id_for_update` | Só quando **aumenta** a quantidade |
+| `OrderService.create` | `get_by_id_for_update` | Dois checkouts simultâneos — o caso crítico |
+| `OrderService._update_items` | `get_by_id_for_update` | Mesma lógica na edição de pedido |
+
+**Melhoria adicional em `add_item`:** a validação passou a considerar o que
+**já está** na sacola. Antes, com estoque 3 e 2 já no carrinho, adicionar mais 2
+passava (comparava só `quantity` 2 < 3) e o item ficava com 4 unidades de um
+produto que só tem 3. Agora compara `quantidade_atual + quantity`.
+
+**Detalhe de portabilidade:** SQLite (usado nos testes) **ignora** a cláusula
+`FOR UPDATE` silenciosamente — o SQL gerado em PostgreSQL é
+`SELECT ... FOR UPDATE` e em SQLite é `SELECT ...` sem a cláusula. Por isso o
+lock é um **reforço de concorrência para produção**, não algo de que a
+correção dependa: os testes de comportamento continuam válidos.
+
+**Cobertura de teste:** `TestLockDeEstoque` e `TestProductRepositoryLock` em
+`tests/service_tests/test_cart_service.py` travam o comportamento — falham se
+alguém trocar `get_by_id_for_update` de volta por `get_by_id`.
+
+> ⚠️ **Ainda pendente e relacionado:** `stock_qty` **nunca é decrementado**.
+> Nem o carrinho nem o checkout dão baixa no estoque — o campo só é escrito em
+> create/update de produto. O lock evita a race, mas enquanto não houver baixa
+> o estoque continua não refletindo as vendas. Ver seção 8.2.
+
+##### 10.2.3 Baixa de estoque no checkout — Implementado
+
+> **Status:** implementado em 2025-09-12. Fecha o ciclo iniciado pelo lock
+> (10.2.2): o lock impede a race, a baixa faz o estoque refletir as vendas.
+
+**O que faltava:** `stock_qty` era apenas **lido e comparado**, nunca subtraído.
+Nem o carrinho nem o checkout davam baixa — o campo só era escrito em
+create/update de produto (admin). Na prática, o estoque nunca chegava a zero e a
+validação sempre passava.
+
+**Implementado:**
+
+| Local | Ação | Regra |
+|-------|------|-------|
+| `ProductRepository.decrement_stock()` | Baixa, com guarda contra negativo | — |
+| `ProductRepository.restock()` | Reposição | R38 |
+| `OrderService.create` | Baixa após **todas** as validações passarem | 8.1 passo 17 |
+| `OrderService._update_items` | Devolve o antigo + baixa o novo (reconciliação) | — |
+| `OrderService.update` | Repõe ao transicionar para `cancelled` | R38 |
+
+**Decisões de implementação:**
+
+1. **A baixa ocorre depois de todas as validações**, não durante o loop. Assim,
+   se o 3º item do pedido falhar, os 2 primeiros não ficam debitados.
+2. **Produto repetido no payload é somado.** Duas linhas do produto 5 com 2
+   unidades cada, sobre estoque 3, passariam na validação isoladamente
+   (`2 <= 3`) mas somam 4. Agora o total é validado.
+3. **Editar itens reconcilia o estoque:** devolve o que existia e baixa o novo.
+   Sem isso, trocar 1 por 5 unidades baixaria 5 numa segunda vez, dobrando o
+   débito.
+4. **Cancelar duas vezes não repõe duas vezes.** A transição
+   `cancelled → processing` já é bloqueada, e a reposição só ocorre quando o
+   status **muda para** `cancelled` (guarda `status_anterior != CANCELLED`).
+5. **`decrement_stock` é a última linha de defesa:** mesmo que alguém chame sem
+   validar antes, ele levanta erro em vez de gravar estoque negativo.
+
+**Cobertura de teste:** `TestBaixaDeEstoque` (6 testes) e
+`TestProductRepositoryEstoque` (3 testes). Os testes usam um mock de
+`product_repo` que **de fato muta** `stock_qty` — um Mock que não muta esconderia
+regressões. Verificado removendo a baixa e a reposição do código: os testes
+falham, como devem.
+
+> 💡 **Nota sobre concorrência:** `FOR UPDATE` + baixa dentro da mesma transação
+> é o que torna o conjunto correto. Só o lock (sem baixa) não resolvia nada; só
+> a baixa (sem lock) ainda permitiria dois checkouts lerem o mesmo `stock_qty`.
+
+> ✅ **R32 alinhado:** a seção 9.4 dizia *"NÃO validar estoque no carrinho"*.
+> A decisão final é **validar também no carrinho**, avisando o usuário cedo em
+> vez de só no checkout. R32 foi atualizado para refletir o comportamento
+> implementado.
+
+##### 10.2.4 Limpeza do carrinho no checkout — Implementado
+
+> **Status:** implementado em 2025-09-12. Passo 18 do fluxo da seção 8.1.
+
+**O problema:** após criar o pedido, a sacola continuava cheia. Uma nova compra
+repetiria os mesmos itens, e o usuário teria de remover tudo manualmente.
+
+**Implementado:**
+
+| Local | Ação |
+|-------|------|
+| `CartRepository.clear(cart_id)` | Deleção em massa dos itens, preservando o carrinho |
+| `OrderService._limpar_carrinho(user_id)` | Resolve o carrinho do usuário e limpa |
+| `OrderService.create` | Chama a limpeza após criar o pedido |
+
+**Decisões:**
+
+1. **O carrinho é mantido, só os itens saem.** O modelo tem relação 1:1 com o
+   usuário e `CartService.create` recusa um segundo carrinho
+   ("User already has a cart") — apagar o carrinho quebraria o próximo checkout.
+2. **Ausência de carrinho não é erro.** Um checkout com itens vindos do client,
+   sem sacola persistida, é válido.
+3. **Roda dentro da mesma transação.** Se algo falhar depois, o rollback
+   devolve os itens à sacola — não se perde a sacola de um pedido que falhou.
+4. **Deleção em massa com `synchronize_session=False`**, evitando um SELECT
+   extra para reconciliar objetos já carregados na sessão.
+
+**Cobertura de teste:** `TestLimpezaDoCarrinho` (4 testes) e
+`TestCartRepositoryClear` (1). Verificado removendo a limpeza do código: o teste
+falha, como deve. Também validado contra SQLite real que a deleção atinge apenas
+os itens do carrinho alvo e preserva carrinhos de outros usuários.
+
+> ❗ **Limitação conhecida:** o checkout limpa a sacola **inteira**, mesmo que
+> `data.items` contenha apenas parte dela. Hoje o frontend envia o carrinho
+> completo, então não há problema prático — mas se um dia o checkout aceitar
+> compra parcial ("comprar só este item"), a limpeza precisa remover apenas os
+> itens comprados, não todos.
+
+**Frontend já preparado para isso:** `frontend/Papiro/src/api/cart.js`
+concentra todas as chamadas e `src/api/adapters.js` traduz o shape da API
+(`product.title`, `price`, `image_url`) para o que os componentes esperam
+(`titulo`, `preco`, `imagem`). Quando o contrato mudar, a alteração fica
+localizada nesses dois arquivos.
 
 #### Pedidos – `/api/v1/orders`
 
@@ -1646,6 +1912,11 @@ type CheckoutFormData = z.infer<typeof checkoutSchema>;
 | Refresh Token TTL | 7 dias | Balanceia UX (não precisa logar toda hora) e segurança. |
 | Refresh Token rotação | Sim | Cada uso gera novo refresh token e invalida o anterior. |
 | Refresh Token storage | Cookie httpOnly, Secure, SameSite=Strict | Previne XSS (não acessível via JS) e CSRF (SameSite). |
+
+> ⚠️ **Pendência:** a tabela acima é o alvo. A implementação atual **ainda não**
+> tem refresh token, `/auth/refresh` nem `/auth/logout`, e o frontend guarda o
+> access token em `localStorage`. Ver **7.3 Estado Atual da Implementação** para o
+> diagnóstico completo e o checklist de migração. **Bloqueia ir para produção.**
 
 ### 13.2 Autorização (RBAC)
 

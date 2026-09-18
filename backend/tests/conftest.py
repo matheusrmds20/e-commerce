@@ -22,7 +22,36 @@ def user_repo():
 
 @pytest.fixture
 def product_repo():
-    return Mock(name="product_repo")
+    """Mock do ProductRepository com semântica de estoque real.
+
+    - ``get_by_id_for_update`` (leitura com ``FOR UPDATE``) é um alias de
+      ``get_by_id``: nos testes o banco é mockado e não há transação real, então
+      o lock é irrelevante.
+    - ``decrement_stock`` / ``restock`` **de fato alteram** ``stock_qty`` do
+      produto recebido. Sem isso os testes de baixa de estoque passariam sem
+      provar nada (um Mock que não muta o objeto esconde regressões).
+    """
+    repo = Mock(name="product_repo")
+    repo.get_by_id_for_update.side_effect = lambda product_id: (
+        repo.get_by_id(product_id)
+    )
+
+    def _decrement(product, quantity):
+        if product.stock_qty < quantity:
+            raise ValueError(
+                f"Estoque insuficiente para baixa: disponível "
+                f"{product.stock_qty}, solicitado {quantity}"
+            )
+        product.stock_qty -= quantity
+        return product
+
+    def _restock(product, quantity):
+        product.stock_qty += quantity
+        return product
+
+    repo.decrement_stock.side_effect = _decrement
+    repo.restock.side_effect = _restock
+    return repo
 
 
 @pytest.fixture
@@ -149,6 +178,7 @@ def order_service(
     coupon_repo,
     product_repo,
     user_repo,
+    cart_repo,
 ):
     with (
         patch("app.services.order_service.OrderRepository", return_value=order_repo),
@@ -157,6 +187,7 @@ def order_service(
         patch("app.services.order_service.CouponRepository", return_value=coupon_repo),
         patch("app.services.order_service.ProductRepository", return_value=product_repo),
         patch("app.services.order_service.UserRepository", return_value=user_repo),
+        patch("app.services.order_service.CartRepository", return_value=cart_repo),
     ):
         from app.services.order_service import OrderService
 

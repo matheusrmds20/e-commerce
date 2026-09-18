@@ -41,12 +41,9 @@ class ReviewService:
         if product is None:
             raise ValueError(f"No product found with id {product_id}")
 
-        reviews = self.repo.get_by_product_id(product_id)
-
-        if not reviews:
-            raise ValueError(f"No reviews found with product_id {product_id}")
-
-        return reviews
+        # Produto válido sem avaliações é um estado normal (lista vazia), não um
+        # erro. Retornar [] mantém o endpoint de listagem idempotente para a UI.
+        return self.repo.get_by_product_id(product_id)
 
     def get_by_rating(self, rating: int) -> list:
         reviews = self.repo.get_by_rating(rating)

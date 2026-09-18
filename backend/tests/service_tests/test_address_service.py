@@ -22,7 +22,6 @@ def make_address(**kwargs):
 
 def create_payload(**kwargs):
     fields = dict(
-        user_id=1,
         street="Rua A",
         number="10",
         neighborhood="Centro",
@@ -133,13 +132,18 @@ class TestCreate:
         assert created.street == "Rua A"
         assert created.zip_code == "01001000"
 
-    def test_user_id_mismatch(self, address_service, address_repo):
+    def test_owner_comes_from_argument_not_payload(self, address_service, address_repo):
+        """O dono é sempre o ``user_id`` recebido (do token), não do payload.
+
+        ``AddressCreate`` não tem mais ``user_id``; este teste garante que o
+        service persiste o endereço sob o usuário autenticado.
+        """
         address_repo.get_by_zip_code.return_value = None
+        address_repo.create.side_effect = lambda address: address
 
-        with pytest.raises(ValueError) as exc:
-            address_service.create(create_payload(user_id=2), 1)
+        result = address_service.create(create_payload(), 7)
 
-        assert str(exc.value) == "Address is not owned by user"
+        assert result.user_id == 7
 
     def test_zip_code_already_exists(self, address_service, address_repo):
         address_repo.get_by_zip_code.return_value = make_address()

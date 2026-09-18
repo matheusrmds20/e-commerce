@@ -1,122 +1,73 @@
 import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import './App.css'
+import Navbar from './components/Navbar'
+import Footer from './components/Footer'
+import Home from './pages/Home'
+import Login from './pages/Login'
+import DetalheLivro from './pages/DetalheLivro'
+import Carrinho from './pages/Carrinho'
+import Checkout from './pages/Checkout'
+import { useCart } from './context/cart-context'
 
-function App() {
-  const [count, setCount] = useState(0)
+const PAGINAS = ['home', 'detalhe', 'carrinho', 'checkout', 'login']
+
+/**
+ * App — alterna entre as páginas enquanto ainda não há roteador.
+ * Quando entrarmos com react-router, isto vira <Routes>.
+ */
+export default function App() {
+  const [pagina, setPagina] = useState('home')
+  const [produtoId, setProdutoId] = useState(null)
+
+  // Badge da sacola vem do carrinho real (API quando logado, memória se não).
+  const { totalItens } = useCart()
+
+  /** Abre a página de detalhe; sem id, cai no primeiro produto do catálogo. */
+  const abrirLivro = (id) => {
+    setProdutoId(typeof id === 'number' ? id : null)
+    setPagina('detalhe')
+  }
+
+  const renderizar = () => {
+    if (pagina === 'login') return <Login onEntrar={() => setPagina('home')} />
+    if (pagina === 'detalhe')
+      return <DetalheLivro productId={produtoId ?? 1} />
+    if (pagina === 'carrinho')
+      return (
+        <Carrinho
+          onCheckout={() => setPagina('checkout')}
+          onIrParaLogin={() => setPagina('login')}
+        />
+      )
+    if (pagina === 'checkout')
+      return <Checkout onIrParaLogin={() => setPagina('login')} />
+    return <Home onAbrirLivro={abrirLivro} />
+  }
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+    <div className="flex min-h-svh flex-col">
+      <Navbar onNavegar={setPagina} totalItens={totalItens} />
 
-      <div className="ticks"></div>
+      <div className="flex-1">{renderizar()}</div>
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
+      <Footer />
 
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
+      {/* Alternador temporário — remover ao adicionar o roteador */}
+      <nav className="fixed bottom-5 right-5 z-40 flex gap-1 bg-forest p-1 shadow-lg">
+        {PAGINAS.map((nome) => (
+          <button
+            key={nome}
+            type="button"
+            onClick={() => setPagina(nome)}
+            className={`px-4 py-2.5 font-body text-[0.62rem] uppercase tracking-[0.18em] transition-colors duration-300 ${
+              pagina === nome
+                ? 'bg-gold text-forest'
+                : 'text-cream-soft hover:bg-forest-soft'
+            }`}
+          >
+            {nome}
+          </button>
+        ))}
+      </nav>
+    </div>
   )
 }
-
-export default App

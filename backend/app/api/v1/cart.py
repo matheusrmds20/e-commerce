@@ -3,14 +3,18 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db
+from app.api.deps import get_db, get_current_user
 from app.schemas.cart import CartItemCreate, CartItemResponse, CartResponse
 from app.services.cart_service import CartService
+from app.models.user import User 
+
 
 cart_router = APIRouter()
 
 DbSession = Annotated[Session, Depends(get_db)]
-UserId = Annotated[int, Query(description="ID do usuário dono do carrinho")]
+UserDb = Annotated[User, Depends(get_current_user)]
+
+
 
 
 def get_cart_service(db: DbSession) -> CartService:
@@ -23,17 +27,18 @@ def get_cart_service(db: DbSession) -> CartService:
     status_code=status.HTTP_201_CREATED,
     summary="Cria um carrinho para o usuário",
 )
-def create_cart(user_id: UserId, db: DbSession) -> CartResponse:
-    return get_cart_service(db).create(user_id)
+def create_cart(user: UserDb, db: DbSession) -> CartResponse:
+    return get_cart_service(db).create(user.id)
 
 
 @cart_router.get(
-    "/list",
+    "/cart/me",
     response_model=CartResponse,
     summary="Busca o carrinho do usuário",
 )
-def get_user_cart(user_id: UserId, db: DbSession) -> CartResponse:
-    return get_cart_service(db).get_by_user_id(user_id)
+def get_user_cart(user: UserDb, db: DbSession) -> CartResponse:
+    return get_cart_service(db).get_by_user_id(user.id)
+
 
 
 @cart_router.get(
@@ -41,8 +46,9 @@ def get_user_cart(user_id: UserId, db: DbSession) -> CartResponse:
     response_model=CartResponse,
     summary="Busca um carrinho pelo ID",
 )
-def get_cart(cart_id: int, user_id: UserId, db: DbSession) -> CartResponse:
-    return get_cart_service(db).get_by_id(cart_id, user_id)
+def get_cart(cart_id: int, user: UserDb, db: DbSession) -> CartResponse:
+    return get_cart_service(db).get_by_id(cart_id, user.id)
+
 
 
 @cart_router.get(
@@ -50,8 +56,9 @@ def get_cart(cart_id: int, user_id: UserId, db: DbSession) -> CartResponse:
     response_model=list[CartItemResponse],
     summary="Lista os itens de um carrinho",
 )
-def get_cart_items(cart_id: int, user_id: UserId, db: DbSession) -> list:
-    return get_cart_service(db).get_with_items(cart_id, user_id)
+def get_cart_items(cart_id: int, user: UserDb, db: DbSession) -> list:
+    return get_cart_service(db).get_with_items(cart_id, user.id)
+
 
 
 @cart_router.post(
@@ -61,10 +68,10 @@ def get_cart_items(cart_id: int, user_id: UserId, db: DbSession) -> list:
     summary="Adiciona um item ao carrinho",
 )
 def add_cart_item(
-    cart_id: int, data: CartItemCreate, user_id: UserId, db: DbSession
+    cart_id: int, data: CartItemCreate, user: UserDb, db: DbSession
 ) -> CartItemResponse:
     return get_cart_service(db).add_item(
-        cart_id, user_id, data.product_id, data.quantity
+        cart_id, user.id, data.product_id, data.quantity
     )
 
 
@@ -76,11 +83,11 @@ def add_cart_item(
 def update_cart_item(
     cart_id: int,
     item_id: int,
-    quantity: Annotated[int, Query(ge=1, description="Nova quantidade")],
-    user_id: UserId,
+    quantity: int,
+    user: UserDb,
     db: DbSession,
 ) -> CartItemResponse:
-    return get_cart_service(db).update_item(cart_id, user_id, item_id, quantity)
+    return get_cart_service(db).update_item(cart_id, user.id, item_id, quantity)
 
 
 @cart_router.patch(
@@ -91,11 +98,11 @@ def update_cart_item(
 def decrease_cart_item(
     cart_id: int,
     item_id: int,
-    quantity: Annotated[int, Query(1, ge=1, description="Quantidade a diminuir")],
-    user_id: UserId,
+    user : UserDb,
     db: DbSession,
+    quantity: int ,
 ) -> CartItemResponse:
-    return get_cart_service(db).decrease_item(cart_id, user_id, item_id, quantity)
+    return get_cart_service(db).decrease_item(cart_id, user.id, item_id, quantity)
 
 
 @cart_router.delete(
@@ -104,9 +111,9 @@ def decrease_cart_item(
     summary="Remove um item do carrinho",
 )
 def remove_cart_item(
-    cart_id: int, item_id: int, user_id: UserId, db: DbSession
+    cart_id: int, item_id: int, user: UserDb, db: DbSession
 ) -> CartItemResponse:
-    return get_cart_service(db).remove_item(cart_id, user_id, item_id)
+    return get_cart_service(db).remove_item(cart_id, user.id, item_id)
 
 
 @cart_router.delete(
@@ -114,8 +121,9 @@ def remove_cart_item(
     response_model=CartResponse,
     summary="Esvazia um carrinho",
 )
-def clear_cart(cart_id: int, user_id: UserId, db: DbSession) -> CartResponse:
-    return get_cart_service(db).clear(cart_id, user_id)
+def clear_cart(cart_id: int, user: UserDb, db: DbSession) -> CartResponse:
+    return get_cart_service(db).clear(cart_id, user.id)
+
 
 
 @cart_router.delete(
@@ -123,6 +131,5 @@ def clear_cart(cart_id: int, user_id: UserId, db: DbSession) -> CartResponse:
     response_model=CartResponse,
     summary="Exclui um carrinho",
 )
-def delete_cart(cart_id: int, user_id: UserId, db: DbSession) -> CartResponse:
-    return get_cart_service(db).delete(cart_id, user_id)
-
+def delete_cart(cart_id: int, user: UserDb, db: DbSession) -> CartResponse:
+    return get_cart_service(db).delete(cart_id, user.id)

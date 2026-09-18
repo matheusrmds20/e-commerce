@@ -1,7 +1,8 @@
 from datetime import datetime
-from app.models.order import Order
+from app.models.order import Order, OrderStatus
 from app.models.coupon import DiscountType
 from app.repositories.address_repo import AddressRepository
+from app.repositories.cart_repo import CartRepository
 from app.repositories.coupon_repo import CouponRepository
 from app.repositories.order_item import OrderItemRepository
 from app.repositories.order_repo import OrderRepository
@@ -17,20 +18,38 @@ class OrderService:
         self.coupon_repo = CouponRepository(db)
         self.product_repo = ProductRepository(db)
         self.user_repo = UserRepository(db)
+        self.cart_repo = CartRepository(db)
         self.session = db
 
     def _update_items(self, order, items):
+        """Substitui os itens do pedido ajustando o estoque.
 
+        A edição de itens precisa reconciliar o inventário em dois passos:
+        1. **devolve** o estoque dos itens que existiam (eles saem do pedido);
+        2. **baixa** o estoque dos novos itens.
 
+        Sem isso, editar um pedido de 1 para 5 unidades baixaria 5 numa segunda
+        vez, dobrando o débito. Tudo dentro da mesma transação do `update`.
+        """
         existing_items = self.repo.get_with_items(order.id)
 
+        # 1. Devolve o estoque do que será substituído.
         for existing_item in existing_items:
+            product = self.product_repo.get_by_id_for_update(
+                existing_item.product_id
+            )
+
+            if product is not None:
+                self.product_repo.restock(product, existing_item.quantity)
+
             self.order_item_repo.delete_item(existing_item.id)
 
         order_items = []
+        baixas_de_estoque = []
 
         for item in items:
-            product = self.product_repo.get_by_id(item.product_id)
+            # FOR UPDATE: trava a linha do produto até o commit.
+            product = self.product_repo.get_by_id_for_update(item.product_id)
 
             if product is None:
                 raise ValueError(f"No product found with id {item.product_id}")
@@ -38,11 +57,20 @@ class OrderService:
             if not product.is_active:
                 raise ValueError(f"Product '{product.title}' is not active")
 
-            if product.stock_qty < item.quantity:
-                 raise ValueError(
+            # Soma o que já foi reservado para este mesmo produto em outra
+            # linha do payload.
+            ja_reservado = sum(
+                q for p, q in baixas_de_estoque if p.id == product.id
+            )
+
+            if product.stock_qty < item.quantity + ja_reservado:
+                raise ValueError(
                     f"Insufficient stock for '{product.title}'. "
-                    f"Available: {product.stock_qty}"
+                    f"Available: {product.stock_qty}, requested: "
+                    f"{item.quantity + ja_reservado}"
                 )
+
+            baixas_de_estoque.append((product, item.quantity))
 
             order_item = self.order_item_repo.create_order_item(
                 product_id=item.product_id,
@@ -52,6 +80,10 @@ class OrderService:
 
             order_item.order_id = order.id
             order_items.append(order_item)
+
+        # 2. Baixa o estoque dos novos itens.
+        for product, quantidade in baixas_de_estoque:
+            self.product_repo.decrement_stock(product, quantidade)
 
         return order_items
 
@@ -171,10 +203,20 @@ class OrderService:
             if not data.items:
                 raise ValueError("Order must have at least one item")
 
-            order_items = []
+            # Guarda os itens validados como (product_id, quantity, price).
+            # Eles só viram linhas de `order_items` DEPOIS que o pedido existe:
+            # `OrderItem.order_id` é NOT NULL e o repositório faz flush, então
+            # criar os itens antes do `Order` estoura IntegrityError.
+            itens_validados = []
+            # Guarda (produto, quantidade) para dar baixa no estoque só depois
+            # de TODAS as validações passarem — assim nenhum item é debitado se
+            # um item posterior do pedido falhar.
+            baixas_de_estoque = []
 
             for item in data.items:
-                product = self.product_repo.get_by_id(item.product_id)
+                # FOR UPDATE: impede que dois checkouts simultâneos validem o
+                # mesmo estoque e vendam o último exemplar duas vezes.
+                product = self.product_repo.get_by_id_for_update(item.product_id)
 
                 if product is None:
                     raise ValueError(f"No product found with id {item.product_id}")
@@ -188,19 +230,53 @@ class OrderService:
                         f"Available: {product.stock_qty}"
                     )
 
-                order_item = self.order_item_repo.create_order_item(
-                    product_id=item.product_id,
-                    quantity=item.quantity,
-                    price=product.price,
+                # Defesa contra o mesmo produto repetido em `items` (ex.: duas
+                # linhas do produto 5 com 3 e 4 unidades). Cada linha passaria
+                # na validação isoladamente, mas a baixa somaria 7.
+                ja_reservado = sum(
+                    q for p, q in baixas_de_estoque if p.id == product.id
                 )
 
-                order_items.append(order_item)
+                if product.stock_qty < item.quantity + ja_reservado:
+                    raise ValueError(
+                        f"Insufficient stock for '{product.title}'. "
+                        f"Available: {product.stock_qty}, requested: "
+                        f"{item.quantity + ja_reservado}"
+                    )
 
+                baixas_de_estoque.append((product, item.quantity))
 
+                itens_validados.append(
+                    {
+                        "product_id": item.product_id,
+                        "quantity": item.quantity,
+                        "price": product.price,
+                    }
+                )
 
             coupon = self._validate_coupon(data.coupon_id, data.items)
 
-            subtotal, discount_amount, shipping_cost, total = self._calculate_totals(order_items, coupon)
+            # `_calculate_totals` só lê `price` e `quantity` de cada item.
+            subtotal = sum(i["price"] * i["quantity"] for i in itens_validados)
+            discount_amount = 0.0
+
+            if coupon is not None:
+                if subtotal < (coupon.min_purchase or 0):
+                    raise ValueError(
+                        f"Coupon '{coupon.code}' requires a minimum purchase "
+                        f"of {coupon.min_purchase}"
+                    )
+
+                if coupon.discount_type == DiscountType.PERCENTAGE:
+                    discount_amount = subtotal * (coupon.discount_value / 100)
+                else:
+                    discount_amount = coupon.discount_value
+
+                if coupon.max_discount is not None:
+                    discount_amount = min(discount_amount, coupon.max_discount)
+
+            shipping_cost = 0.0
+            total = subtotal - discount_amount + shipping_cost
 
             order_data = Order(
                 user_id=user_id,
@@ -213,16 +289,53 @@ class OrderService:
                 total=total,
             )
 
-
+            # 1. O pedido precisa existir (e ter id) antes dos itens.
             order = self.repo.create(order_data)
+
+            # 2. Agora sim os itens, já com order_id e dentro da mesma transação.
+            order_items = []
+
+            for item in itens_validados:
+                order_item = self.order_item_repo.create_order_item(
+                    product_id=item["product_id"],
+                    quantity=item["quantity"],
+                    price=item["price"],
+                )
+                order_item.order_id = order.id
+                order_items.append(order_item)
 
             self.session.flush()
 
-            for order_item in order_items:
-                order_item.order_id = order.id
+            # Baixa de estoque — passo 17 do fluxo de checkout (seção 8.1).
+            # Ocorre dentro da mesma transação: qualquer erro posterior faz
+            # rollback do estoque junto com o pedido.
+            for product, quantidade in baixas_de_estoque:
+                self.product_repo.decrement_stock(product, quantidade)
 
+            # Limpa a sacola — passo 18 do fluxo de checkout (seção 8.1).
+            # Dentro da mesma transação: se algo falhar depois, o carrinho
+            # também volta ao estado anterior (rollback).
+            self._limpar_carrinho(user_id)
 
             return order
+
+    def _limpar_carrinho(self, user_id: int) -> None:
+        """Esvazia o carrinho do usuário após o checkout.
+
+        Sem isso, os itens permanecem na sacola e uma nova compra repetiria o
+        mesmo pedido. O carrinho em si é **mantido** (só os itens saem): o
+        modelo tem relação 1:1 com o usuário e `CartService.create` recusa um
+        segundo carrinho ("User already has a cart").
+
+        Ausência de carrinho não é erro: um checkout pode ter sido feito com
+        itens vindos do client, sem sacola persistida.
+        """
+        user = self.user_repo.get_by_id(user_id)
+
+        if user is None or user.cart is None:
+            return
+
+        self.cart_repo.clear(user.cart.id)
 
 
     def update(self, order_id: int, user_id: int, data) -> dict:
@@ -268,8 +381,26 @@ class OrderService:
 
             update_data = data.model_dump(exclude_unset=True, exclude={"items"})
 
+            status_anterior = order.status
+
             if update_data.get("status") is not None:
                 order.status = update_data.pop("status")
+
+            # R38: ao cancelar, o estoque é reposto (rollback de inventário).
+            # `OrderStatus.CANCELLED` é StrEnum, então compara com "cancelled".
+            virou_cancelado = (
+                status_anterior != OrderStatus.CANCELLED
+                and order.status == OrderStatus.CANCELLED
+            )
+
+            if virou_cancelado:
+                for order_item in order_items:
+                    product = self.product_repo.get_by_id_for_update(
+                        order_item.product_id
+                    )
+
+                    if product is not None:
+                        self.product_repo.restock(product, order_item.quantity)
 
             for field, value in update_data.items():
                 setattr(order, field, value)

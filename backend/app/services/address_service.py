@@ -63,9 +63,6 @@ class AddressService:
         with self.session.begin():
             address_already_exists = self.repo.get_by_zip_code(user_id, data.zip_code)
 
-            if data.user_id != user_id:
-                raise ValueError("Address is not owned by user")
-
             if address_already_exists:
                 raise ValueError(f"Address with zip_code {data.zip_code} already exists")
 

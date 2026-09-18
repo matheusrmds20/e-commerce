@@ -48,5 +48,6 @@ def login(data: LoginRequest, db: DbSession) -> TokenResponse:
 )
 def me(
     user: Annotated[User, Depends(get_current_user)],
+    db: DbSession,
 ) -> AuthResponse:
-    return get_auth_service(user.db).me(user)
+    return get_auth_service(db).me(user)

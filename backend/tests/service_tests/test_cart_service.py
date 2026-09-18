@@ -215,19 +215,42 @@ class TestAddItem:
 
         assert str(exc.value) == "No product found with id 99"
 
-    def test_insufficient_stock(self, cart_service, cart_repo, product_repo):
+    def test_insufficient_stock(self, cart_service, cart_repo, product_repo, cart_item_repo):
         cart_repo.get_by_id.return_value = make_cart()
         product_repo.get_by_id.return_value = make_product(stock_qty=1)
+        # Nada ainda na sacola — a validação compara o total pedido com o estoque.
+        cart_item_repo.get_by_cart_and_product.return_value = None
 
         with pytest.raises(ValueError) as exc:
             cart_service.add_item(1, 1, 1, 5)
 
-        assert str(exc.value) == "Insufficient stock for product 1"
+        assert "Insufficient stock for product 1" in str(exc.value)
+
+    def test_insufficient_stock_considera_o_que_ja_esta_na_sacola(
+        self, cart_service, cart_repo, product_repo, cart_item_repo
+    ):
+        """Estoque 3, 2 já na sacola, adicionar 2 → total 4 > 3, deve falhar.
+
+        Sem somar o que já existe, `quantity` (2) caberia no estoque e o item
+        ficaria com 4 unidades de um produto que só tem 3.
+        """
+        cart_repo.get_by_id.return_value = make_cart()
+        product_repo.get_by_id.return_value = make_product(stock_qty=3)
+        cart_item_repo.get_by_cart_and_product.return_value = make_cart_item(
+            quantity=2
+        )
+
+        with pytest.raises(ValueError) as exc:
+            cart_service.add_item(1, 1, 1, 2)
+
+        assert "requested: 4" in str(exc.value)
 
 
 class TestUpdateItem:
-    def test_success(self, cart_service, cart_repo, cart_item_repo):
+    def test_success(self, cart_service, cart_repo, cart_item_repo, product_repo):
         cart_repo.get_by_id.return_value = make_cart()
+        # Estoque de sobra para o novo valor pedido.
+        product_repo.get_by_id.return_value = make_product(stock_qty=100)
         item = make_cart_item()
         cart_item_repo.get_by_id.return_value = item
 
@@ -333,3 +356,80 @@ class TestDelete:
             cart_service.delete(1, 1)
 
         assert str(exc.value) == "Cart is not owned by user"
+
+
+class TestLockDeEstoque:
+    """Garante que a leitura do produto usa a versão com lock (FOR UPDATE).
+
+    Em produção, sem `FOR UPDATE`, dois `add_item` simultâneos leem o mesmo
+    `stock_qty` e ambos passam na validação (check-then-act race). Estes testes
+    travam o comportamento: o service deve chamar `get_by_id_for_update`, e não
+    a leitura simples.
+    """
+
+    def test_add_item_usa_leitura_com_lock(
+        self, cart_service, cart_repo, product_repo, cart_item_repo
+    ):
+        cart_repo.get_by_id.return_value = make_cart()
+        product_repo.get_by_id.return_value = make_product(stock_qty=10)
+        cart_item_repo.get_by_cart_and_product.return_value = None
+
+        cart_service.add_item(1, 1, 7, 1)
+
+        product_repo.get_by_id_for_update.assert_called_once_with(7)
+
+    def test_update_item_para_cima_usa_leitura_com_lock(
+        self, cart_service, cart_repo, cart_item_repo, product_repo
+    ):
+        cart_repo.get_by_id.return_value = make_cart()
+        cart_item_repo.get_by_id.return_value = make_cart_item(
+            product_id=7, quantity=1
+        )
+        product_repo.get_by_id.return_value = make_product(stock_qty=10)
+
+        cart_service.update_item(1, 1, 1, 5)
+
+        product_repo.get_by_id_for_update.assert_called_once_with(7)
+
+    def test_update_item_para_baixo_nao_precisa_de_lock(
+        self, cart_service, cart_repo, cart_item_repo, product_repo
+    ):
+        """Reduzir quantidade nunca esbarra no estoque — não vale travar a linha."""
+        cart_repo.get_by_id.return_value = make_cart()
+        cart_item_repo.get_by_id.return_value = make_cart_item(quantity=5)
+
+        cart_service.update_item(1, 1, 1, 2)
+
+        product_repo.get_by_id_for_update.assert_not_called()
+
+    def test_update_item_sem_estoque_suficiente(self, cart_service, cart_repo, cart_item_repo, product_repo):
+        cart_repo.get_by_id.return_value = make_cart()
+        cart_item_repo.get_by_id.return_value = make_cart_item(quantity=1)
+        product_repo.get_by_id.return_value = make_product(stock_qty=3)
+
+        with pytest.raises(ValueError) as exc:
+            cart_service.update_item(1, 1, 1, 10)
+
+        assert "Insufficient stock" in str(exc.value)
+
+
+class TestProductRepositoryLock:
+    """A query do repositório precisa emitir FOR UPDATE de verdade."""
+
+    def test_get_by_id_for_update_emite_for_update(self):
+        from unittest.mock import MagicMock
+
+        from app.repositories.product_repo import ProductRepository
+
+        session = MagicMock(name="session")
+        repo = ProductRepository(session)
+
+        repo.get_by_id_for_update(42)
+
+        # session.query(Product).filter(...).with_for_update().first()
+        chain = session.query.return_value.filter.return_value
+        assert chain.with_for_update.called, (
+            "get_by_id_for_update deve chamar .with_for_update() — sem isso o "
+            "lock não existe e a race condition de estoque volta."
+        )
+        assert chain.with_for_update.return_value.first.called
