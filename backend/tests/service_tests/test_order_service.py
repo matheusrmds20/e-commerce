@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 import pytest
 
 from app.models.address import Address
+from app.models.cart import Cart
 from app.models.coupon import Coupon, DiscountType
 from app.models.order import Order, OrderStatus
 from app.models.order_item import OrderItem
@@ -459,3 +460,301 @@ class TestDelete:
             order_service.delete(1, 1)
 
         assert str(exc.value) == "Order is not owned by user"
+
+
+class TestBaixaDeEstoque:
+    """Baixa de estoque no checkout e reposição no cancelamento.
+
+    Regras cobertas: passo 17 da seção 8.1 (decrementa estoque) e R38
+    (ao cancelar, estoque é reposto).
+    """
+
+    def _setup(
+        self, address_repo, product_repo, order_item_repo, order_repo, produto
+    ):
+        address_repo.get_by_id.return_value = make_address()
+        product_repo.get_by_id.return_value = produto
+        order_item_repo.create_order_item.return_value = make_order_item()
+        order_repo.create.return_value = make_order()
+
+    def test_create_baixa_estoque(
+        self, order_service, address_repo, product_repo, order_item_repo, order_repo
+    ):
+        produto = make_product(stock_qty=10)
+        self._setup(
+            address_repo, product_repo, order_item_repo, order_repo, produto
+        )
+
+        order_service.create(1, order_create_payload())
+
+        # Pedido de 2 unidades sobre estoque 10 → 8.
+        assert produto.stock_qty == 8
+        product_repo.decrement_stock.assert_called_once_with(produto, 2)
+
+    def test_create_sem_estoque_nao_baixa(
+        self, order_service, address_repo, product_repo, order_item_repo, order_repo
+    ):
+        """Estoque insuficiente interrompe ANTES de qualquer baixa."""
+        produto = make_product(stock_qty=1)
+        self._setup(
+            address_repo, product_repo, order_item_repo, order_repo, produto
+        )
+
+        with pytest.raises(ValueError):
+            order_service.create(1, order_create_payload())
+
+        assert produto.stock_qty == 1
+        product_repo.decrement_stock.assert_not_called()
+
+    def test_create_produto_repetido_soma_a_quantidade(
+        self, order_service, address_repo, product_repo, order_item_repo, order_repo
+    ):
+        """Duas linhas do MESMO produto não podem furar a validação.
+
+        Estoque 3, duas linhas de 2 unidades: cada uma passa isoladamente
+        (2 <= 3), mas o total é 4. Deve falhar.
+        """
+        produto = make_product(stock_qty=3)
+        self._setup(
+            address_repo, product_repo, order_item_repo, order_repo, produto
+        )
+
+        payload = order_create_payload(
+            items=[
+                OrderItemCreate(product_id=1, quantity=2),
+                OrderItemCreate(product_id=1, quantity=2),
+            ]
+        )
+
+        with pytest.raises(ValueError) as exc:
+            order_service.create(1, payload)
+
+        assert "requested: 4" in str(exc.value)
+        assert produto.stock_qty == 3
+        product_repo.decrement_stock.assert_not_called()
+
+    def test_cancelar_repõe_estoque(
+        self, order_service, order_repo, product_repo, order_item_repo
+    ):
+        """R38: cancelar o pedido devolve as unidades ao estoque."""
+        order = make_order(status=OrderStatus.PENDING)
+        order_repo.get_by_id.return_value = order
+        order_repo.get_with_items.return_value = [make_order_item(quantity=2)]
+
+        produto = make_product(stock_qty=8)
+        product_repo.get_by_id.return_value = produto
+
+        order_service.update(1, 1, OrderUpdate(status=OrderStatus.CANCELLED))
+
+        assert order.status == OrderStatus.CANCELLED
+        assert produto.stock_qty == 10
+        product_repo.restock.assert_called_once_with(produto, 2)
+
+    def test_cancelar_duas_vezes_nao_repõe_de_novo(
+        self, order_service, order_repo, product_repo
+    ):
+        """Já cancelado não pode repor de novo (senão o estoque infla)."""
+        order = make_order(status=OrderStatus.CANCELLED)
+        order_repo.get_by_id.return_value = order
+        order_repo.get_with_items.return_value = [make_order_item(quantity=2)]
+
+        produto = make_product(stock_qty=8)
+        product_repo.get_by_id.return_value = produto
+
+        # Transição cancelado → processing é bloqueada antes de tocar estoque.
+        with pytest.raises(ValueError):
+            order_service.update(1, 1, OrderUpdate(status=OrderStatus.PROCESSING))
+
+        assert produto.stock_qty == 8
+        product_repo.restock.assert_not_called()
+
+    def test_editar_itens_reconcilia_estoque(
+        self, order_service, order_repo, product_repo, order_item_repo
+    ):
+        """Trocar 1 unidade por 5 devolve 1 e baixa 5 — não baixa 5 duas vezes."""
+        order = make_order()
+        order_repo.get_by_id.return_value = order
+        order_repo.get_with_items.return_value = [make_order_item(quantity=1)]
+
+        produto = make_product(stock_qty=10)
+        product_repo.get_by_id.return_value = produto
+        order_item_repo.create_order_item.return_value = make_order_item(quantity=5)
+
+        order_service.update(
+            1, 1, OrderUpdate(items=[OrderItemCreate(product_id=1, quantity=5)])
+        )
+
+        # 10 + 1 (devolvido) - 5 (novo) = 6
+        assert produto.stock_qty == 6
+        product_repo.restock.assert_called_once_with(produto, 1)
+        product_repo.decrement_stock.assert_called_once_with(produto, 5)
+
+
+class TestLimpezaDoCarrinho:
+    """Passo 18 do fluxo de checkout (seção 8.1): a sacola é esvaziada.
+
+    Sem isso os itens permanecem e uma nova compra repetiria o mesmo pedido.
+    """
+
+    def _setup(
+        self, address_repo, product_repo, order_item_repo, order_repo, user_repo, cart
+    ):
+        address_repo.get_by_id.return_value = make_address()
+        product_repo.get_by_id.return_value = make_product(stock_qty=10)
+        order_item_repo.create_order_item.return_value = make_order_item()
+        order_repo.create.return_value = make_order()
+
+        usuario = make_user()
+        usuario.cart = cart
+        user_repo.get_by_id.return_value = usuario
+        return usuario
+
+    def test_create_limpa_o_carrinho_do_usuario(
+        self,
+        order_service,
+        address_repo,
+        product_repo,
+        order_item_repo,
+        order_repo,
+        user_repo,
+        cart_repo,
+    ):
+        cart = Cart(id=99, user_id=1)
+        self._setup(
+            address_repo, product_repo, order_item_repo, order_repo, user_repo, cart
+        )
+
+        order_service.create(1, order_create_payload())
+
+        # Limpa pelo id do carrinho do usuário, não por um id qualquer.
+        cart_repo.clear.assert_called_once_with(99)
+
+    def test_create_sem_carrinho_nao_quebra(
+        self,
+        order_service,
+        address_repo,
+        product_repo,
+        order_item_repo,
+        order_repo,
+        user_repo,
+        cart_repo,
+    ):
+        """Checkout sem sacola persistida é válido e não deve explodir."""
+        self._setup(
+            address_repo,
+            product_repo,
+            order_item_repo,
+            order_repo,
+            user_repo,
+            cart=None,
+        )
+
+        order_service.create(1, order_create_payload())
+
+        cart_repo.clear.assert_not_called()
+
+    def test_create_usuario_inexistente_nao_quebra_limpeza(
+        self,
+        order_service,
+        address_repo,
+        product_repo,
+        order_item_repo,
+        order_repo,
+        user_repo,
+        cart_repo,
+    ):
+        address_repo.get_by_id.return_value = make_address()
+        product_repo.get_by_id.return_value = make_product(stock_qty=10)
+        order_item_repo.create_order_item.return_value = make_order_item()
+        order_repo.create.return_value = make_order()
+        user_repo.get_by_id.return_value = None
+
+        order_service.create(1, order_create_payload())
+
+        cart_repo.clear.assert_not_called()
+
+    def test_falha_no_checkout_nao_limpa_o_carrinho(
+        self,
+        order_service,
+        address_repo,
+        product_repo,
+        order_item_repo,
+        order_repo,
+        user_repo,
+        cart_repo,
+    ):
+        """Estoque insuficiente aborta antes da limpeza — a sacola é preservada."""
+        cart = Cart(id=99, user_id=1)
+        self._setup(
+            address_repo,
+            product_repo,
+            order_item_repo,
+            order_repo,
+            user_repo,
+            cart,
+        )
+        product_repo.get_by_id.return_value = make_product(stock_qty=1)
+
+        with pytest.raises(ValueError):
+            order_service.create(1, order_create_payload())
+
+        cart_repo.clear.assert_not_called()
+
+
+class TestCartRepositoryClear:
+    """O `clear` do repositório precisa deletar por cart_id."""
+
+    def test_clear_deleta_por_cart_id(self):
+        from unittest.mock import MagicMock
+
+        from app.repositories.cart_repo import CartRepository
+
+        session = MagicMock(name="session")
+        repo = CartRepository(session)
+        session.query.return_value.filter.return_value.delete.return_value = 3
+
+        removidos = repo.clear(42)
+
+        assert removidos == 3
+        assert session.query.return_value.filter.return_value.delete.called
+
+
+class TestProductRepositoryEstoque:
+    """O repositório deve baixar/repor e nunca deixar estoque negativo."""
+
+    def test_decrement_stock_reduz(self):
+        from unittest.mock import MagicMock
+
+        from app.repositories.product_repo import ProductRepository
+
+        repo = ProductRepository(MagicMock(name="session"))
+        produto = make_product(stock_qty=10)
+
+        repo.decrement_stock(produto, 3)
+
+        assert produto.stock_qty == 7
+
+    def test_decrement_stock_nao_permite_negativo(self):
+        from unittest.mock import MagicMock
+
+        from app.repositories.product_repo import ProductRepository
+
+        repo = ProductRepository(MagicMock(name="session"))
+        produto = make_product(stock_qty=2)
+
+        with pytest.raises(ValueError):
+            repo.decrement_stock(produto, 5)
+
+        assert produto.stock_qty == 2
+
+    def test_restock_aumenta(self):
+        from unittest.mock import MagicMock
+
+        from app.repositories.product_repo import ProductRepository
+
+        repo = ProductRepository(MagicMock(name="session"))
+        produto = make_product(stock_qty=2)
+
+        repo.restock(produto, 5)
+
+        assert produto.stock_qty == 7

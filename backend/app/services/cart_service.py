@@ -100,18 +100,25 @@ class CartService:
             if cart.user_id != user_id:
                 raise ValueError("Cart is not owned by user")
 
-            product = self.product_repo.get_by_id(product_id)
+            product = self.product_repo.get_by_id_for_update(product_id)
 
             if not product:
                 raise ValueError(f"No product found with id {product_id}")
 
-            if product.stock_qty < quantity:
-                raise ValueError(f"Insufficient stock for product {product_id}")
-
             cart_item = self.cart_item_repo.get_by_cart_and_product(cart_id, product_id)
 
+
+            quantidade_atual = cart_item.quantity if cart_item else 0
+            quantidade_total = quantidade_atual + quantity
+
+            if product.stock_qty < quantidade_total:
+                raise ValueError(
+                    f"Insufficient stock for product {product_id}. "
+                    f"Available: {product.stock_qty}, requested: {quantidade_total}"
+                )
+
             if cart_item:
-                return self._update_cart(cart_item, cart_item.quantity + quantity)
+                return self._update_cart(cart_item, quantidade_total)
 
             cart_item_added = self.cart_item_repo.add_item(cart_id, product_id, quantity)
 
@@ -133,32 +140,20 @@ class CartService:
 
             if not cart_item:
                 raise ValueError(f"No cart item found with id {item_id}")
-            
+
+            if quantity > cart_item.quantity:
+                product = self.product_repo.get_by_id_for_update(cart_item.product_id)
+
+                if product and product.stock_qty < quantity:
+                    raise ValueError(
+                        f"Insufficient stock for product {cart_item.product_id}. "
+                        f"Available: {product.stock_qty}, requested: {quantity}"
+                    )
 
             self.cart_item_repo.update_quantity(cart_item, quantity)
 
             return cart_item
 
-    def decrease_item(self, cart_id: int, user_id: int, item_id: int, quantity: int):
-        with self.session.begin():
-
-            cart = self.cart_repo.get_by_id(cart_id)
-
-            if not cart:
-                raise ValueError(f"No cart found with id {cart_id}")
-
-            if cart.user_id != user_id:
-                raise ValueError("Cart is not owned by user")
-
-            cart_item = self.cart_item_repo.get_by_id(item_id)
-
-            if not cart_item:
-                raise ValueError(f"No cart item found with id {item_id}")
-
-
-            self.cart_item_repo.decrease_quantity(cart_item, quantity)
-
-            return cart_item
 
 
     def remove_item(self, cart_id: int, user_id: int, item_id: int):
@@ -181,6 +176,32 @@ class CartService:
 
             self.cart_item_repo.delete(cart_item)
             return cart_item
+
+    def decrease_item(self, cart_id: int, user_id: int, item_id: int, quantity: int):
+        with self.session.begin():
+
+            cart = self.cart_repo.get_by_id(cart_id)
+
+            if not cart:
+                raise ValueError(f"No cart found with id {cart_id}")
+
+            if cart.user_id != user_id:
+                raise ValueError("Cart is not owned by user")
+
+            cart_item = self.cart_item_repo.get_by_id(item_id)
+
+            if not cart_item:
+                raise ValueError(f"No cart item found with id {item_id}")
+
+
+            if cart_item.quantity - quantity <= 0:
+                self.cart_item_repo.delete(cart_item)
+                return cart_item
+
+            self.cart_item_repo.decrease_quantity(cart_item, quantity)
+
+            return cart_item
+
 
     def clear(self, cart_id: int, user_id: int):
         with self.session.begin():

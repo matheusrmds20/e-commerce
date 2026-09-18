@@ -109,10 +109,8 @@ class TestGet:
         product_repo.get_by_id.return_value = make_product()
         review_repo.get_by_product_id.return_value = []
 
-        with pytest.raises(ValueError) as exc:
-            review_service.get_by_product_id(1)
-
-        assert str(exc.value) == "No reviews found with product_id 1"
+        # Produto válido sem avaliações devolve lista vazia (não é erro).
+        assert review_service.get_by_product_id(1) == []
 
     def test_get_by_rating_success(self, review_service, review_repo):
         reviews = [make_review()]

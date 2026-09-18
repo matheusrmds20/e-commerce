@@ -9,6 +9,41 @@ class ProductRepository(BaseRepository[Product]):
     def __init__(self, db: Session) -> None:
         super().__init__(Product, db)
 
+    def get_by_id_for_update(self, product_id: int) -> Product | None:
+
+        return (
+            self.session.query(Product)
+            .filter(Product.id == product_id)
+            .with_for_update()
+            .first()
+        )
+
+    def decrement_stock(self, product: Product, quantity: int) -> Product:
+
+        if quantity < 0:
+            raise ValueError("A quantidade a baixar não pode ser negativa")
+
+        novo_saldo = product.stock_qty - quantity
+
+        if novo_saldo < 0:
+            raise ValueError(
+                f"Estoque insuficiente para baixa: disponível "
+                f"{product.stock_qty}, solicitado {quantity}"
+            )
+
+        product.stock_qty = novo_saldo
+        self.session.add(product)
+        return product
+
+    def restock(self, product: Product, quantity: int) -> Product:
+
+        if quantity < 0:
+            raise ValueError("A quantidade a repor não pode ser negativa")
+
+        product.stock_qty = product.stock_qty + quantity
+        self.session.add(product)
+        return product
+
     def get_by_category_id(self, category_id: int) -> list[Product]:
         return self.session.query(Product).filter(Product.category_id == category_id).all()
 
