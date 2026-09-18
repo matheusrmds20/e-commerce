@@ -165,14 +165,19 @@ export function CartProvider({ children }) {
     await recarregar()
   }, [userId, idDoCarrinho, recarregar])
 
-  /** Recomendações do catálogo, excluindo o que já está na sacola. */
+  /**
+   * Recomendações do catálogo, excluindo o que já está na sacola.
+   *
+   * O filtro e o limite agora acontecem no servidor
+   * (`GET /products/recommendations?exclude=...&limit=...`). Antes, esta função
+   * baixava o catálogo INTEIRO e filtrava em memória — e como ela é recriada a
+   * cada mudança de `itens`, o catálogo era rebaixado toda vez que o usuário
+   * adicionava ou removia um produto.
+   */
   const recomendados = useCallback(async (limite = 4) => {
-    const produtos = await productService.listar()
-    const naSacola = new Set(itens.map((i) => i.productId))
-    return produtos
-      .filter((p) => p.is_active && !naSacola.has(p.id))
-      .slice(0, limite)
-      .map(produtoParaRecomendacao)
+    const naSacola = itens.map((i) => i.productId)
+    const produtos = await productService.recomendacoes(naSacola, limite)
+    return produtos.map(produtoParaRecomendacao)
   }, [itens])
 
   const totalItens = useMemo(

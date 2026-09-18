@@ -6,9 +6,10 @@ import Login from './pages/Login'
 import DetalheLivro from './pages/DetalheLivro'
 import Carrinho from './pages/Carrinho'
 import Checkout from './pages/Checkout'
+import Acervo from './pages/Acervo'
 import { useCart } from './context/cart-context'
 
-const PAGINAS = ['home', 'detalhe', 'carrinho', 'checkout', 'login']
+const PAGINAS = ['home', 'acervo', 'detalhe', 'carrinho', 'checkout', 'login']
 
 /**
  * App — alterna entre as páginas enquanto ainda não há roteador.
@@ -29,6 +30,7 @@ export default function App() {
 
   const renderizar = () => {
     if (pagina === 'login') return <Login onEntrar={() => setPagina('home')} />
+    if (pagina === 'acervo') return <Acervo onAbrirLivro={abrirLivro} />
     if (pagina === 'detalhe')
       return <DetalheLivro productId={produtoId ?? 1} />
     if (pagina === 'carrinho')
@@ -40,7 +42,7 @@ export default function App() {
       )
     if (pagina === 'checkout')
       return <Checkout onIrParaLogin={() => setPagina('login')} />
-    return <Home onAbrirLivro={abrirLivro} />
+    return <Home onAbrirLivro={abrirLivro} onExplorarAcervo={() => setPagina('acervo')} />
   }
 
   return (

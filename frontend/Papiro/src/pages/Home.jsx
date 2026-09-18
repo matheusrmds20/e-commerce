@@ -20,7 +20,7 @@ import { carregarHome } from '../api/home'
  *
  * Navbar e Footer ficam no App, compartilhados por todas as páginas.
  */
-export default function Home({ onAbrirLivro }) {
+export default function Home({ onAbrirLivro, onExplorarAcervo }) {
   const [dados, setDados] = useState(null)
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState(null)
@@ -73,8 +73,13 @@ export default function Home({ onAbrirLivro }) {
     )
   }
 
-  const { catalogo = [], ofertas = [], categorias = [], recomendacao = null } =
-    dados ?? {}
+  const {
+    catalogo = [],
+    destaques = [],
+    ofertas = [],
+    categorias = [],
+    recomendacao = null,
+  } = dados ?? {}
 
   return (
     <main>
@@ -85,10 +90,12 @@ export default function Home({ onAbrirLivro }) {
         onAbrirLivro={onAbrirLivro}
       />
       <LivrosDestaque
-        livros={catalogo}
+        livros={destaques}
+        categoriaIds={catalogo}
         categorias={categorias}
         carregando={carregando}
         onAbrirLivro={onAbrirLivro}
+        onExplorarAcervo={onExplorarAcervo}
       />
       <ProximaLeitura colecoes={categorias} carregando={carregando} />
       <RecomendacaoDestaque

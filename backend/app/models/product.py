@@ -25,6 +25,12 @@ class Product(Base):
     stock_qty = Column(Integer, nullable=False)
     image_url = Column(String(500), nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
+    is_featured = Column(
+        Boolean, default=False, server_default="false", nullable=False
+    )
+    is_bestseller = Column(
+        Boolean, default=False, server_default="false", nullable=False
+    )
     created_at = Column(DateTime, nullable=False, default=datetime.now)
     updated_at = Column(DateTime, nullable=False, default=datetime.now)
 

@@ -75,12 +75,13 @@ class ProductService:
         return products
 
     def get_by_discount_pct(self, discount_pct: int) -> list:
-        products = self.repo.get_by_discount_pct(discount_pct)
+        """Produtos com desconto de pelo menos `discount_pct`.
 
-        if not products:
-            raise ValueError(f"No products found with discount_pct {discount_pct}")
-
-        return products
+        Não levanta erro quando vazio: "nenhum produto em promoção" é um estado
+        normal de catálogo, e o carrossel da Home deve receber `[]` (200) em vez
+        de estourar 500.
+        """
+        return self.repo.get_by_discount_pct(discount_pct)
 
     def get_by_stock_qty(self, stock_qty: int) -> list:
         products = self.repo.get_by_stock_qty(stock_qty)
@@ -97,6 +98,67 @@ class ProductService:
             raise ValueError(f"No products found with is_active {is_active}")
 
         return products
+
+    def get_featured(self, limit: int | None = None) -> list:
+        """Produtos em destaque para a vitrine.
+
+        Diferente dos demais `get_by_*`, NÃO levanta erro quando a lista está
+        vazia: "nenhum destaque marcado" é um estado normal de curadoria, e a
+        Home deve receber `[]` (HTTP 200) em vez de 400.
+        """
+        return self.repo.get_featured(limit)
+
+    def get_bestsellers(self, limit: int | None = None) -> list:
+        """Produtos mais vendidos (curadoria manual) para a vitrine.
+
+        Mesma regra de `get_featured`: lista vazia é resposta válida.
+        """
+        return self.repo.get_bestsellers(limit)
+
+    def get_recommendations(
+        self,
+        exclude_ids: list[int] | None = None,
+        limit: int = 4,
+    ) -> list:
+        """Recomendações para o carrinho.
+
+        Não levanta erro quando vazio (catálogo pequeno ou tudo já na sacola):
+        o carrinho apenas não mostra a seção de recomendados.
+        """
+        return self.repo.get_recommendations(exclude_ids, limit)
+
+    def get_paginated(
+        self,
+        page: int = 1,
+        per_page: int = 20,
+        category_id: int | None = None,
+    ) -> dict:
+        """Catálogo paginado no formato do envelope `Page[T]`.
+
+        Retorna `{"data": [...], "meta": {...}}`. A paginação e o filtro por
+        categoria acontecem no banco (`WHERE` + `offset`/`limit`), então o custo
+        não cresce com o tamanho do catálogo.
+
+        Quando `category_id` é informado, a categoria precisa existir: um id
+        inválido é erro do cliente (404), não um catálogo vazio.
+        """
+        if category_id is not None:
+            categoria = self.category_repo.get_by_id(category_id)
+            if categoria is None:
+                raise ValueError(f"No category found with id {category_id}")
+
+        items, total = self.repo.paginate(page, per_page, category_id)
+        total_pages = (total + per_page - 1) // per_page if per_page else 0
+
+        return {
+            "data": items,
+            "meta": {
+                "page": page,
+                "per_page": per_page,
+                "total": total,
+                "total_pages": total_pages,
+            },
+        }
 
     def get_all(self) -> list:
         products = self.repo.get_all()
@@ -132,6 +194,11 @@ class ProductService:
                     price=data.price,
                     image_url=data.image_url,
                     is_active=data.is_active,
+                    # Flags de curadoria da vitrine. Sem repassar aqui, o admin
+                    # não conseguiria marcar um produto e `/products/featured`
+                    # ficaria sempre vazio.
+                    is_featured=data.is_featured,
+                    is_bestseller=data.is_bestseller,
                     author=data.author,
                     isbn=data.isbn,
                     publisher=data.publisher,

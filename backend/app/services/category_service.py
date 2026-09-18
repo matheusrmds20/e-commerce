@@ -35,7 +35,7 @@ class CategoryService:
     def get_all(self) -> list:
         categories = self.repo.get_all()
 
-        if not categories:
+        if categories is None:
             raise ValueError("No categories found")
 
         return categories

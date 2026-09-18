@@ -321,3 +321,241 @@ class TestDeleteProduct:
             response = client.delete(f"{PREFIX}/delete/999")
 
         assert_error(response, 404, "PRODUCT_NOT_FOUND")
+
+
+class TestFeaturedProducts:
+    """Rota /products/featured — vitrine de destaques da Home.
+
+    Regra de contrato: lista vazia é 200 com [] (ausência de curadoria não é
+    erro), diferente das demais listagens que devolvem 400/500 quando vazias.
+    """
+
+    def test_featured_success(self, client):
+        svc = Mock(name="product_service")
+        svc.get_featured.return_value = [
+            product_payload(is_featured=True),
+            product_payload(id=2, is_featured=True, is_bestseller=True),
+        ]
+
+        with patch("app.api.v1.products.get_product_service", return_value=svc):
+            response = client.get(f"{PREFIX}/featured")
+
+        assert response.status_code == 200
+        body = response.json()
+        assert len(body) == 2
+        assert all(item["is_featured"] for item in body)
+
+    def test_featured_empty_is_200(self, client):
+        """Sem destaques marcados: 200 com lista vazia, não erro."""
+        svc = Mock(name="product_service")
+        svc.get_featured.return_value = []
+
+        with patch("app.api.v1.products.get_product_service", return_value=svc):
+            response = client.get(f"{PREFIX}/featured")
+
+        assert response.status_code == 200
+        assert response.json() == []
+
+    def test_featured_passes_limit(self, client):
+        svc = Mock(name="product_service")
+        svc.get_featured.return_value = [product_payload(is_featured=True)]
+
+        with patch("app.api.v1.products.get_product_service", return_value=svc):
+            response = client.get(f"{PREFIX}/featured?limit=3")
+
+        assert response.status_code == 200
+        svc.get_featured.assert_called_once_with(3)
+
+    def test_featured_invalid_limit(self, client):
+        assert_validation_error(client.get(f"{PREFIX}/featured?limit=0"))
+        assert_validation_error(client.get(f"{PREFIX}/featured?limit=101"))
+
+
+class TestBestsellerProducts:
+    """Rota /products/bestsellers — vitrine de mais vendidos da Home."""
+
+    def test_bestsellers_success(self, client):
+        svc = Mock(name="product_service")
+        svc.get_bestsellers.return_value = [product_payload(is_bestseller=True)]
+
+        with patch("app.api.v1.products.get_product_service", return_value=svc):
+            response = client.get(f"{PREFIX}/bestsellers")
+
+        assert response.status_code == 200
+        body = response.json()
+        assert len(body) == 1
+        assert body[0]["is_bestseller"] is True
+
+    def test_bestsellers_empty_is_200(self, client):
+        svc = Mock(name="product_service")
+        svc.get_bestsellers.return_value = []
+
+        with patch("app.api.v1.products.get_product_service", return_value=svc):
+            response = client.get(f"{PREFIX}/bestsellers")
+
+        assert response.status_code == 200
+        assert response.json() == []
+
+    def test_bestsellers_passes_limit(self, client):
+        svc = Mock(name="product_service")
+        svc.get_bestsellers.return_value = []
+
+        with patch("app.api.v1.products.get_product_service", return_value=svc):
+            response = client.get(f"{PREFIX}/bestsellers?limit=5")
+
+        assert response.status_code == 200
+        svc.get_bestsellers.assert_called_once_with(5)
+
+    def test_bestsellers_invalid_limit(self, client):
+        assert_validation_error(client.get(f"{PREFIX}/bestsellers?limit=200"))
+
+
+class TestPaginatedProducts:
+    """Rota /products/paginated — envelope { data, meta } (PageMeta)."""
+
+    def test_paginated_success(self, client):
+        svc = Mock(name="product_service")
+        svc.get_paginated.return_value = {
+            "data": [product_payload()],
+            "meta": {"page": 1, "per_page": 20, "total": 1, "total_pages": 1},
+        }
+
+        with patch("app.api.v1.products.get_product_service", return_value=svc):
+            response = client.get(f"{PREFIX}/paginated")
+
+        assert response.status_code == 200
+        body = response.json()
+        assert len(body["data"]) == 1
+        assert body["meta"]["total"] == 1
+        assert body["meta"]["total_pages"] == 1
+
+    def test_paginated_defaults(self, client):
+        svc = Mock(name="product_service")
+        svc.get_paginated.return_value = {
+            "data": [],
+            "meta": {"page": 1, "per_page": 20, "total": 0, "total_pages": 0},
+        }
+
+        with patch("app.api.v1.products.get_product_service", return_value=svc):
+            client.get(f"{PREFIX}/paginated")
+
+        svc.get_paginated.assert_called_once_with(1, 20, None)
+
+    def test_paginated_passes_params(self, client):
+        svc = Mock(name="product_service")
+        svc.get_paginated.return_value = {
+            "data": [],
+            "meta": {"page": 3, "per_page": 5, "total": 0, "total_pages": 0},
+        }
+
+        with patch("app.api.v1.products.get_product_service", return_value=svc):
+            response = client.get(f"{PREFIX}/paginated?page=3&per_page=5")
+
+        assert response.status_code == 200
+        svc.get_paginated.assert_called_once_with(3, 5, None)
+
+    def test_paginated_with_category_filter(self, client):
+        """`category_id` deve chegar ao serviço para filtrar antes de paginar."""
+        svc = Mock(name="product_service")
+        svc.get_paginated.return_value = {
+            "data": [],
+            "meta": {"page": 1, "per_page": 20, "total": 0, "total_pages": 0},
+        }
+
+        with patch("app.api.v1.products.get_product_service", return_value=svc):
+            response = client.get(f"{PREFIX}/paginated?category_id=7")
+
+        assert response.status_code == 200
+        svc.get_paginated.assert_called_once_with(1, 20, 7)
+
+    def test_paginated_invalid_category_id(self, client):
+        assert_validation_error(client.get(f"{PREFIX}/paginated?category_id=0"))
+
+    def test_paginated_category_not_found(self, client):
+        """Categoria inexistente é 404 (erro do cliente), não lista vazia."""
+        svc = Mock(name="product_service")
+        svc.get_paginated.side_effect = ValueError("No category found with id 999")
+
+        with patch("app.api.v1.products.get_product_service", return_value=svc):
+            response = client.get(f"{PREFIX}/paginated?category_id=999")
+
+        assert_error(response, 404, "CATEGORY_NOT_FOUND")
+
+    def test_paginated_empty_is_200(self, client):
+        """Catálogo vazio: 200 com data [] e meta zerado, não erro."""
+        svc = Mock(name="product_service")
+        svc.get_paginated.return_value = {
+            "data": [],
+            "meta": {"page": 1, "per_page": 20, "total": 0, "total_pages": 0},
+        }
+
+        with patch("app.api.v1.products.get_product_service", return_value=svc):
+            response = client.get(f"{PREFIX}/paginated")
+
+        assert response.status_code == 200
+        assert response.json()["data"] == []
+
+    def test_paginated_invalid_page(self, client):
+        assert_validation_error(client.get(f"{PREFIX}/paginated?page=0"))
+
+    def test_paginated_per_page_above_limit(self, client):
+        assert_validation_error(client.get(f"{PREFIX}/paginated?per_page=101"))
+
+
+class TestRecommendations:
+    """Rota /products/recommendations — usada pelo carrinho."""
+
+    def test_recommendations_success(self, client):
+        svc = Mock(name="product_service")
+        svc.get_recommendations.return_value = [product_payload()]
+
+        with patch("app.api.v1.products.get_product_service", return_value=svc):
+            response = client.get(f"{PREFIX}/recommendations")
+
+        assert response.status_code == 200
+        assert len(response.json()) == 1
+
+    def test_recommendations_parses_exclude(self, client):
+        """`exclude=1,2,3` deve virar [1, 2, 3] para o serviço."""
+        svc = Mock(name="product_service")
+        svc.get_recommendations.return_value = []
+
+        with patch("app.api.v1.products.get_product_service", return_value=svc):
+            response = client.get(f"{PREFIX}/recommendations?exclude=1,2,3&limit=4")
+
+        assert response.status_code == 200
+        svc.get_recommendations.assert_called_once_with([1, 2, 3], 4)
+
+    def test_recommendations_ignores_garbage_in_exclude(self, client):
+        """Ids inválidos não podem derrubar a chamada."""
+        svc = Mock(name="product_service")
+        svc.get_recommendations.return_value = []
+
+        with patch("app.api.v1.products.get_product_service", return_value=svc):
+            response = client.get(f"{PREFIX}/recommendations?exclude=1,abc,3")
+
+        assert response.status_code == 200
+        svc.get_recommendations.assert_called_once_with([1, 3], 4)
+
+    def test_recommendations_without_exclude(self, client):
+        svc = Mock(name="product_service")
+        svc.get_recommendations.return_value = []
+
+        with patch("app.api.v1.products.get_product_service", return_value=svc):
+            client.get(f"{PREFIX}/recommendations")
+
+        svc.get_recommendations.assert_called_once_with([], 4)
+
+    def test_recommendations_empty_is_200(self, client):
+        svc = Mock(name="product_service")
+        svc.get_recommendations.return_value = []
+
+        with patch("app.api.v1.products.get_product_service", return_value=svc):
+            response = client.get(f"{PREFIX}/recommendations")
+
+        assert response.status_code == 200
+        assert response.json() == []
+
+    def test_recommendations_invalid_limit(self, client):
+        assert_validation_error(client.get(f"{PREFIX}/recommendations?limit=0"))
+        assert_validation_error(client.get(f"{PREFIX}/recommendations?limit=51"))

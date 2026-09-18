@@ -16,6 +16,8 @@ def make_product(**kwargs):
         price=50.0,
         stock_qty=10,
         is_active=True,
+        is_featured=False,
+        is_bestseller=False,
     )
     fields.update(kwargs)
     return Product(**fields)
@@ -108,7 +110,8 @@ def test_get_list_success(product_service, product_repo, method, repo_method, lo
         ("get_by_publisher", "get_by_publisher", "Editora X", "No products found with publisher 'Editora X'"),
         ("get_by_publication_year", "get_by_publication_year", 2020, "No products found with publication_year 2020"),
         ("get_by_language", "get_by_language", "pt-BR", "No products found with language 'pt-BR'"),
-        ("get_by_discount_pct", "get_by_discount_pct", 10, "No products found with discount_pct 10"),
+        # `get_by_discount_pct` NÃO entra aqui: lista vazia é resposta válida
+        # (ausência de promoção não é erro). Coberto em TestVitrine.
         ("get_by_stock_qty", "get_by_stock_qty", 5, "No products found with stock_qty 5"),
         ("get_by_is_active", "get_by_is_active", True, "No products found with is_active True"),
         ("get_all", "get_all", None, "No products found"),
@@ -231,3 +234,187 @@ class TestDelete:
             product_service.delete(1)
 
         assert str(exc.value) == "No product found with id 1"
+
+
+class TestVitrine:
+    """Métodos de vitrine: get_featured e get_bestsellers.
+
+    Contrato diferente dos demais `get_by_*`: lista vazia NÃO é erro. A Home
+    deve receber [] para renderizar o estado vazio, em vez de estourar 400.
+    """
+
+    @pytest.mark.parametrize(
+        "method,repo_method",
+        [
+            ("get_featured", "get_featured"),
+            ("get_bestsellers", "get_bestsellers"),
+        ],
+    )
+    def test_vitrine_success(self, product_service, product_repo, method, repo_method):
+        products = [make_product(is_featured=True)]
+        getattr(product_repo, repo_method).return_value = products
+
+        result = getattr(product_service, method)()
+
+        assert result == products
+
+    @pytest.mark.parametrize(
+        "method,repo_method",
+        [
+            ("get_featured", "get_featured"),
+            ("get_bestsellers", "get_bestsellers"),
+        ],
+    )
+    def test_vitrine_empty_returns_list(self, product_service, product_repo, method, repo_method):
+        """Vazio é resposta válida — não deve levantar ValueError."""
+        getattr(product_repo, repo_method).return_value = []
+
+        result = getattr(product_service, method)()
+
+        assert result == []
+
+    @pytest.mark.parametrize(
+        "method,repo_method",
+        [
+            ("get_featured", "get_featured"),
+            ("get_bestsellers", "get_bestsellers"),
+        ],
+    )
+    def test_vitrine_passes_limit(self, product_service, product_repo, method, repo_method):
+        getattr(product_repo, repo_method).return_value = []
+
+        getattr(product_service, method)(3)
+
+        getattr(product_repo, repo_method).assert_called_once_with(3)
+
+
+class TestPaginacao:
+    """get_paginated: envelope { data, meta } com total_pages calculado."""
+
+    def test_paginated_meta(self, product_service, product_repo):
+        product_repo.paginate.return_value = ([make_product()], 45)
+
+        result = product_service.get_paginated(page=2, per_page=20)
+
+        assert result["meta"] == {
+            "page": 2,
+            "per_page": 20,
+            "total": 45,
+            "total_pages": 3,
+        }
+        assert len(result["data"]) == 1
+        product_repo.paginate.assert_called_once_with(2, 20, None)
+
+    def test_paginated_total_pages_arredonda_para_cima(
+        self, product_service, product_repo
+    ):
+        """41 itens com 20 por página = 3 páginas (não 2)."""
+        product_repo.paginate.return_value = ([], 41)
+
+        result = product_service.get_paginated(page=1, per_page=20)
+
+        assert result["meta"]["total_pages"] == 3
+
+    def test_paginated_exato_nao_cria_pagina_extra(
+        self, product_service, product_repo
+    ):
+        """40 itens com 20 por página = exatamente 2 páginas."""
+        product_repo.paginate.return_value = ([], 40)
+
+        result = product_service.get_paginated(page=1, per_page=20)
+
+        assert result["meta"]["total_pages"] == 2
+
+    def test_paginated_vazio(self, product_service, product_repo):
+        product_repo.paginate.return_value = ([], 0)
+
+        result = product_service.get_paginated(page=1, per_page=20)
+
+        assert result["data"] == []
+        assert result["meta"]["total_pages"] == 0
+
+
+class TestRecommendations:
+    """get_recommendations: lista vazia é resposta válida."""
+
+    def test_recommendations_success(self, product_service, product_repo):
+        product_repo.get_recommendations.return_value = [make_product()]
+
+        result = product_service.get_recommendations([1, 2], 4)
+
+        assert len(result) == 1
+        product_repo.get_recommendations.assert_called_once_with([1, 2], 4)
+
+    def test_recommendations_empty_returns_list(
+        self, product_service, product_repo
+    ):
+        product_repo.get_recommendations.return_value = []
+
+        assert product_service.get_recommendations([], 4) == []
+
+
+class TestPaginacaoComFiltro:
+    """get_paginated com category_id: filtra no banco e valida a categoria."""
+
+    def test_paginated_passa_category_id(
+        self, product_service, product_repo, category_repo
+    ):
+        category_repo.get_by_id.return_value = make_category()
+        product_repo.paginate.return_value = ([], 0)
+
+        product_service.get_paginated(page=1, per_page=12, category_id=3)
+
+        product_repo.paginate.assert_called_once_with(1, 12, 3)
+
+    def test_paginated_total_reflete_o_filtro(
+        self, product_service, product_repo, category_repo
+    ):
+        """`total` deve vir do filtro, senão total_pages anunciaria páginas extras."""
+        category_repo.get_by_id.return_value = make_category()
+        # 13 itens NA CATEGORIA, com 12 por página = 2 páginas.
+        product_repo.paginate.return_value = ([make_product()], 13)
+
+        result = product_service.get_paginated(page=1, per_page=12, category_id=3)
+
+        assert result["meta"]["total"] == 13
+        assert result["meta"]["total_pages"] == 2
+
+    def test_paginated_categoria_inexistente_levanta(
+        self, product_service, category_repo
+    ):
+        category_repo.get_by_id.return_value = None
+
+        with pytest.raises(ValueError) as exc:
+            product_service.get_paginated(page=1, per_page=12, category_id=999)
+
+        assert "No category found with id 999" in str(exc.value)
+
+    def test_paginated_sem_filtro_nao_valida_categoria(
+        self, product_service, product_repo, category_repo
+    ):
+        product_repo.paginate.return_value = ([], 0)
+
+        product_service.get_paginated(page=1, per_page=12)
+
+        category_repo.get_by_id.assert_not_called()
+
+
+class TestDesconto:
+    """get_by_discount_pct: filtro mínimo (>=) e vazio não é erro.
+
+    Antes o service levantava ValueError quando não encontrava nada, e a rota
+    devolvia 500. Como a Home chama `/products/discount/1`, o carrossel de
+    promoções quebrava sempre que nenhum produto tinha desconto.
+    """
+
+    def test_desconto_vazio_retorna_lista(self, product_service, product_repo):
+        product_repo.get_by_discount_pct.return_value = []
+
+        assert product_service.get_by_discount_pct(50) == []
+
+    def test_desconto_repassa_o_minimo(self, product_service, product_repo):
+        product_repo.get_by_discount_pct.return_value = [make_product()]
+
+        product_service.get_by_discount_pct(15)
+
+        product_repo.get_by_discount_pct.assert_called_once_with(15)

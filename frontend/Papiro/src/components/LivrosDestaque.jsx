@@ -6,32 +6,43 @@ import { formatarPreco } from '../api/adapters'
 /**
  * LivrosDestaque — Seção de Livros em Destaque com filtros por categoria.
  *
- * Dados vêm da Home (`catalogo` = produtos ativos; `categorias` = categorias da
- * API, já normalizadas). Os filtros são montados dinamicamente a partir das
- * categorias que realmente possuem livros no catálogo, precedidos por "Todos".
- * Isso evita botões de filtro que não retornam resultado.
+ * Dados:
+ * - `livros`: os itens exibidos na grade. Vêm da curadoria (`is_featured`) ou,
+ *   quando a curadoria está vazia, do fallback montado em `home.js`.
+ * - `categoriaIds`: catálogo completo, usado só para decidir **quais filtros de
+ *   categoria aparecem**. Sem ele, um destaque de uma categoria sem outros
+ *   livros criaria um filtro que não leva a lugar nenhum.
+ * - `categorias`: nomes/ids das categorias.
  *
- * O backend não expõe um conceito de "destaque"; a seção mostra os primeiros
- * itens do catálogo ativo (a ordem de `GET /products/list`).
+ * Quando a lista exibida veio da curadoria, cada card ganha o selo
+ * "Curadoria" — assim a flag do backend fica visível na interface.
  */
 const LIMITE_DESTAQUES = 8
 
 export default function LivrosDestaque({
   livros = [],
+  categoriaIds = [],
   categorias = [],
   carregando = false,
   onAbrirLivro,
+  onExplorarAcervo,
 }) {
   const [categoriaAtiva, setCategoriaAtiva] = useState('Todos')
 
-  // Só categorias com ao menos um livro no catálogo viram filtro.
+  // Se os itens exibidos têm a flag de curadoria, mostramos o selo.
+  const daCuradoria = livros.some((l) => l.destaque)
+
+  // Só categorias com ao menos um livro NO CATÁLOGO viram filtro — o filtro
+  // precisa apontar para resultados que existem de fato.
   const filtros = useMemo(() => {
-    const idsComLivros = new Set(livros.map((l) => l.categoriaId))
+    const idsComLivros = new Set(
+      (categoriaIds.length ? categoriaIds : livros).map((l) => l.categoriaId),
+    )
     const nomes = categorias
       .filter((c) => idsComLivros.has(c.id))
       .map((c) => c.titulo)
     return ['Todos', ...nomes]
-  }, [livros, categorias])
+  }, [livros, categoriaIds, categorias])
 
   // Garante que um filtro selecionado que sumiu do catálogo volte para "Todos".
   const filtroAtivo = filtros.includes(categoriaAtiva)
@@ -117,6 +128,7 @@ export default function LivrosDestaque({
                 }
                 image={book.imagem}
                 tint="bg-coffee"
+                badge={daCuradoria && book.destaque ? 'Curadoria' : null}
                 onAbrir={onAbrirLivro}
               />
             ))}
@@ -152,7 +164,7 @@ export default function LivrosDestaque({
           <div className="mt-14 text-center">
             <button
               type="button"
-              onClick={() => onAbrirLivro?.(livros[0]?.id)}
+              onClick={() => onExplorarAcervo?.()}
               className="group inline-flex items-center gap-3 rounded-sm border border-forest bg-forest px-8 py-4 font-body text-xs font-semibold uppercase tracking-[0.22em] text-cream-soft shadow-md transition-all duration-300 hover:bg-forest-soft hover:shadow-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest"
             >
               <span>Explorar todo o acervo</span>

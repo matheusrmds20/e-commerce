@@ -12,6 +12,8 @@ class ProductCreate(BaseModel):
     price: float = Field(..., ge=0, description="Preço do produto")
     image_url: str | None = Field(None, max_length=500, description="URL da imagem do produto")
     is_active: bool = Field(True, description="Ativo")
+    is_featured: bool = Field(False, description="Destaque")
+    is_bestseller: bool = Field(False, description="Melhor vendido")
     author: str = Field(..., min_length=3, max_length=255, description="Autor do produto")
     isbn: str | None = Field(None, max_length=20, description="ISBN do produto")
     publisher: str | None = Field(None, max_length=150, description="Editora do produto")
@@ -40,6 +42,8 @@ class ProductUpdate(BaseModel):
     price: float | None = Field(None, ge=0)
     image_url: str | None = Field(None, max_length=500)
     is_active: bool | None = None
+    is_featured: bool | None = None
+    is_bestseller: bool | None = None
     author: str | None = Field(None, min_length=3, max_length=255)
     isbn: str | None = Field(None, max_length=20)
     publisher: str | None = Field(None, max_length=150)
@@ -60,6 +64,10 @@ class ProductResponse(BaseModel):
     price: float
     image_url: str | None
     is_active: bool
+    # Defaults para manter o contrato retrocompatível: payloads que ainda não
+    # enviam as flags de curadoria continuam válidos (produto sem destaque).
+    is_featured: bool = False
+    is_bestseller: bool = False
     author: str
     isbn: str | None
     publisher: str | None

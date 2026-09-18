@@ -10,6 +10,7 @@ export default function BookCard({
   oldPrice,
   image,
   tint = 'bg-coffee',
+  badge = null,
   onAbrir,
 }) {
   return (
@@ -31,6 +32,13 @@ export default function BookCard({
             className="h-full w-full object-cover transition-transform duration-700 ease-[var(--ease-cozy)] group-hover:scale-[1.04]"
             loading="lazy"
           />
+
+          {/* Selo de curadoria (ex.: produto marcado como destaque na API) */}
+          {badge && (
+            <span className="absolute left-3 top-3 z-10 rounded-sm bg-forest/95 px-2.5 py-1 font-body text-[0.65rem] font-semibold uppercase tracking-[0.16em] text-cream-soft shadow-sm backdrop-blur-sm">
+              {badge}
+            </span>
+          )}
 
           {/* Véu ao passar o mouse */}
           <div className="absolute inset-0 bg-forest/0 transition-colors duration-500 group-hover:bg-forest/25" />
