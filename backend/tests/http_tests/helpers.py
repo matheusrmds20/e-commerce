@@ -25,6 +25,8 @@ def product_payload(**overrides):
         "price": 59.9,
         "image_url": None,
         "is_active": True,
+        "is_featured": False,
+        "is_bestseller": False,
         "author": "Robert C. Martin",
         "isbn": "9780132350884",
         "publisher": "Prentice Hall",

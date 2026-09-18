@@ -7,11 +7,18 @@ import { mediaAvaliacoes } from './adapters'
 /**
  * Composição dos dados da Home a partir dos endpoints existentes.
  *
- * O backend não possui um endpoint dedicado de vitrine (`/home`), então a
- * página monta as seções assim:
+ * A página monta as seções assim:
  *
- * - **Catálogo base:** `GET /products/list` → alimenta os Livros em Destaque,
- *   as Coleções (categorias) e a Recomendação da Casa.
+ * - **Catálogo base:** `GET /products/list` (via `/products/active/true`)
+ *   → alimenta as Coleções (categorias), o fallback de destaques e a
+ *   Recomendação da Casa.
+ * - **Destaques:** `GET /products/featured` (`is_featured = true`) → alimenta
+ *   a grade "Livros em Destaque". Se a curadoria não marcou nada (200 com
+ *   `[]`), cai no fallback: os primeiros itens do catálogo. Isso mantém a Home
+ *   apresentável em ambiente sem curadoria, sem esconder a seção.
+ * - **Mais vendidos:** `GET /products/bestsellers` (`is_bestseller = true`)
+ *   → exposto em `maisVendidos` para uso futuro. Sem fallback: se vazio, é
+ *   porque nada foi marcado.
  * - **Ofertas:** `GET /products/discount/{pct}` → alimenta o carrossel de
  *   Promoções. Se nenhum produto tiver desconto, o carrossel fica vazio.
  * - **Categorias:** `GET /categories/list` → alimenta as Coleções.
@@ -23,15 +30,19 @@ import { mediaAvaliacoes } from './adapters'
  * - Catálogo vazio → seções caem para estado vazio explícito.
  *
  * @typedef {Object} HomeData
- * @property {Array} catalogo        ProductResponse[] ativos
- * @property {Array} ofertas         ProductResponse[] com desconto
- * @property {Array} categorias      CategoryResponse[]
- * @property {Object|null} recomendacao { produto, avaliacoes }
- * @property {Object|null} erro      Erro global (só quando o catálogo falha)
+ * @property {Array} catalogo        ProductResponse[] ativos (normalizados)
+ * @property {Array} destaques       grade de destaques (curadoria ou fallback)
+ * @property {Array} maisVendidos    curadoria de mais vendidos (pode ser [])
+ * @property {Array} ofertas         produtos com desconto
+ * @property {Array} categorias      CategoryResponse[] enriquecidas com `total`
+ * @property {Object|null} recomendacao { produto, avaliacoes, notaMedia }
  */
 
 /** Número mínimo de desconto (%) para um produto entrar no carrossel. */
 const DESCONTO_MINIMO = 1
+
+/** Limite da grade de destaques da Home. */
+const LIMITE_DESTAQUES = 8
 
 /**
  * Normaliza um produto do catálogo para o shape dos cards da Home.
@@ -55,6 +66,10 @@ export function produtoParaCard(p) {
     imagem: p.image_url ?? '',
     estoque: p.stock_qty ?? 0,
     ativo: p.is_active ?? true,
+    // Flags de curadoria — usadas para rotular os cards e priorizar a
+    // recomendação da casa (um destaque é melhor vitrine que um item comum).
+    destaque: p.is_featured ?? false,
+    maisVendido: p.is_bestseller ?? false,
     criadoEm: p.created_at ?? null,
   }
 }
@@ -75,8 +90,16 @@ export function categoriaParaColecao(c) {
  * @returns {Promise<HomeData>}
  */
 export async function carregarHome() {
-  const [catalogoResp, ofertasResp, categoriasResp] = await Promise.allSettled([
+  const [
+    catalogoResp,
+    destaquesResp,
+    maisVendidosResp,
+    ofertasResp,
+    categoriasResp,
+  ] = await Promise.allSettled([
     productService.listarPorAtivo(true),
+    productService.listarDestaques(LIMITE_DESTAQUES),
+    productService.listarMaisVendidos(LIMITE_DESTAQUES),
     productService.listarPorDesconto(DESCONTO_MINIMO),
     categoryService.listar(),
   ])
@@ -87,6 +110,32 @@ export async function carregarHome() {
   }
 
   const catalogo = (catalogoResp.value ?? []).map(produtoParaCard)
+
+  // Destaques: usa a curadoria (`is_featured`). Quando ela não cobre nada,
+  // cai no fallback dos primeiros itens do catálogo para a grade não ficar
+  // vazia. Falha na chamada também degrada para o fallback.
+  const destaquesCuradoria =
+    destaquesResp.status === 'fulfilled' && destaquesResp.value?.length
+      ? destaquesResp.value.map(produtoParaCard)
+      : null
+
+  const destaques =
+    destaquesCuradoria ?? catalogo.slice(0, LIMITE_DESTAQUES)
+
+  // Mais vendidos: só curadoria, sem fallback (não há como inferir).
+  const maisVendidos =
+    maisVendidosResp.status === 'fulfilled'
+      ? (maisVendidosResp.value ?? []).map(produtoParaCard)
+      : []
+
+  // Ordenação da grade: dentro dos destaques, os mais vendidos vêm primeiro.
+  // Isso dá uso à segunda flag sem criar uma seção nova na Home.
+  const idsMaisVendidos = new Set(maisVendidos.map((p) => p.id))
+  const destaquesOrdenados = [...destaques].sort((a, b) => {
+    const aTop = idsMaisVendidos.has(a.id) ? 0 : 1
+    const bTop = idsMaisVendidos.has(b.id) ? 0 : 1
+    return aTop - bTop
+  })
 
   // Ofertas: usa o endpoint de desconto; se vazio, deriva do próprio catálogo.
   const ofertasBrutas =
@@ -114,20 +163,46 @@ export async function carregarHome() {
           .filter((c) => c.total > 0)
       : []
 
-  // Recomendação da Casa: primeiro item do catálogo + nota média real.
-  const recomendacao = await montarRecomendacao(catalogo)
+  // Recomendação da Casa: prefere um destaque com estoque — é a melhor
+  // vitrine. Sem destaques marcados, cai no primeiro item com estoque.
+  const recomendacao = await montarRecomendacao(destaques, catalogo)
 
-  return { catalogo, ofertas, categorias, recomendacao }
+  return {
+    catalogo,
+    destaques: destaquesOrdenados,
+    maisVendidos,
+    ofertas,
+    categorias,
+    recomendacao,
+  }
 }
 
 /**
  * Escolhe um produto e busca as avaliações para calcular a média.
  * Nunca lança: falha de avaliações vira `avaliacoes: []` e nota 0.
+ *
+ * Ordem de preferência: destaque com estoque → destaque → item com estoque →
+ * primeiro do catálogo.
+ *
+ * @param {Array} destaques
  * @param {Array} catalogo
  */
-async function montarRecomendacao(catalogo) {
+async function montarRecomendacao(destaques, catalogo) {
+  // `destaques` normalmente é um subconjunto do catálogo; sem deduplicar, os
+  // mesmos produtos apareceriam duas vezes na lista de candidatos.
+  const vistos = new Set()
+  const candidatos = [...destaques, ...catalogo].filter((p) => {
+    if (vistos.has(p.id)) return false
+    vistos.add(p.id)
+    return true
+  })
+
   const produto =
-    catalogo.find((p) => p.estoque > 0) ?? catalogo[0] ?? null
+    candidatos.find((p) => p.destaque && p.estoque > 0) ??
+    candidatos.find((p) => p.destaque) ??
+    candidatos.find((p) => p.estoque > 0) ??
+    candidatos[0] ??
+    null
   if (!produto) return null
 
   let avaliacoes

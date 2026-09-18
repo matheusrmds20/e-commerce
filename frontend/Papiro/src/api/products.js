@@ -71,6 +71,75 @@ export const productService = {
       return data
     })
   },
+
+  /**
+   * Lista os produtos em destaque da vitrine (`is_featured = true`).
+   *
+   * Diferença de contrato em relação às demais listagens: o backend responde
+   * 200 com `[]` quando não há destaques marcados — lista vazia NÃO é erro.
+   * Por isso, aqui não usamos `listarOuVazio`; um 200 vazio já é a resposta
+   * esperada e o fallback é responsabilidade do chamador (`home.js`).
+   * @param {number} [limite] 1..100
+   */
+  async listarDestaques(limite) {
+    const { data } = await api.get('/products/featured', {
+      params: limite ? { limit: limite } : undefined,
+    })
+    return data ?? []
+  },
+
+  /**
+   * Lista os produtos mais vendidos da vitrine (`is_bestseller = true`).
+   * Mesmo contrato de `listarDestaques`: vazio é 200 com `[]`.
+   * @param {number} [limite] 1..100
+   */
+  async listarMaisVendidos(limite) {
+    const { data } = await api.get('/products/bestsellers', {
+      params: limite ? { limit: limite } : undefined,
+    })
+    return data ?? []
+  },
+
+  /**
+   * Catálogo paginado — envelope `{ data, meta }`.
+   *
+   * `meta` traz `page`, `per_page`, `total` e `total_pages`, permitindo montar
+   * a navegação sem uma segunda chamada de contagem. Quando `categoryId` é
+   * informado, o backend filtra **antes** de paginar, então `meta.total`
+   * reflete a categoria e não o catálogo inteiro.
+   *
+   * @param {{page?: number, perPage?: number, categoryId?: number}} [opcoes]
+   * @returns {Promise<{data: Array, meta: object}>}
+   */
+  async listarPaginado({ page = 1, perPage = 20, categoryId } = {}) {
+    const { data } = await api.get('/products/paginated', {
+      params: {
+        page,
+        per_page: perPage,
+        ...(categoryId ? { category_id: categoryId } : {}),
+      },
+    })
+    return data
+  },
+
+  /**
+   * Recomendações para o carrinho, já filtradas no servidor.
+   *
+   * Substitui o padrão de baixar o catálogo inteiro e filtrar em memória:
+   * o `exclude` evita rebaixar produtos que já estão na sacola.
+   *
+   * @param {Array<number>} [excludeIds] ids a excluir (itens já na sacola)
+   * @param {number} [limite] 1..50
+   */
+  async recomendacoes(excludeIds = [], limite = 4) {
+    const { data } = await api.get('/products/recommendations', {
+      params: {
+        ...(excludeIds.length ? { exclude: excludeIds.join(',') } : {}),
+        limit: limite,
+      },
+    })
+    return data ?? []
+  },
 }
 
 export default productService
