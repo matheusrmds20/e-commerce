@@ -9,6 +9,7 @@ from app.api.v1.coupons import coupon_router
 from app.api.v1.wishlist import wishlist_router
 from app.api.v1.auth import auth_router
 from app.api.v1.reviews import review_router
+from app.api.v1.admin import admin_router
 
 router = APIRouter()
 
@@ -22,3 +23,4 @@ router.include_router(coupon_router, prefix="/coupons", tags=["coupons"])
 router.include_router(wishlist_router, prefix="/wishlists", tags=["wishlists"])
 router.include_router(auth_router, prefix="/auth", tags=["auth"])
 router.include_router(review_router, prefix="/reviews", tags=["reviews"])
+router.include_router(admin_router, prefix="/admin", tags=["admin"])

@@ -45,6 +45,18 @@ export const orderService = {
     const { data } = await api.get(`/orders/items/${orderId}`)
     return data
   },
+
+  /** Atualiza um pedido (ex: status). */
+  async atualizar(orderId, updateData) {
+    const { data } = await api.patch(`/orders/update/${orderId}`, updateData)
+    return data
+  },
+
+  /** Exclui um pedido. */
+  async excluir(orderId) {
+    const { data } = await api.delete(`/orders/delete/${orderId}`)
+    return data
+  },
 }
 
 export default orderService
