@@ -8,7 +8,7 @@ from app.api.router import router
 
 app = FastAPI()
 
-# CORS — libera o dev server do Vite (e o preview) para chamar a API.
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -22,7 +22,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Handlers globais: converte exceções da app em { error: { code, message } }
+
 register_exception_handlers(app)
 
 

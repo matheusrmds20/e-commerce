@@ -41,13 +41,7 @@ def client():
 
 @pytest.fixture
 def patch_service():
-    """Retorna um helper que patcheia o factory de serviço de uma rota.
 
-    Uso:
-        svc = Mock(name="auth_service")
-        with patch_service("auth", "get_auth_service", svc):
-            response = client.post(...)
-    """
     from unittest.mock import patch
 
     def _patch_service(module: str, factory: str, service: Mock):

@@ -159,8 +159,21 @@ export default function Navbar({ onNavegar, totalItens = 0 }) {
                 <button
                   type="button"
                   role="menuitem"
+                  onClick={() => {
+                    setContaOpen(false)
+                    onNavegar?.('admin')
+                  }}
+                  className="mt-1.5 w-full px-3 py-2.5 text-left font-body text-[0.82rem] font-medium tracking-wide text-coffee transition-colors duration-300 hover:bg-forest-soft/10 hover:text-gold flex items-center justify-between"
+                >
+                  <span>Painel Administrativo</span>
+                  <span className="text-[0.65rem] uppercase tracking-wider px-1.5 py-0.5 bg-forest text-cream rounded">Curadoria</span>
+                </button>
+
+                <button
+                  type="button"
+                  role="menuitem"
                   onClick={handleSair}
-                  className="mt-1.5 w-full px-3 py-2.5 text-left font-body text-[0.82rem] font-medium tracking-wide text-coffee-soft transition-colors duration-300 hover:bg-forest-soft/10 hover:text-gold"
+                  className="w-full px-3 py-2 text-left font-body text-[0.82rem] font-medium tracking-wide text-coffee-soft transition-colors duration-300 hover:bg-forest-soft/10 hover:text-gold border-t border-line mt-1"
                 >
                   Sair da conta
                 </button>
@@ -257,13 +270,25 @@ export default function Navbar({ onNavegar, totalItens = 0 }) {
                     {usuario?.email}
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={handleSair}
-                  className="self-start border-b border-line pb-1 font-body text-[0.8rem] font-semibold uppercase tracking-[0.18em] text-coffee-soft transition-colors duration-300 hover:border-gold hover:text-gold"
-                >
-                  Sair da conta
-                </button>
+                <div className="flex flex-col gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMenuOpen(false)
+                      onNavegar?.('admin')
+                    }}
+                    className="self-start font-body text-[0.8rem] font-semibold uppercase tracking-[0.18em] text-forest transition-colors duration-300 hover:text-gold"
+                  >
+                    Painel Administrativo
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSair}
+                    className="self-start border-b border-line pb-1 font-body text-[0.8rem] font-semibold uppercase tracking-[0.18em] text-coffee-soft transition-colors duration-300 hover:border-gold hover:text-gold"
+                  >
+                    Sair da conta
+                  </button>
+                </div>
               </div>
             ) : (
               <div className="flex flex-col gap-4">

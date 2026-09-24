@@ -140,6 +140,25 @@ export const productService = {
     })
     return data ?? []
   },
+
+  /** Cria um novo produto no acervo. */
+  async criar(produtoData) {
+    const { data } = await api.post('/products/create', produtoData)
+    return data
+  },
+
+  /** Atualiza um produto existente. */
+  async atualizar(productId, produtoData) {
+    const { data } = await api.patch(`/products/update/${productId}`, produtoData)
+    return data
+  },
+
+  /** Exclui um produto do acervo. */
+  async excluir(productId) {
+    const { data } = await api.delete(`/products/delete/${productId}`)
+    return data
+  },
 }
 
 export default productService
+
