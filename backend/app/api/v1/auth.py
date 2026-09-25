@@ -12,10 +12,12 @@ from app.schemas.auth import (
     TokenResponse,
 )
 from app.services.auth_service import AuthService
+from fastapi.security import OAuth2PasswordRequestForm
 
 auth_router = APIRouter()
 
 DbSession = Annotated[Session, Depends(get_db)]
+
 
 
 def get_auth_service(db: DbSession) -> AuthService:
@@ -34,11 +36,12 @@ def register(data: RegisterRequest, db: DbSession) -> AuthResponse:
 
 @auth_router.post(
     "/login",
-    response_model=TokenResponse,
+    response_model=None,
     summary="Autentica um usuário e retorna o token de acesso",
 )
-def login(data: LoginRequest, db: DbSession) -> TokenResponse:
-    return get_auth_service(db).login(data)
+def login(form_data: OAuth2PasswordRequestForm = Depends(), db: DbSession = None) -> TokenResponse:
+    return get_auth_service(db).login(form_data)
+
 
 
 @auth_router.get(

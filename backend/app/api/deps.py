@@ -62,15 +62,6 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # A query acima abriu uma transação implícita (SQLAlchemy 2.x autobegin).
-    # Vários services chamam `with session.begin()` no mesmo `db`; sem encerrar
-    # aqui, o begin estoura "A transaction is already begun on this Session" e
-    # a rota devolve 500.
-    #
-    # `expunge` desliga o objeto da sessão e `rollback` fecha a transação de
-    # leitura. A ordem importa: sem o expunge, o rollback expira os atributos e
-    # o próximo `user.id` (no router) reabriria uma transação, reproduzindo o
-    # problema. O `id` já está em memória, então segue acessível.
     db.expunge(user)
     db.rollback()
 

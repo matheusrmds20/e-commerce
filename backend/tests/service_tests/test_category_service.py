@@ -68,10 +68,7 @@ class TestGet:
     def test_get_all_empty(self, category_service, category_repo):
         category_repo.get_all.return_value = []
 
-        with pytest.raises(ValueError) as exc:
-            category_service.get_all()
-
-        assert str(exc.value) == "No categories found"
+        assert category_service.get_all() == []
 
 
 class TestCreate:

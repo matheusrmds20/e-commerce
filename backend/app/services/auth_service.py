@@ -12,6 +12,7 @@ from app.repositories.user_repo import UserRepository
 from app.schemas.auth import AuthResponse, LoginRequest, RegisterRequest, TokenResponse
 
 
+
 class AuthService:
     def __init__(self, db: Session) -> None:
         self.user_repo = UserRepository(db)
@@ -37,7 +38,7 @@ class AuthService:
 
 
     def login(self, data) -> TokenResponse:
-        user = self.user_repo.get_by_email(data.email)
+        user = self.user_repo.get_by_email(data.username)
         
         if user is None or not verify_password(data.password, user.password_hash):
             raise InvalidCredentialsException()
