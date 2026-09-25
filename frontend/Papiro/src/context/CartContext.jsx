@@ -60,7 +60,7 @@ export function CartProvider({ children }) {
       const id = await garantirCarrinho()
       const carrinho = await cartService.obter()
       setCartId(id)
-      setItens(itensParaView(carrinho.items))
+      setItens(itensParaView(carrinho.cart_items))
     } catch (error) {
       setErro(error)
       setItens([])

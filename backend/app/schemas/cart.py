@@ -40,7 +40,7 @@ class CartUpdate(BaseModel):
 class CartResponse(BaseModel):
     id: int
     user_id: int
-    items: list[CartItemResponse] = Field(default_factory=list)
+    cart_items: list[CartItemResponse]
     created_at: datetime
     updated_at: datetime
 
