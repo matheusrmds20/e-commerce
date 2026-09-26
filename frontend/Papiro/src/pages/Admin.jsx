@@ -165,7 +165,6 @@ export default function Admin({ onVoltarParaLoja }) {
   const [clientes, setClientes] = useState(CLIENTES_FALLBACK)
   const [categorias, setCategorias] = useState([])
   const [statsApi, setStatsApi] = useState(null)
-  const [carregando, setCarregando] = useState(true)
   const [erroAviso, setErroAviso] = useState(null)
   const [modalNovoLivro, setModalNovoLivro] = useState(false)
   const [salvandoLivro, setSalvandoLivro] = useState(false)
@@ -174,7 +173,7 @@ export default function Admin({ onVoltarParaLoja }) {
   const [novoTitulo, setNovoTitulo] = useState('')
   const [novoAutor, setNovoAutor] = useState('')
   const [novaCategoriaId, setNovaCategoriaId] = useState(1)
-  const [novaDescricao, setNovaDescricao] = useState('')
+  const [novoDescricao, setNovoDescricao] = useState('')
   const [novoPreco, setNovoPreco] = useState('')
   const [novoEstoque, setNovoEstoque] = useState('')
 
@@ -183,7 +182,6 @@ export default function Admin({ onVoltarParaLoja }) {
     let ativo = true
 
     async function carregarTudo() {
-      setCarregando(true)
       try {
         // 1. Estatísticas do Dashboard (/admin/dashboard/stats)
         const stats = await adminService.obterEstatisticas().catch(() => null)
@@ -238,8 +236,6 @@ export default function Admin({ onVoltarParaLoja }) {
         }
       } catch (err) {
         console.warn('Conectando via mock/fallback offline:', err)
-      } finally {
-        if (ativo) setCarregando(false)
       }
     }
 
@@ -296,11 +292,11 @@ export default function Admin({ onVoltarParaLoja }) {
       setLivros([novoLivroObj, ...livros])
       setNovoTitulo('')
       setNovoAutor('')
-      setNovaDescricao('')
+      setNovoDescricao('')
       setNovoPreco('')
       setNovoEstoque('')
       setModalNovoLivro(false)
-    } catch (err) {
+    } catch {
       setErroAviso('Erro ao cadastrar via API. Adicionado na visualização local.')
     } finally {
       setSalvandoLivro(false)
@@ -312,7 +308,7 @@ export default function Admin({ onVoltarParaLoja }) {
     try {
       await productService.excluir(id).catch(() => null)
       setLivros(livros.filter((l) => l.id !== id))
-    } catch (err) {
+    } catch {
       setLivros(livros.filter((l) => l.id !== id))
     }
   }

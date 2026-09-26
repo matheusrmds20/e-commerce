@@ -28,19 +28,45 @@ export const addressService = {
 
   /** Lista os endereços do usuário autenticado. */
   async listar() {
-    const { data } = await api.get('/addresses/list')
-    return data
+    try {
+      const { data } = await api.get('/addresses/list')
+      return Array.isArray(data) ? data : []
+    } catch (error) {
+      if (error?.status === 404 || error?.code === 'ADDRESS_NOT_FOUND') {
+        return []
+      }
+      throw error
+    }
   },
 
   /** Busca o endereço padrão. */
   async padrao() {
-    const { data } = await api.get('/addresses/default')
-    return data
+    try {
+      const { data } = await api.get('/addresses/default')
+      return data
+    } catch (error) {
+      if (error?.status === 404 || error?.code === 'ADDRESS_NOT_FOUND') {
+        return null
+      }
+      throw error
+    }
   },
 
   /** Define um endereço como padrão. */
   async definirPadrao(addressId) {
     const { data } = await api.patch(`/addresses/default/set/${addressId}`)
+    return data
+  },
+
+  /** Atualiza um endereço existente. */
+  async atualizar(addressId, endereco) {
+    const { data } = await api.patch(`/addresses/update/${addressId}`, endereco)
+    return data
+  },
+
+  /** Exclui um endereço. */
+  async excluir(addressId) {
+    const { data } = await api.delete(`/addresses/delete/${addressId}`)
     return data
   },
 }
