@@ -43,6 +43,7 @@ from app.models.order_item import OrderItem  # noqa: F401
 from app.models.product import Product  # noqa: F401
 from app.models.review import Review  # noqa: F401
 from app.models.user import User  # noqa: F401
+from app.models.user_coupon import UserCoupon  # noqa: F401
 from app.models.wishlist import Wishlist  # noqa: F401
 
 # Objeto de configuração do Alembic (lê o alembic.ini).

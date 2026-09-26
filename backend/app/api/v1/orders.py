@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user, get_db
 from app.api.exceptions import (
     BadRequestException,
+    CouponNotAssignedException,
     ForbiddenException,
     InsufficientStockException,
     InvalidCouponException,
@@ -56,6 +57,11 @@ def _traduzir_value_error(exc: ValueError) -> BadRequestException:
 
     if "No product found" in msg or "is not active" in msg:
         return ProductNotFoundException()
+
+    if "not assigned to user" in msg:
+        # Cupom válido, porém não resgatado (vinculado) por este usuário.
+        # Usa a mensagem padrão em português da exceção, não o texto cru inglês.
+        return CouponNotAssignedException()
 
     if "coupon" in msg.lower():
         return InvalidCouponException(msg)
