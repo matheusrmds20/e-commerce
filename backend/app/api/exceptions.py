@@ -144,6 +144,19 @@ class InactiveUserException(ForbiddenException):
         super().__init__("Usuário desativado.", code="INACTIVE_USER")
 
 
+class CouponNotAssignedException(ForbiddenException):
+    """O cupom existe, mas não está atribuído (resgatado) a este usuário.
+
+    Distinto de ``InvalidCouponException``: aqui o cupom pode ser perfeitamente
+    válido, só não pertence ao usuário que está tentando usá-lo.
+    """
+
+    def __init__(
+        self, message: str = "Este cupom não está atribuído ao seu usuário."
+    ) -> None:
+        super().__init__(message, code="COUPON_NOT_ASSIGNED")
+
+
 # ---------------------------------------------------------------------------
 # 404 - Not Found
 # ---------------------------------------------------------------------------

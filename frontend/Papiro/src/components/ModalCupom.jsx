@@ -63,11 +63,26 @@ export default function ModalCupom({
   onSalvar,
   cupomParaEditar = null,
   produtos = [],
+  usuarios = [],
+  vinculosIniciais = [],
 }) {
   const [form, setForm] = useState(() => formInicial(cupomParaEditar))
   const [erros, setErros] = useState({})
   const [erroGeral, setErroGeral] = useState(null)
   const [salvando, setSalvando] = useState(false)
+  // IDs de usuários selecionados para receber o cupom (ownership).
+  const [usuariosSelecionados, setUsuariosSelecionados] = useState(
+    () => new Set(vinculosIniciais.map((v) => v.user_id)),
+  )
+
+  const toggleUsuario = (userId) => {
+    setUsuariosSelecionados((prev) => {
+      const proximo = new Set(prev)
+      if (proximo.has(userId)) proximo.delete(userId)
+      else proximo.add(userId)
+      return proximo
+    })
+  }
 
   // Fecha no ESC
   useEffect(() => {
@@ -143,7 +158,10 @@ export default function ModalCupom({
 
     setSalvando(true)
     try {
-      await onSalvar(payload, cupomParaEditar?.id ?? null)
+      await onSalvar(payload, cupomParaEditar?.id ?? null, {
+        usuariosSelecionados: Array.from(usuariosSelecionados),
+        vinculosIniciais,
+      })
       onClose()
     } catch (err) {
       setErroGeral(err.message || 'Não foi possível salvar o cupom.')
@@ -332,6 +350,49 @@ export default function ModalCupom({
               Cupom ativo (disponível para uso no checkout)
             </span>
           </label>
+
+          {/* Atribuição de posse: só os usuários marcados verão/usarão o cupom */}
+          <div className="pt-4 border-t border-line">
+            <div className="flex items-baseline justify-between gap-3">
+              <label className={rotuloCampo}>Atribuir a usuários</label>
+              <span className="text-[0.7rem] text-coffee-faint">
+                {usuariosSelecionados.size} selecionado(s)
+              </span>
+            </div>
+            <p className="font-body text-[0.72rem] text-coffee-faint mb-2">
+              O cupom só aparece no checkout para os leitores marcados.
+            </p>
+
+            {usuarios.length === 0 ? (
+              <p className="text-xs text-coffee-faint">
+                Nenhum usuário cadastrado para atribuir.
+              </p>
+            ) : (
+              <div className="max-h-44 overflow-y-auto rounded-sm border border-line-strong bg-cream-soft divide-y divide-line">
+                {usuarios.map((u) => (
+                  <label
+                    key={u.id}
+                    className="flex items-center gap-3 px-3 py-2 cursor-pointer select-none hover:bg-cream-deep/50"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={usuariosSelecionados.has(u.id)}
+                      onChange={() => toggleUsuario(u.id)}
+                      className="h-4 w-4 accent-forest"
+                    />
+                    <span className="min-w-0">
+                      <span className="block text-xs font-medium text-coffee truncate">
+                        {u.full_name || u.email}
+                      </span>
+                      <span className="block text-[0.68rem] text-coffee-faint truncate">
+                        {u.email}
+                      </span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
 
           <div className="flex justify-end gap-3 pt-4 border-t border-line mt-6">
             <button

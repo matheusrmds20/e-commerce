@@ -35,3 +35,8 @@ class Coupon(Base):
 
     products = relationship("Product", back_populates="coupons")
     orders = relationship("Order", back_populates="coupon")
+    users = relationship(
+        "UserCoupon",
+        back_populates="coupons",
+        cascade="all, delete-orphan",
+    )

@@ -12,6 +12,18 @@ from app.models.user import User, UserRole
 from app.schemas.order import OrderCreate, OrderItemCreate, OrderUpdate
 
 
+@pytest.fixture(autouse=True)
+def _grant_coupon_ownership(user_coupon_repo):
+    """Por padrão, concede a posse do cupom ao usuário do pedido.
+
+    O ``OrderService`` passou a exigir que o cupom esteja atribuído ao usuário
+    (vínculo N:N). Para os testes que já existiam e focam em totais/estoque,
+    simulamos o vínculo presente; o teste dedicado abaixo cobre a rejeição
+    quando ele não existe.
+    """
+    user_coupon_repo.get_by_user_and_coupon.return_value = object()
+
+
 def make_user(**kwargs):
     fields = dict(
         id=1,
@@ -354,6 +366,27 @@ class TestCreate:
             order_service.create(1, order_create_payload(coupon_id=1))
 
         assert "not applicable" in str(exc.value)
+
+    def test_coupon_not_assigned_to_user(
+        self,
+        order_service,
+        address_repo,
+        product_repo,
+        order_item_repo,
+        order_repo,
+        coupon_repo,
+        user_coupon_repo,
+    ):
+        """Cupom válido, mas sem vínculo com o usuário → rejeitado."""
+        self._setup(address_repo, product_repo, order_item_repo, order_repo)
+        coupon_repo.get_by_id.return_value = make_coupon()
+        # Sobrescreve o default do autouse: o vínculo não existe.
+        user_coupon_repo.get_by_user_and_coupon.return_value = None
+
+        with pytest.raises(ValueError) as exc:
+            order_service.create(1, order_create_payload(coupon_id=1))
+
+        assert "is not assigned to user" in str(exc.value)
 
     def test_coupon_min_purchase_not_met(
         self,

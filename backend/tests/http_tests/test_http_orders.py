@@ -179,6 +179,22 @@ class TestCreateOrder:
 
         assert_error(response, 400, "INVALID_COUPON")
 
+    def test_create_coupon_not_assigned(self, client, auth_user):
+        """Cupom válido, mas não vinculado ao usuário: 403 com código dedicado."""
+        auth_user(1)
+        svc = Mock(name="order_service")
+        svc.create.side_effect = ValueError(
+            "Coupon 'PAPIRO10' is not assigned to user 1"
+        )
+
+        with patch("app.api.v1.orders.get_order_service", return_value=svc):
+            response = client.post(
+                f"{PREFIX}/create", json={**CREATE_OK, "coupon_id": 1}
+            )
+
+        assert_error(response, 403, "COUPON_NOT_ASSIGNED")
+        assert "atribuído" in response.json()["error"]["message"]
+
     def test_create_address_not_owned(self, client, auth_user):
         auth_user(1)
         svc = Mock(name="order_service")

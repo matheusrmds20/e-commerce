@@ -101,11 +101,13 @@ export default function Checkout({ onIrParaLogin }) {
 
   const total = Math.max(0, totalBase - desconto)
 
-  // Carrega os cupons disponíveis (público no backend)
+  // Carrega os cupons ATRIBUÍDOS ao usuário autenticado (ownership).
+  // Sem login não há vínculo: a lista simplesmente fica vazia (não busca).
   useEffect(() => {
+    if (!autenticado) return
     let ativo = true
     couponService
-      .listar()
+      .meusCupons()
       .then((lista) => {
         if (ativo) setCupons(Array.isArray(lista) ? lista : [])
       })
@@ -115,7 +117,7 @@ export default function Checkout({ onIrParaLogin }) {
     return () => {
       ativo = false
     }
-  }, [])
+  }, [autenticado])
 
   // Carrega os endereços do usuário
   const carregarEnderecos = useCallback(async () => {

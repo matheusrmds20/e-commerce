@@ -166,14 +166,15 @@ export default function Admin({ onVoltarParaLoja }) {
   const [livros, setLivros] = useState(LIVROS_FALLBACK)
   const [clientes, setClientes] = useState(CLIENTES_FALLBACK)
   const [categorias, setCategorias] = useState([])
+  // Estados de Cupons
   const [cupons, setCupons] = useState([])
+  const [cupomEditando, setCupomEditando] = useState(null)
+  const [vinculosCupom, setVinculosCupom] = useState([])
   const [statsApi, setStatsApi] = useState(null)
   const [erroAviso, setErroAviso] = useState(null)
   const [modalNovoLivro, setModalNovoLivro] = useState(false)
   const [salvandoLivro, setSalvandoLivro] = useState(false)
   const [modalCupom, setModalCupom] = useState(false)
-  const [cupomEditando, setCupomEditando] = useState(null)
-
   // Form novo livro
   const [novoTitulo, setNovoTitulo] = useState('')
   const [novoAutor, setNovoAutor] = useState('')
@@ -333,22 +334,66 @@ export default function Admin({ onVoltarParaLoja }) {
   // Abre o modal de cupom em modo criação
   const handleNovoCupom = () => {
     setCupomEditando(null)
+    setVinculosCupom([])
     setModalCupom(true)
   }
 
-  // Abre o modal de cupom em modo edição
-  const handleEditarCupom = (cupom) => {
+  // Abre o modal de cupom em modo edição. Carrega os vínculos ANTES de montar
+  // o modal: o ModalCupom inicializa o estado de posse no primeiro render, então
+  // precisa receber os vínculos já prontos (sem re-sincronização posterior).
+  const handleEditarCupom = async (cupom) => {
     setCupomEditando(cupom)
+    setVinculosCupom([])
+    try {
+      const resp = await couponService.vinculosDoCupom(cupom.id)
+      setVinculosCupom(Array.isArray(resp) ? resp : [])
+    } catch {
+      setVinculosCupom([])
+    }
     setModalCupom(true)
   }
 
-  // Cria ou atualiza um cupom, conforme o id recebido
-  const handleSalvarCupom = async (payload, cupomId) => {
+  // Cria/atualiza um cupom e sincroniza a posse escolhida no modal.
+  // O `onSalvar` do modal entrega os ids de usuários marcados; aqui é feito o
+  // diff com os vínculos atuais: cria os que faltam e remove os desmarcados.
+  const handleSalvarCupom = async (
+    payload,
+    cupomId,
+    { usuariosSelecionados = [], vinculosIniciais = [] } = {},
+  ) => {
+    let idFinal = cupomId
     if (cupomId) {
       await couponService.atualizar(cupomId, payload)
     } else {
-      await couponService.criar(payload)
+      const criado = await couponService.criar(payload)
+      idFinal = criado?.id ?? null
     }
+
+    if (idFinal != null) {
+      const selecionados = new Set(usuariosSelecionados)
+      const vinculosPorUsuario = new Map(
+        vinculosIniciais.map((v) => [v.user_id, v]),
+      )
+
+      // Adiciona os novos; ignora conflito (já atribuído) para não quebrar o lote.
+      await Promise.all(
+        usuariosSelecionados
+          .filter((uid) => !vinculosPorUsuario.has(uid))
+          .map((uid) =>
+            couponService.atribuir(uid, idFinal).catch(() => null),
+          ),
+      )
+
+      // Remove os que foram desmarcados.
+      await Promise.all(
+        vinculosIniciais
+          .filter((v) => !selecionados.has(v.user_id))
+          .map((v) =>
+            couponService.removerVinculo(v.id, v.user_id).catch(() => null),
+          ),
+      )
+    }
+
     await recarregarCupons()
   }
 
@@ -1313,6 +1358,8 @@ export default function Admin({ onVoltarParaLoja }) {
           onSalvar={handleSalvarCupom}
           cupomParaEditar={cupomEditando}
           produtos={livros}
+          usuarios={clientes}
+          vinculosIniciais={vinculosCupom}
         />
       )}
     </div>

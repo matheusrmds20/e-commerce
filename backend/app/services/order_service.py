@@ -7,6 +7,7 @@ from app.repositories.coupon_repo import CouponRepository
 from app.repositories.order_item import OrderItemRepository
 from app.repositories.order_repo import OrderRepository
 from app.repositories.product_repo import ProductRepository
+from app.repositories.user_coupon_repo import UserCouponRepository
 from app.repositories.user_repo import UserRepository
 
 
@@ -16,6 +17,7 @@ class OrderService:
         self.order_item_repo = OrderItemRepository(db)
         self.address_repo = AddressRepository(db)
         self.coupon_repo = CouponRepository(db)
+        self.user_coupon_repo = UserCouponRepository(db)
         self.product_repo = ProductRepository(db)
         self.user_repo = UserRepository(db)
         self.cart_repo = CartRepository(db)
@@ -89,7 +91,7 @@ class OrderService:
 
         
 
-    def _validate_coupon(self, coupon_id, items):
+    def _validate_coupon(self, coupon_id, items, user_id):
 
         if coupon_id is None:
             return None
@@ -98,6 +100,12 @@ class OrderService:
 
         if coupon is None:
             raise ValueError(f"No coupon found with id {coupon_id}")
+
+        # Ownership: o cupom precisa estar atribuído ao usuário do pedido.
+        if self.user_coupon_repo.get_by_user_and_coupon(user_id, coupon_id) is None:
+            raise ValueError(
+                f"Coupon '{coupon.code}' is not assigned to user {user_id}"
+            )
 
         if not coupon.is_active:
             raise ValueError(f"Coupon with code '{coupon.code}' is not active")
@@ -254,7 +262,7 @@ class OrderService:
                     }
                 )
 
-            coupon = self._validate_coupon(data.coupon_id, data.items)
+            coupon = self._validate_coupon(data.coupon_id, data.items, user_id)
 
             # `_calculate_totals` só lê `price` e `quantity` de cada item.
             subtotal = sum(i["price"] * i["quantity"] for i in itens_validados)
@@ -369,7 +377,7 @@ class OrderService:
                 if not order_items:
                     raise ValueError(f"No items found in order with id {order_id}")
 
-            coupon = self._validate_coupon(order.coupon_id, order_items)
+            coupon = self._validate_coupon(order.coupon_id, order_items, user_id)
 
             subtotal, discount_amount, shipping_cost, total = self._calculate_totals(order_items, coupon)
 

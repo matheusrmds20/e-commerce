@@ -60,6 +60,11 @@ class User(Base):
         back_populates="users",
         cascade="all, delete-orphan",
     )
+    coupons = relationship(
+        "UserCoupon",
+        back_populates="users",
+        cascade="all, delete-orphan",
+    )
 
     def __repr__(self) -> str:
         """Representação legível do usuário."""

@@ -90,6 +90,11 @@ def wishlist_repo():
 
 
 @pytest.fixture
+def user_coupon_repo():
+    return Mock(name="user_coupon_repo")
+
+
+@pytest.fixture
 def order_repo():
     return Mock(name="order_repo")
 
@@ -179,12 +184,14 @@ def order_service(
     product_repo,
     user_repo,
     cart_repo,
+    user_coupon_repo,
 ):
     with (
         patch("app.services.order_service.OrderRepository", return_value=order_repo),
         patch("app.services.order_service.OrderItemRepository", return_value=order_item_repo),
         patch("app.services.order_service.AddressRepository", return_value=address_repo),
         patch("app.services.order_service.CouponRepository", return_value=coupon_repo),
+        patch("app.services.order_service.UserCouponRepository", return_value=user_coupon_repo),
         patch("app.services.order_service.ProductRepository", return_value=product_repo),
         patch("app.services.order_service.UserRepository", return_value=user_repo),
         patch("app.services.order_service.CartRepository", return_value=cart_repo),
@@ -227,3 +234,15 @@ def wishlist_service(db, wishlist_repo, user_repo, product_repo):
         from app.services.wishlist_service import WishlistService
 
         yield WishlistService(db)
+
+
+@pytest.fixture
+def user_coupon_service(db, user_coupon_repo, user_repo, coupon_repo):
+    with (
+        patch("app.services.user_coupon_service.UserCouponRepository", return_value=user_coupon_repo),
+        patch("app.services.user_coupon_service.UserRepository", return_value=user_repo),
+        patch("app.services.user_coupon_service.CouponRepository", return_value=coupon_repo),
+    ):
+        from app.services.user_coupon_service import UserCouponService
+
+        yield UserCouponService(db)

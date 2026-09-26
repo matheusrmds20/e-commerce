@@ -73,6 +73,60 @@ export const couponService = {
     const { data } = await api.delete(`/coupons/delete/${couponId}`)
     return data
   },
+
+  // ---------------------------------------------------------------------
+  // Vínculo usuário ↔ cupom (ownership)
+  // ---------------------------------------------------------------------
+
+  /**
+   * Lista os cupons ATRIBUÍDOS ao usuário autenticado (para o checkout).
+   * Backend: `GET /user-coupons/my` -> CouponResponse[].
+   */
+  async meusCupons() {
+    return listarOuVazio(async () => {
+      const { data } = await api.get('/user-coupons/my')
+      return data
+    })
+  },
+
+  /**
+   * Lista os vínculos de um cupom com usuários.
+   * Backend: `GET /user-coupons/coupon/{couponId}` -> UserCouponResponse[].
+   * Cada item tem `{ id, user_id, coupon_id }`; o `id` é o vínculo.
+   */
+  async vinculosDoCupom(couponId) {
+    return listarOuVazio(async () => {
+      const { data } = await api.get(`/user-coupons/coupon/${couponId}`)
+      return data
+    })
+  },
+
+  /**
+   * Atribui (resgata) um cupom para um usuário.
+   * Backend: `POST /user-coupons/create` -> UserCouponResponse (201).
+   * @param {number} userId
+   * @param {number} couponId
+   */
+  async atribuir(userId, couponId) {
+    const { data } = await api.post('/user-coupons/create', {
+      user_id: userId,
+      coupon_id: couponId,
+    })
+    return data
+  },
+
+  /**
+   * Remove o vínculo de um cupom com um usuário.
+   * Backend: `DELETE /user-coupons/delete/{id}?user_id=` -> UserCouponResponse.
+   * @param {number} vinculoId id do vínculo (não do cupom)
+   * @param {number} userId
+   */
+  async removerVinculo(vinculoId, userId) {
+    const { data } = await api.delete(`/user-coupons/delete/${vinculoId}`, {
+      params: { user_id: userId },
+    })
+    return data
+  },
 }
 
 export default couponService
