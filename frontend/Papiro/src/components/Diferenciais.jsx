@@ -1,4 +1,3 @@
-import { BookOpenIcon, MedalIcon } from './Icons'
 import Quill from './Quill'
 
 /**
