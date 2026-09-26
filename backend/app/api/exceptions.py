@@ -240,6 +240,16 @@ class DuplicateWishlistException(ConflictException):
         )
 
 
+class AddressLinkedToOrdersException(ConflictException):
+    """Endereço não pode ser excluído pois há pedidos vinculados a ele."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            "Este endereço está vinculado a pedidos e não pode ser excluído.",
+            code="ADDRESS_LINKED_TO_ORDERS",
+        )
+
+
 # ---------------------------------------------------------------------------
 # Handlers Globais
 # ---------------------------------------------------------------------------

@@ -381,13 +381,13 @@ class TestClearCart:
     def test_clear_success(self, client, auth_user):
         auth_user(1)
         svc = Mock(name="cart_service")
-        svc.clear.return_value = cart_payload(items=[])
+        svc.clear.return_value = cart_payload(cart_items=[])
 
         with patch("app.api.v1.cart.get_cart_service", return_value=svc):
             response = client.delete(f"{PREFIX}/1/items/clear")
 
         assert response.status_code == 200
-        assert response.json()["items"] == []
+        assert response.json()["cart_items"] == []
         svc.clear.assert_called_once_with(1, 1)
 
     def test_clear_cart_not_found(self, client, auth_user):

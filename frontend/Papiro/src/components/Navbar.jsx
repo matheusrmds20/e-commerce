@@ -25,7 +25,7 @@ function primeiroNome(nomeCompleto) {
  * Navbar — barra clara e fixa, com o logotipo centralizado em serifada.
  * Some ao descer, reaparece ao subir (mantém o hero limpo).
  */
-export default function Navbar({ onNavegar, totalItens = 0 }) {
+export default function Navbar({ onNavegar, totalItens = 0, simples = false }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
@@ -91,14 +91,16 @@ export default function Navbar({ onNavegar, totalItens = 0 }) {
     >
       <nav className="mx-auto flex h-[74px] max-w-[1400px] items-center gap-4 px-5 sm:px-8">
         {/* Esquerda — abrir menu */}
-        <button
-          type="button"
-          onClick={() => setMenuOpen(true)}
-          aria-label="Abrir menu"
-          className="grid h-10 w-10 place-items-center text-coffee transition-colors duration-300 hover:text-gold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
-        >
-          <MenuIcon />
-        </button>
+        {!simples && (
+          <button
+            type="button"
+            onClick={() => setMenuOpen(true)}
+            aria-label="Abrir menu"
+            className="grid h-10 w-10 place-items-center text-coffee transition-colors duration-300 hover:text-gold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
+          >
+            <MenuIcon />
+          </button>
+        )}
 
         {/* Centro — logotipo */}
         <a
@@ -113,6 +115,7 @@ export default function Navbar({ onNavegar, totalItens = 0 }) {
         </a>
 
         {/* Direita — ações */}
+        {!simples && (
         <div className="ml-auto flex items-center gap-1">
           <button
             type="button"
@@ -161,9 +164,21 @@ export default function Navbar({ onNavegar, totalItens = 0 }) {
                   role="menuitem"
                   onClick={() => {
                     setContaOpen(false)
+                    onNavegar?.('minhaconta')
+                  }}
+                  className="mt-1.5 w-full px-3 py-2.5 text-left font-body text-[0.82rem] font-medium tracking-wide text-coffee transition-colors duration-300 hover:bg-forest-soft/10 hover:text-gold"
+                >
+                  Minha conta
+                </button>
+
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setContaOpen(false)
                     onNavegar?.('admin')
                   }}
-                  className="mt-1.5 w-full px-3 py-2.5 text-left font-body text-[0.82rem] font-medium tracking-wide text-coffee transition-colors duration-300 hover:bg-forest-soft/10 hover:text-gold flex items-center justify-between"
+                  className="w-full px-3 py-2.5 text-left font-body text-[0.82rem] font-medium tracking-wide text-coffee transition-colors duration-300 hover:bg-forest-soft/10 hover:text-gold flex items-center justify-between"
                 >
                   <span>Painel Administrativo</span>
                   <span className="text-[0.65rem] uppercase tracking-wider px-1.5 py-0.5 bg-forest text-cream rounded">Curadoria</span>
@@ -195,6 +210,7 @@ export default function Navbar({ onNavegar, totalItens = 0 }) {
             )}
           </button>
         </div>
+        )}
       </nav>
 
       {/* Busca expansível */}
@@ -271,6 +287,16 @@ export default function Navbar({ onNavegar, totalItens = 0 }) {
                   </p>
                 </div>
                 <div className="flex flex-col gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMenuOpen(false)
+                      onNavegar?.('minhaconta')
+                    }}
+                    className="self-start font-body text-[0.8rem] font-semibold uppercase tracking-[0.18em] text-forest transition-colors duration-300 hover:text-gold"
+                  >
+                    Minha conta
+                  </button>
                   <button
                     type="button"
                     onClick={() => {

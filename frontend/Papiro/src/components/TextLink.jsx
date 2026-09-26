@@ -1,10 +1,11 @@
 /**
  * TextLink — quiet inline action, underline grows on hover.
  */
-export default function TextLink({ href = '#', children, className = '' }) {
+export default function TextLink({ href = '#', children, className = '', onClick }) {
   return (
     <a
       href={href}
+      onClick={onClick}
       className={`group relative inline-block font-body text-[0.8rem] tracking-wide text-coffee-soft transition-colors duration-300 hover:text-gold ${className}`}
     >
       {children}

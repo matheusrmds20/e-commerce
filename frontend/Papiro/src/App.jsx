@@ -3,14 +3,27 @@ import Navbar from './components/Navbar'
 import Footer from './components/Footer'
 import Home from './pages/Home'
 import Login from './pages/Login'
+import Registro from './pages/Registro'
 import DetalheLivro from './pages/DetalheLivro'
 import Carrinho from './pages/Carrinho'
 import Checkout from './pages/Checkout'
 import Acervo from './pages/Acervo'
 import Admin from './pages/Admin'
+import MinhaConta from './pages/MinhaConta'
+
 import { useCart } from './context/cart-context'
 
-const PAGINAS = ['home', 'acervo', 'detalhe', 'carrinho', 'checkout', 'login', 'admin']
+const PAGINAS = [
+  'home',
+  'acervo',
+  'detalhe',
+  'carrinho',
+  'checkout',
+  'minhaconta',
+  'login',
+  'registro',
+  'admin',
+]
 
 /**
  * App — alterna entre as páginas enquanto ainda não há roteador.
@@ -31,7 +44,16 @@ export default function App() {
 
   const renderizar = () => {
     if (pagina === 'admin') return <Admin onVoltarParaLoja={() => setPagina('home')} />
-    if (pagina === 'login') return <Login onEntrar={() => setPagina('home')} />
+    if (pagina === 'login') return <Login onEntrar={() => setPagina('home')} onRegistrar={() => setPagina('registro')} />
+    if (pagina === 'registro')
+      return (
+        <Registro
+          onConcluir={() => setPagina('home')}
+          onVoltarLogin={() => setPagina('login')}
+        />
+      )
+    if (pagina === 'minhaconta')
+      return <MinhaConta onIrParaLogin={() => setPagina('login')} />
     if (pagina === 'acervo') return <Acervo onAbrirLivro={abrirLivro} />
     if (pagina === 'detalhe')
       return <DetalheLivro productId={produtoId ?? 1} />
@@ -49,11 +71,17 @@ export default function App() {
 
   return (
     <div className="flex min-h-svh flex-col">
-      <Navbar onNavegar={setPagina} totalItens={totalItens} />
+      {pagina !== 'admin' && (
+        <Navbar
+          onNavegar={setPagina}
+          totalItens={totalItens}
+          simples={pagina === 'login' || pagina === 'registro'}
+        />
+      )}
 
       <div className="flex-1">{renderizar()}</div>
 
-      <Footer />
+      {pagina !== 'admin' && <Footer />}
 
       {/* Alternador temporário — remover ao adicionar o roteador */}
       <nav className="fixed bottom-5 right-5 z-40 flex gap-1 bg-forest p-1 shadow-lg">

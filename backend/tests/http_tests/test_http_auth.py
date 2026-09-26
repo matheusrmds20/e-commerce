@@ -83,14 +83,20 @@ class TestRegister:
 
 
 class TestLogin:
-    LOGIN_OK = {"email": "user@example.com", "password": "secret123"}
+    # O login usa OAuth2PasswordRequestForm: form-urlencoded com
+    # `username` (o e-mail) e `password`.
+    LOGIN_OK = {"username": "user@example.com", "password": "secret123"}
+
+    @staticmethod
+    def _enviar(client, svc, form=None):
+        with patch("app.api.v1.auth.get_auth_service", return_value=svc):
+            return client.post(f"{PREFIX}/login", data=form or TestLogin.LOGIN_OK)
 
     def test_login_success(self, client):
         svc = Mock(name="auth_service")
         svc.login.return_value = {"access_token": "jwt-token", "token_type": "bearer"}
 
-        with patch("app.api.v1.auth.get_auth_service", return_value=svc):
-            response = client.post(f"{PREFIX}/login", json=self.LOGIN_OK)
+        response = self._enviar(client, svc)
 
         assert response.status_code == 200
         body = response.json()
@@ -101,8 +107,7 @@ class TestLogin:
         svc = Mock(name="auth_service")
         svc.login.side_effect = InvalidCredentialsException()
 
-        with patch("app.api.v1.auth.get_auth_service", return_value=svc):
-            response = client.post(f"{PREFIX}/login", json=self.LOGIN_OK)
+        response = self._enviar(client, svc)
 
         assert_error(response, 401, "INVALID_CREDENTIALS")
 
@@ -110,18 +115,18 @@ class TestLogin:
         svc = Mock(name="auth_service")
         svc.login.side_effect = InactiveUserException()
 
-        with patch("app.api.v1.auth.get_auth_service", return_value=svc):
-            response = client.post(f"{PREFIX}/login", json=self.LOGIN_OK)
+        response = self._enviar(client, svc)
 
         assert_error(response, 403, "INACTIVE_USER")
 
-    def test_login_invalid_email_format(self, client):
-        payload = {**self.LOGIN_OK, "email": "invalid"}
-        response = client.post(f"{PREFIX}/login", json=payload)
+    def test_login_missing_username(self, client):
+        response = client.post(f"{PREFIX}/login", data={"password": "secret123"})
         assert_validation_error(response)
 
     def test_login_missing_password(self, client):
-        response = client.post(f"{PREFIX}/login", json={"email": "user@example.com"})
+        response = client.post(
+            f"{PREFIX}/login", data={"username": "user@example.com"}
+        )
         assert_validation_error(response)
 
 

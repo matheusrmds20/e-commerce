@@ -1,7 +1,16 @@
 /**
  * ResumoPedido — coluna esquerda do checkout: itens, totais e total geral.
+ * `desconto` é o valor estimado do cupom aplicado (0 quando não há cupom).
  */
-export default function ResumoPedido({ itens, subtotal, frete, total, formatarPreco }) {
+export default function ResumoPedido({
+  itens,
+  subtotal,
+  frete,
+  desconto = 0,
+  cupom,
+  total,
+  formatarPreco,
+}) {
   return (
     <aside className="rounded-md border border-line bg-cream-tint/60 p-6 sm:p-7">
       <div className="flex items-baseline justify-between gap-4 border-b border-line pb-4">
@@ -51,6 +60,17 @@ export default function ResumoPedido({ itens, subtotal, frete, total, formatarPr
             {formatarPreco(subtotal)}
           </dd>
         </div>
+
+        {desconto > 0 && (
+          <div className="flex items-baseline justify-between gap-4">
+            <dt className="font-body text-[0.92rem] font-medium text-forest">
+              Desconto {cupom?.code ? `(${cupom.code})` : ''}
+            </dt>
+            <dd className="font-body text-[0.95rem] font-medium text-forest">
+              −{formatarPreco(desconto)}
+            </dd>
+          </div>
+        )}
 
         <div className="flex items-baseline justify-between gap-4">
           <dt className="font-body text-[0.92rem] font-medium text-coffee-soft">Frete</dt>
