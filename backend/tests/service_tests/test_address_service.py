@@ -1,5 +1,6 @@
 import pytest
 
+from app.api.exceptions import AddressLinkedToOrdersException
 from app.models.address import Address
 from app.schemas.address import AddressCreate, AddressUpdate
 
@@ -184,7 +185,9 @@ class TestUpdate:
 
 
 class TestDelete:
-    def test_success(self, address_service, address_repo):
+    def test_success(self, address_service, address_repo, db):
+        # Nenhum pedido vinculado ao endereço.
+        db.query.return_value.filter.return_value.first.return_value = None
         address = make_address()
         address_repo.get_by_id.return_value = address
 
@@ -192,6 +195,16 @@ class TestDelete:
 
         assert result is address
         address_repo.delete.assert_called_once_with(address)
+
+    def test_linked_to_orders(self, address_service, address_repo, db):
+        """Endereço usado em pedidos não pode ser excluído."""
+        db.query.return_value.filter.return_value.first.return_value = object()
+        address_repo.get_by_id.return_value = make_address()
+
+        with pytest.raises(AddressLinkedToOrdersException):
+            address_service.delete(1, 1)
+
+        address_repo.delete.assert_not_called()
 
     def test_not_found(self, address_service, address_repo):
         address_repo.get_by_id.return_value = None

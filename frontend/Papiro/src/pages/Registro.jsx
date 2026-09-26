@@ -3,15 +3,27 @@ import Field from '../components/Field'
 import TextLink from '../components/TextLink'
 import Quill from '../components/Quill'
 import { useAuth } from '../context/auth-context'
+import authService from '../api/auth'
 
-export default function Login({ onEntrar, onRegistrar }) {
+/**
+ * Registro — tela de criação de conta.
+ * Valida os campos localmente, chama POST /auth/register e, em seguida,
+ * faz login automático para o usuário já entrar com a sessão ativa.
+ */
+export default function Registro({ onConcluir, onVoltarLogin }) {
+  const { login } = useAuth()
   const [mostrarSenha, setMostrarSenha] = useState(false)
-  const [form, setForm] = useState({ email: '', password: '' })
-  const [erro, setErro] = useState(null) // { message, code, details }
+  const [mostrarConfirmacao, setMostrarConfirmacao] = useState(false)
+  const [form, setForm] = useState({
+    full_name: '',
+    email: '',
+    password: '',
+    confirmacao: '',
+  })
+  const [erros, setErros] = useState({})
+  const [erro, setErro] = useState(null) // { message, details } vindo da API
   const [enviando, setEnviando] = useState(false)
   const [sucesso, setSucesso] = useState(false)
-
-  const { login } = useAuth()
   const timerRef = useRef(null)
 
   // Evita que o timer de redirecionamento dispare após sair da tela.
@@ -20,6 +32,25 @@ export default function Login({ onEntrar, onRegistrar }) {
   const handleChange = (event) => {
     const { name, value } = event.target
     setForm((atual) => ({ ...atual, [name]: value }))
+    // Limpa o erro do campo enquanto o usuário digita.
+    setErros((atual) => (atual[name] ? { ...atual, [name]: null } : atual))
+  }
+
+  /** Validação simples no cliente; retorna um mapa campo -> mensagem. */
+  const validar = () => {
+    const novos = {}
+    if (!form.full_name.trim()) novos.full_name = 'Informe seu nome.'
+    if (!form.email.trim()) novos.email = 'Informe seu e-mail.'
+    else if (!/^\S+@\S+\.\S+$/.test(form.email))
+      novos.email = 'E-mail inválido.'
+    if (!form.password) novos.password = 'Informe uma senha.'
+    else if (form.password.length < 8)
+      novos.password = 'A senha deve ter ao menos 8 caracteres.'
+    else if (!/[a-zA-Z]/.test(form.password) || !/\d/.test(form.password))
+      novos.password = 'A senha deve conter ao menos uma letra e um número.'
+    if (form.confirmacao !== form.password)
+      novos.confirmacao = 'As senhas não coincidem.'
+    return novos
   }
 
   /** Erro de validação (422) por campo, para exibir sob o input certo. */
@@ -30,14 +61,24 @@ export default function Login({ onEntrar, onRegistrar }) {
     event.preventDefault()
     if (enviando || sucesso) return
 
+    const novos = validar()
+    setErros(novos)
+    if (Object.values(novos).some(Boolean)) return
+
     setErro(null)
     setEnviando(true)
 
     try {
+      await authService.register({
+        email: form.email,
+        full_name: form.full_name,
+        password: form.password,
+      })
+      // Cadastra e já autentica, para o usuário entrar direto na loja.
       await login({ email: form.email, password: form.password })
       // Pequena pausa para o leitor ver a confirmação antes de sair da tela.
       setSucesso(true)
-      timerRef.current = setTimeout(() => onEntrar?.(), 900)
+      timerRef.current = setTimeout(() => onConcluir?.(), 900)
     } catch (error) {
       setErro(error)
       setEnviando(false)
@@ -51,14 +92,14 @@ export default function Login({ onEntrar, onRegistrar }) {
         <div className="grid md:grid-cols-2">
         <div className="flex flex-col items-center justify-start px-8 pb-10 pt-10 text-center sm:px-12 sm:pt-12 md:border-r md:border-line md:pt-14">
           <header>
-            <p className="label-caps text-gold">Entrar</p>
+            <p className="label-caps text-gold">Criar conta</p>
 
             <h1 className="mt-4 font-display text-[2.75rem] leading-[1.1] font-normal tracking-[-0.01em] text-coffee sm:text-[3.35rem]">
-              Um convite silencioso
+              Sua primeira página
             </h1>
 
             <p className="mx-auto mt-5 max-w-[21rem] font-body text-[0.98rem] font-normal leading-relaxed text-coffee-soft">
-              Sua estante está esperando. Entre para continuar de onde parou.
+              Cada estante começa com um livro. A sua começa aqui.
             </p>
           </header>
         </div>
@@ -78,7 +119,7 @@ export default function Login({ onEntrar, onRegistrar }) {
               role="status"
               className="mb-6 rounded-sm border border-gold/40 bg-gold/[0.08] px-4 py-3 text-center font-body text-[0.86rem] font-medium tracking-wide text-coffee"
             >
-              Bem-vindo de volta. Abrindo sua estante…
+              Conta criada. Levando você ao login…
             </div>
           )}
 
@@ -87,7 +128,21 @@ export default function Login({ onEntrar, onRegistrar }) {
             noValidate
             className="flex flex-col gap-6"
           >
-            <Field label="E-mail" id="email" error={erroDoCampo('email')}>
+            <Field label="Nome completo" id="full_name" error={erros.full_name || erroDoCampo('full_name')}>
+              <input
+                id="full_name"
+                name="full_name"
+                type="text"
+                autoComplete="name"
+                placeholder="Maria Almeida"
+                value={form.full_name}
+                onChange={handleChange}
+                required
+                className="w-full bg-transparent pb-2 font-display text-[1.15rem] text-coffee placeholder:text-coffee-faint/70 focus:outline-none"
+              />
+            </Field>
+
+            <Field label="E-mail" id="email" error={erros.email || erroDoCampo('email')}>
               <input
                 id="email"
                 name="email"
@@ -101,17 +156,18 @@ export default function Login({ onEntrar, onRegistrar }) {
               />
             </Field>
 
-            <Field label="Senha" id="password" error={erroDoCampo('password')}>
+            <Field label="Senha" id="password" error={erros.password || erroDoCampo('password')}>
               <div className="flex items-center gap-3">
                 <input
                   id="password"
                   name="password"
                   type={mostrarSenha ? 'text' : 'password'}
-                  autoComplete="current-password"
+                  autoComplete="new-password"
                   placeholder="••••••••"
                   value={form.password}
                   onChange={handleChange}
                   required
+                  minLength={8}
                   className="w-full bg-transparent pb-2 font-display text-[1.15rem] tracking-[0.08em] text-coffee placeholder:tracking-normal placeholder:text-coffee-faint/70 focus:outline-none"
                 />
                 <button
@@ -125,51 +181,61 @@ export default function Login({ onEntrar, onRegistrar }) {
               </div>
             </Field>
 
-            <div className="flex items-center justify-between">
-              <label className="flex cursor-pointer select-none items-center gap-3">
-                <input type="checkbox" name="remember" className="peer sr-only" />
-                <span className="relative grid h-[16px] w-[16px] place-items-center rounded-sm border border-line-strong bg-cream-soft transition-colors duration-300 peer-checked:border-gold peer-focus-visible:outline peer-focus-visible:outline-1 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-gold">
-                  <svg
-                    viewBox="0 0 12 12"
-                    className="h-2.5 w-2.5 text-gold"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.8"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
-                  >
-                    <path d="M2 6.5 4.6 9 10 3" />
-                  </svg>
-                </span>
-                <span className="font-body text-[0.88rem] font-medium tracking-wide text-coffee-soft">
-                  Lembrar de mim
-                </span>
-              </label>
+            <Field
+              label="Confirmar senha"
+              id="confirmacao"
+              error={erros.confirmacao}
+            >
+              <div className="flex items-center gap-3">
+                <input
+                  id="confirmacao"
+                  name="confirmacao"
+                  type={mostrarConfirmacao ? 'text' : 'password'}
+                  autoComplete="new-password"
+                  placeholder="••••••••"
+                  value={form.confirmacao}
+                  onChange={handleChange}
+                  required
+                  className="w-full bg-transparent pb-2 font-display text-[1.15rem] tracking-[0.08em] text-coffee placeholder:tracking-normal placeholder:text-coffee-faint/70 focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => setMostrarConfirmacao((v) => !v)}
+                  aria-label={
+                    mostrarConfirmacao ? 'Ocultar senha' : 'Mostrar senha'
+                  }
+                  className="pb-2 font-body text-[0.75rem] font-medium uppercase tracking-[0.18em] text-coffee-faint transition-colors duration-300 hover:text-gold"
+                >
+                  {mostrarConfirmacao ? 'Ocultar' : 'Mostrar'}
+                </button>
+              </div>
+            </Field>
 
-              <TextLink href="#">Esqueci a senha</TextLink>
-            </div>
+            <p className="font-body text-[0.8rem] font-normal leading-relaxed text-coffee-faint">
+              Ao criar uma conta, você concorda com os nossos termos e com a
+              política de privacidade.
+            </p>
 
             <button
               type="submit"
               disabled={enviando || sucesso}
               className="mt-2 w-full rounded-sm bg-gold py-4 font-body text-xs font-semibold uppercase tracking-[0.28em] text-cream-soft shadow-md transition-all duration-300 ease-[var(--ease-cozy)] hover:bg-caramel hover:shadow-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {sucesso ? 'Conectado' : enviando ? 'Entrando…' : 'Entrar'}
+              {sucesso ? 'Conta criada' : enviando ? 'Criando…' : 'Criar conta'}
             </button>
           </form>
 
           <p className="mt-10 text-center font-body text-[0.88rem] font-normal tracking-wide text-coffee-soft">
-            Novo por aqui?{' '}
+            Já tem uma conta?{' '}
             <TextLink
               href="#"
               onClick={(e) => {
                 e.preventDefault()
-                onRegistrar?.()
+                onVoltarLogin?.()
               }}
               className="ml-1 font-semibold"
             >
-              Criar uma conta
+              Entrar
             </TextLink>
           </p>
           {/* Floreio da pena */}

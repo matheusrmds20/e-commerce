@@ -8,7 +8,9 @@ from app.api.exceptions import (
     UserNotFoundException,
 )
 from app.models.user import User, UserRole
-from app.schemas.auth import LoginRequest, RegisterRequest
+from types import SimpleNamespace
+
+from app.schemas.auth import RegisterRequest
 
 
 def make_user(**kwargs):
@@ -62,7 +64,7 @@ class TestLogin:
     def test_login_success(self, auth_service, user_repo):
         user_repo.get_by_email.return_value = make_user()
 
-        result = auth_service.login(LoginRequest(email="user@example.com", password="secret123"))
+        result = auth_service.login(SimpleNamespace(username="user@example.com", password="secret123"))
 
         assert result.access_token == "access-token"
         assert result.token_type == "bearer"
@@ -73,19 +75,19 @@ class TestLogin:
         user_repo.get_by_email.return_value = make_user()
 
         with pytest.raises(InvalidCredentialsException):
-            auth_service.login(LoginRequest(email="user@example.com", password="wrong-password"))
+            auth_service.login(SimpleNamespace(username="user@example.com", password="wrong-password"))
 
     def test_login_user_not_found(self, auth_service, user_repo):
         user_repo.get_by_email.return_value = None
 
         with pytest.raises(InvalidCredentialsException):
-            auth_service.login(LoginRequest(email="user@example.com", password="secret123"))
+            auth_service.login(SimpleNamespace(username="user@example.com", password="secret123"))
 
     def test_login_inactive_user(self, auth_service, user_repo):
         user_repo.get_by_email.return_value = make_user(is_active=False)
 
         with pytest.raises(InactiveUserException):
-            auth_service.login(LoginRequest(email="user@example.com", password="secret123"))
+            auth_service.login(SimpleNamespace(username="user@example.com", password="secret123"))
 
 
 class TestMe:

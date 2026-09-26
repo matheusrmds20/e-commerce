@@ -1,4 +1,6 @@
 from app.models.address import Address
+from app.models.order import Order
+from app.api.exceptions import AddressLinkedToOrdersException
 from app.repositories.address_repo import AddressRepository
 from app.repositories.user_repo import UserRepository
 
@@ -114,6 +116,18 @@ class AddressService:
 
             if address.user_id != user_id:
                 raise ValueError("Address is not owned by user")
+
+            # Endereços usados em pedidos não podem ser excluídos: o pedido
+            # guarda referência NOT NULL ao endereço de entrega e removê-lo
+            # quebraria o histórico (IntegrityError no banco).
+            tem_pedidos = (
+                self.session.query(Order)
+                .filter(Order.address_id == adress_id)
+                .first()
+                is not None
+            )
+            if tem_pedidos:
+                raise AddressLinkedToOrdersException()
 
             self.repo.delete(address)
             return address

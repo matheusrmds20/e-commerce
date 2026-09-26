@@ -28,13 +28,13 @@ class CartCreate(BaseModel):
 
 
     user_id: int = Field(description="ID do usuário")
-    items: list[CartItemCreate] = Field(default_factory=list)
+    cart_items: list[CartItemCreate] = Field(default_factory=list)
 
 
 
 class CartUpdate(BaseModel):
 
-    items: list[CartItemCreate] | None = None
+    cart_items: list[CartItemCreate] | None = None
 
 
 class CartResponse(BaseModel):

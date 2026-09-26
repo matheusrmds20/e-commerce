@@ -122,7 +122,7 @@ def cart_payload(**overrides):
     payload = {
         "id": 1,
         "user_id": 1,
-        "items": [cart_item_payload()],
+        "cart_items": [cart_item_payload()],
         "created_at": CREATED_AT,
         "updated_at": UPDATED_AT,
     }

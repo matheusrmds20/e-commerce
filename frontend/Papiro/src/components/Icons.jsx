@@ -86,9 +86,14 @@ export function StarIcon({ className = 'h-4 w-4', filled = true }) {
   )
 }
 
-export function HeartIcon({ className = 'h-4 w-4' }) {
+export function HeartIcon({ className = 'h-4 w-4', filled = false }) {
   return (
-    <svg viewBox="0 0 24 24" className={className} {...base}>
+    <svg
+      viewBox="0 0 24 24"
+      className={className}
+      {...base}
+      fill={filled ? 'currentColor' : 'none'}
+    >
       <path d="M12 20s-7-4.4-7-9.3A4.2 4.2 0 0 1 12 8a4.2 4.2 0 0 1 7 2.7C19 15.6 12 20 12 20Z" />
     </svg>
   )

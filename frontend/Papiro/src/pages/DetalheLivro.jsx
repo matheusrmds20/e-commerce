@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import Estrelas from '../components/Estrelas'
 import GaleriaLivro from '../components/GaleriaLivro'
-import Migalhas from '../components/Migalhas'
 import PainelCompra from '../components/PainelCompra'
 import DetalhesLivro from '../components/DetalhesLivro'
-import { ArrowRightIcon, BookOpenIcon, PdfIcon } from '../components/Icons'
+import { PdfIcon } from '../components/Icons'
 import productService from '../api/products'
 import reviewService from '../api/reviews'
 import {
@@ -15,6 +14,7 @@ import {
 } from '../api/adapters'
 import { useAuth } from '../context/auth-context'
 import { useCart } from '../context/cart-context'
+import wishlistService from '../api/wishlist'
 
 /**
  * DetalheLivro — página de produto ligada à API.
@@ -44,6 +44,8 @@ export default function DetalheLivro({ productId = 1 }) {
   const [erro, setErro] = useState(null)
   const [enviando, setEnviando] = useState(false)
   const [feedback, setFeedback] = useState(null)
+  const [nosDesejos, setNosDesejos] = useState(false)
+  const [feedbackDesejos, setFeedbackDesejos] = useState(null)
 
   /** Carrega produto + avaliações. As avaliações nunca derrubam a página. */
   const carregar = useCallback(async () => {
@@ -82,6 +84,23 @@ export default function DetalheLivro({ productId = 1 }) {
     carregar()
   }, [carregar])
 
+  // Verifica se o produto já está na wishlist do usuário logado.
+  useEffect(() => {
+    if (!autenticado || !produto) return
+    let ativo = true
+    wishlistService
+      .listar(usuario.id)
+      .then((lista) => {
+        if (ativo) {
+          setNosDesejos(lista.some((item) => item.product_id === produto.id))
+        }
+      })
+      .catch(() => {})
+    return () => {
+      ativo = false
+    }
+  }, [autenticado, usuario, produto])
+
   /** Adiciona o produto atual à sacola (visitante: memória; logado: API). */
   const adicionarASacola = useCallback(async () => {
     if (!produto) return
@@ -102,6 +121,40 @@ export default function DetalheLivro({ productId = 1 }) {
       })
     }
   }, [adicionar, produto])
+
+  /** Adiciona (ou confirma) o produto na wishlist do usuário logado. */
+  const adicionarAosDesejos = useCallback(async () => {
+    if (!produto) return
+    if (!autenticado) {
+      setFeedbackDesejos({
+        tipo: 'erro',
+        texto: 'Entre na sua conta para guardar desejos.',
+      })
+      return
+    }
+    if (nosDesejos) return
+
+    setFeedbackDesejos(null)
+    try {
+      await wishlistService.adicionar(usuario.id, produto.id)
+      setNosDesejos(true)
+      setFeedbackDesejos({
+        tipo: 'sucesso',
+        texto: 'Guardado na sua lista de desejos.',
+      })
+    } catch (error) {
+      // 409 = já estava na wishlist — tratamos como sucesso visual.
+      if (error?.code === 'WISHLIST_DUPLICATE' || error?.status === 409) {
+        setNosDesejos(true)
+        setFeedbackDesejos(null)
+        return
+      }
+      setFeedbackDesejos({
+        tipo: 'erro',
+        texto: error?.message ?? 'Não foi possível guardar o desejo.',
+      })
+    }
+  }, [autenticado, usuario, produto, nosDesejos])
 
   /** Publica uma nova avaliação do usuário logado. */
   const enviarAvaliacao = useCallback(
@@ -187,17 +240,8 @@ export default function DetalheLivro({ productId = 1 }) {
   return (
     <main className="bg-cream-deep">
       <div className="mx-auto max-w-[1400px] px-5 pt-7 sm:px-8">
-        <Migalhas
-          itens={[
-            { rotulo: 'Início' },
-            { rotulo: 'Não-ficção' },
-            { rotulo: 'Natureza' },
-            { rotulo: produto.titulo },
-          ]}
-        />
-
         {/* Topo: galeria + informações */}
-        <div className="mt-7 grid items-start gap-10 lg:grid-cols-2 lg:gap-14">
+        <div className="grid items-start gap-10 lg:grid-cols-2 lg:gap-14">
           <GaleriaLivro imagens={produto.imagens} titulo={produto.titulo} />
 
           <div>
@@ -239,35 +283,13 @@ export default function DetalheLivro({ productId = 1 }) {
                 stockQty={produto.stockQty}
                 onAdicionar={adicionarASacola}
                 feedback={feedback}
+                onAdicionarDesejos={adicionarAosDesejos}
+                nosDesejos={nosDesejos}
+                feedbackDesejos={feedbackDesejos}
               />
             </div>
           </div>
         </div>
-
-        {/* Leve este também */}
-        <section className="mt-16">
-          <div className="flex items-center gap-3 text-coffee-soft">
-            <BookOpenIcon className="h-5 w-5" />
-            <p className="label-caps text-caramel">Leve este também</p>
-          </div>
-
-          <div className="mt-5 flex flex-wrap gap-4">
-            {[
-              'O Último Boticário',
-              'O Véu Aconchegante',
-              'Histórias da Floresta',
-            ].map((titulo) => (
-              <a
-                key={titulo}
-                href="#"
-                className="group inline-flex items-center gap-2 rounded-sm border border-line-strong bg-cream-soft px-4 py-3 font-body text-[0.88rem] font-medium text-coffee-soft transition-colors duration-300 hover:border-forest hover:text-forest"
-              >
-                {titulo}
-                <ArrowRightIcon className="h-4 w-4 transition-transform duration-300 ease-[var(--ease-cozy)] group-hover:translate-x-1" />
-              </a>
-            ))}
-          </div>
-        </section>
 
         {/* Seções retráteis */}
         <div id="avaliacoes" className="mt-16 border-b border-line">

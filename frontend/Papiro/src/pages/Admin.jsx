@@ -1,8 +1,10 @@
 import { useState, useMemo, useEffect } from 'react'
 import { CloseIcon, SearchIcon } from '../components/Icons'
+import ModalCupom from '../components/ModalCupom'
 import productService from '../api/products'
 import categoryService from '../api/categories'
 import adminService from '../api/admin'
+import couponService from '../api/coupons'
 
 const PEDIDOS_FALLBACK = [
   {
@@ -164,10 +166,13 @@ export default function Admin({ onVoltarParaLoja }) {
   const [livros, setLivros] = useState(LIVROS_FALLBACK)
   const [clientes, setClientes] = useState(CLIENTES_FALLBACK)
   const [categorias, setCategorias] = useState([])
+  const [cupons, setCupons] = useState([])
   const [statsApi, setStatsApi] = useState(null)
   const [erroAviso, setErroAviso] = useState(null)
   const [modalNovoLivro, setModalNovoLivro] = useState(false)
   const [salvandoLivro, setSalvandoLivro] = useState(false)
+  const [modalCupom, setModalCupom] = useState(false)
+  const [cupomEditando, setCupomEditando] = useState(null)
 
   // Form novo livro
   const [novoTitulo, setNovoTitulo] = useState('')
@@ -233,6 +238,12 @@ export default function Admin({ onVoltarParaLoja }) {
         const usuariosApi = await adminService.listarUsuarios().catch(() => [])
         if (ativo && Array.isArray(usuariosApi) && usuariosApi.length > 0) {
           setClientes(usuariosApi)
+        }
+
+        // 6. Cupons de desconto (/coupons/list)
+        const cuponsApi = await couponService.listar().catch(() => [])
+        if (ativo && Array.isArray(cuponsApi)) {
+          setCupons(cuponsApi)
         }
       } catch (err) {
         console.warn('Conectando via mock/fallback offline:', err)
@@ -313,6 +324,45 @@ export default function Admin({ onVoltarParaLoja }) {
     }
   }
 
+  // Recarrega a lista de cupons do backend
+  const recarregarCupons = async () => {
+    const cuponsApi = await couponService.listar().catch(() => [])
+    if (Array.isArray(cuponsApi)) setCupons(cuponsApi)
+  }
+
+  // Abre o modal de cupom em modo criação
+  const handleNovoCupom = () => {
+    setCupomEditando(null)
+    setModalCupom(true)
+  }
+
+  // Abre o modal de cupom em modo edição
+  const handleEditarCupom = (cupom) => {
+    setCupomEditando(cupom)
+    setModalCupom(true)
+  }
+
+  // Cria ou atualiza um cupom, conforme o id recebido
+  const handleSalvarCupom = async (payload, cupomId) => {
+    if (cupomId) {
+      await couponService.atualizar(cupomId, payload)
+    } else {
+      await couponService.criar(payload)
+    }
+    await recarregarCupons()
+  }
+
+  // Exclui um cupom
+  const handleExcluirCupom = async (cupom) => {
+    if (!window.confirm(`Excluir o cupom "${cupom.code}"?`)) return
+    try {
+      await couponService.excluir(cupom.id)
+      await recarregarCupons()
+    } catch (err) {
+      setErroAviso(err.message || 'Erro ao excluir o cupom.')
+    }
+  }
+
   // Atualizar status do pedido
   const handleAtualizarStatusPedido = async (rawId, idFormatted, novoStatus) => {
     try {
@@ -364,6 +414,16 @@ export default function Admin({ onVoltarParaLoja }) {
     )
   }, [clientes, termoBusca])
 
+  const cuponsFiltrados = useMemo(() => {
+    if (!termoBusca.trim()) return cupons
+    const busca = termoBusca.toLowerCase()
+    return cupons.filter(
+      (c) =>
+        c.code?.toLowerCase().includes(busca) ||
+        c.discount_type?.toLowerCase().includes(busca)
+    )
+  }, [cupons, termoBusca])
+
   // KPIs
   const faturamento = statsApi?.total_revenue ?? pedidos.reduce((a, b) => a + (b.total || 0), 0)
   const totalPedidosCount = statsApi?.total_orders ?? pedidos.length
@@ -374,7 +434,7 @@ export default function Admin({ onVoltarParaLoja }) {
   const ticketMedio = statsApi?.average_ticket ?? (totalPedidosCount > 0 ? faturamento / totalPedidosCount : 0)
 
   return (
-    <div className="flex min-h-[calc(100vh-74px)] bg-cream-deep text-coffee">
+    <div className="flex min-h-screen bg-cream-deep text-coffee">
       {/* Sidebar Administrativa */}
       <aside className="w-64 shrink-0 bg-forest text-cream-soft flex flex-col justify-between border-r border-forest-soft shadow-xl hidden md:flex">
         <div>
@@ -465,6 +525,24 @@ export default function Admin({ onVoltarParaLoja }) {
                 {clientes.length}
               </span>
             </button>
+
+            <button
+              type="button"
+              onClick={() => setAbaAtiva('descontos')}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-sm text-left transition-colors duration-200 ${
+                abaAtiva === 'descontos'
+                  ? 'bg-gold text-forest font-semibold shadow-sm'
+                  : 'text-cream-soft hover:bg-forest-soft hover:text-cream'
+              }`}
+            >
+              <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 14l6-6M9.5 8.5h.01M14.5 15.5h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+              </svg>
+              Descontos & Cupons
+              <span className="ml-auto text-xs px-2 py-0.5 rounded-full bg-forest-soft text-gold font-medium">
+                {cupons.length}
+              </span>
+            </button>
           </nav>
         </div>
 
@@ -492,7 +570,7 @@ export default function Admin({ onVoltarParaLoja }) {
       {/* Conteúdo Principal */}
       <main className="flex-1 flex flex-col min-w-0">
         {/* Barra superior */}
-        <header className="border-b border-line bg-cream-soft/80 backdrop-blur px-6 sm:px-10 py-5 flex flex-wrap items-center justify-between gap-4 sticky top-[74px] z-30">
+        <header className="border-b border-line bg-cream-soft/80 backdrop-blur px-6 sm:px-10 py-5 flex flex-wrap items-center justify-between gap-4 sticky top-0 z-30">
           <div>
             <div className="flex items-center gap-2">
               <span className="label-caps text-gold">Painel Administrativo</span>
@@ -502,6 +580,7 @@ export default function Admin({ onVoltarParaLoja }) {
                 {abaAtiva === 'acervo' && 'Gestão de Títulos e Estoque'}
                 {abaAtiva === 'pedidos' && 'Acompanhamento de Todos os Pedidos'}
                 {abaAtiva === 'clientes' && 'Gestão de Leitores'}
+                {abaAtiva === 'descontos' && 'Gestão de Cupons e Descontos'}
               </span>
             </div>
             <h2 className="font-display text-2xl font-bold text-coffee mt-0.5">
@@ -509,32 +588,39 @@ export default function Admin({ onVoltarParaLoja }) {
               {abaAtiva === 'acervo' && 'Acervo de Obras'}
               {abaAtiva === 'pedidos' && 'Controle de Pedidos'}
               {abaAtiva === 'clientes' && 'Leitores Cadastrados'}
+              {abaAtiva === 'descontos' && 'Cupons de Desconto'}
             </h2>
           </div>
 
-          <div className="flex items-center gap-3">
-            <div className="relative">
-              <input
-                type="text"
-                value={termoBusca}
-                onChange={(e) => setTermoBusca(e.target.value)}
-                placeholder="Filtrar nesta página..."
-                className="w-60 sm:w-72 rounded-sm border border-line-strong bg-cream-soft pl-9 pr-3 py-1.5 font-body text-xs text-coffee placeholder:text-coffee-faint focus:border-forest focus:outline-none"
-              />
-              <span className="absolute left-2.5 top-2 text-coffee-faint pointer-events-none">
-                <SearchIcon />
-              </span>
-            </div>
+          {abaAtiva !== 'visao-geral' && (
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                <input
+                  type="text"
+                  value={termoBusca}
+                  onChange={(e) => setTermoBusca(e.target.value)}
+                  placeholder="Filtrar nesta página..."
+                  className="w-60 sm:w-72 rounded-sm border border-line-strong bg-cream-soft pl-9 pr-3 py-1.5 font-body text-xs text-coffee placeholder:text-coffee-faint focus:border-forest focus:outline-none"
+                />
+                <span className="absolute left-2.5 top-2 text-coffee-faint pointer-events-none">
+                  <SearchIcon />
+                </span>
+              </div>
 
-            <button
-              type="button"
-              onClick={() => setModalNovoLivro(true)}
-              className="px-4 py-2 bg-forest hover:bg-forest-soft text-cream text-xs uppercase tracking-wider font-semibold rounded-sm transition-colors flex items-center gap-2 shadow-sm"
-            >
-              <span className="text-gold font-bold text-base leading-none">+</span>
-              Novo Livro
-            </button>
-          </div>
+              <button
+                type="button"
+                onClick={() =>
+                  abaAtiva === 'descontos'
+                    ? handleNovoCupom()
+                    : setModalNovoLivro(true)
+                }
+                className="px-4 py-2 bg-forest hover:bg-forest-soft text-cream text-xs uppercase tracking-wider font-semibold rounded-sm transition-colors flex items-center gap-2 shadow-sm"
+              >
+                <span className="text-gold font-bold text-base leading-none">+</span>
+                {abaAtiva === 'descontos' ? 'Novo Cupom' : 'Novo Livro'}
+              </button>
+            </div>
+          )}
         </header>
 
         {/* Abas mobile */}
@@ -570,6 +656,14 @@ export default function Admin({ onVoltarParaLoja }) {
             }`}
           >
             Clientes ({clientes.length})
+          </button>
+          <button
+            onClick={() => setAbaAtiva('descontos')}
+            className={`py-3 px-4 font-body text-xs uppercase tracking-wider font-semibold whitespace-nowrap border-b-2 ${
+              abaAtiva === 'descontos' ? 'border-forest text-forest' : 'border-transparent text-coffee-faint'
+            }`}
+          >
+            Cupons ({cupons.length})
           </button>
         </div>
 
@@ -952,6 +1046,121 @@ export default function Admin({ onVoltarParaLoja }) {
               </div>
             </section>
           )}
+
+          {/* ===================== ABA: DESCONTOS & CUPONS ===================== */}
+          {abaAtiva === 'descontos' && (
+            <section className="bg-cream-soft rounded-sm border border-line shadow-sm overflow-hidden">
+              <div className="p-6 border-b border-line flex flex-wrap justify-between items-center gap-4">
+                <div>
+                  <h3 className="font-display text-xl font-bold text-coffee">
+                    Cupons de Desconto
+                  </h3>
+                  <p className="font-body text-xs text-coffee-faint">
+                    {cuponsFiltrados.length} cupom(ns) cadastrado(s)
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleNovoCupom}
+                  className="px-4 py-2 bg-forest text-cream text-xs uppercase tracking-wider font-semibold rounded-sm hover:bg-forest-soft transition-colors"
+                >
+                  + Novo Cupom
+                </button>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left font-body text-sm">
+                  <thead className="bg-cream-tint/60 text-[0.72rem] uppercase tracking-[0.16em] text-coffee-faint border-b border-line">
+                    <tr>
+                      <th className="py-3.5 px-6 font-semibold">Código</th>
+                      <th className="py-3.5 px-6 font-semibold">Desconto</th>
+                      <th className="py-3.5 px-6 font-semibold">Mín. Compra</th>
+                      <th className="py-3.5 px-6 font-semibold">Validade</th>
+                      <th className="py-3.5 px-6 font-semibold">Usos</th>
+                      <th className="py-3.5 px-6 font-semibold">Status</th>
+                      <th className="py-3.5 px-6 font-semibold text-right">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-line text-coffee-soft">
+                    {cuponsFiltrados.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="py-10 px-6 text-center text-xs text-coffee-faint">
+                          Nenhum cupom cadastrado. Use “+ Novo Cupom” para começar.
+                        </td>
+                      </tr>
+                    ) : (
+                      cuponsFiltrados.map((cupom) => {
+                        const expirado =
+                          cupom.valid_until && new Date(cupom.valid_until) < new Date()
+                        return (
+                          <tr key={cupom.id} className="hover:bg-cream-deep/40 transition-colors">
+                            <td className="py-4 px-6 font-mono text-xs font-semibold text-coffee">
+                              {cupom.code}
+                              {cupom.product_id && (
+                                <span className="ml-2 text-[0.65rem] uppercase tracking-wider px-2 py-0.5 bg-cream-deep text-coffee-faint rounded font-body font-semibold">
+                                  Produto #{cupom.product_id}
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-4 px-6 font-display font-bold text-coffee">
+                              {cupom.discount_type === 'fixed'
+                                ? `R$ ${Number(cupom.discount_value).toFixed(2).replace('.', ',')}`
+                                : `${cupom.discount_value}%`}
+                              {cupom.max_discount != null && cupom.discount_type === 'percentage' && (
+                                <span className="block text-[0.65rem] font-body font-normal text-coffee-faint">
+                                  máx. R$ {Number(cupom.max_discount).toFixed(2).replace('.', ',')}
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-4 px-6 text-xs">
+                              {cupom.min_purchase != null
+                                ? `R$ ${Number(cupom.min_purchase).toFixed(2).replace('.', ',')}`
+                                : '—'}
+                            </td>
+                            <td className="py-4 px-6 text-xs text-coffee-faint">
+                              {cupom.valid_until
+                                ? new Date(cupom.valid_until).toLocaleDateString('pt-BR')
+                                : '—'}
+                            </td>
+                            <td className="py-4 px-6 text-xs">
+                              {cupom.max_uses != null ? `${cupom.max_uses}` : 'Ilimitado'}
+                            </td>
+                            <td className="py-4 px-6">
+                              <span
+                                className={`text-xs font-semibold px-2 py-0.5 rounded ${
+                                  !cupom.is_active || expirado
+                                    ? 'bg-red-100 text-red-800'
+                                    : 'bg-forest-tint text-forest'
+                                }`}
+                              >
+                                {!cupom.is_active ? 'Inativo' : expirado ? 'Expirado' : 'Ativo'}
+                              </span>
+                            </td>
+                            <td className="py-4 px-6 text-right whitespace-nowrap">
+                              <button
+                                type="button"
+                                onClick={() => handleEditarCupom(cupom)}
+                                className="text-xs text-forest hover:text-forest-soft font-medium transition-colors mr-4"
+                              >
+                                Editar
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleExcluirCupom(cupom)}
+                                className="text-xs text-red-700 hover:text-red-900 font-medium transition-colors"
+                              >
+                                Excluir
+                              </button>
+                            </td>
+                          </tr>
+                        )
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          )}
         </div>
       </main>
 
@@ -1095,6 +1304,16 @@ export default function Admin({ onVoltarParaLoja }) {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Modal: Novo/Editar Cupom */}
+      {modalCupom && (
+        <ModalCupom
+          onClose={() => setModalCupom(false)}
+          onSalvar={handleSalvarCupom}
+          cupomParaEditar={cupomEditando}
+          produtos={livros}
+        />
       )}
     </div>
   )

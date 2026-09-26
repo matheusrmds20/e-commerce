@@ -56,6 +56,10 @@ export function AuthProvider({ children }) {
     setUsuario(null)
   }, [])
 
+  const atualizarUsuario = useCallback((dados) => {
+    setUsuario((atual) => ({ ...atual, ...dados }))
+  }, [])
+
   const value = useMemo(
     () => ({
       usuario,
@@ -63,10 +67,11 @@ export function AuthProvider({ children }) {
       carregando,
       login,
       logout,
+      atualizarUsuario,
       // Reexportado para o formulário mapear erros sem importar o client.
       toApiError,
     }),
-    [usuario, carregando, login, logout],
+    [usuario, carregando, login, logout, atualizarUsuario],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

@@ -4,6 +4,7 @@ import SeletorEndereco from '../components/SeletorEndereco'
 import SeletorPagamento from '../components/SeletorPagamento'
 import ModalEndereco from '../components/ModalEndereco'
 import ModalCartao from '../components/ModalCartao'
+import SecaoCupons from '../components/SecaoCupons'
 import { LockIcon } from '../components/Icons'
 import { useCart } from '../context/cart-context'
 import { useAuth } from '../context/auth-context'
@@ -11,6 +12,7 @@ import { calcularTotais, formatarPreco } from '../api/adapters'
 import addressService from '../api/addresses'
 import orderService from '../api/orders'
 import cardService from '../api/cards'
+import couponService from '../api/coupons'
 
 export default function Checkout({ onIrParaLogin }) {
   const { itens, carregando: carrinhoCarregando, recarregar } = useCart()
@@ -48,11 +50,72 @@ export default function Checkout({ onIrParaLogin }) {
   const [enviando, setEnviando] = useState(false)
   const [pedido, setPedido] = useState(null)
 
+  // Estados de Cupons
+  const [cupons, setCupons] = useState([])
+  const [cupomSelecionado, setCupomSelecionado] = useState(null)
+
   // Totais do carrinho
-  const { subtotal, frete, total } = useMemo(
+  const { subtotal, frete, total: totalBase } = useMemo(
     () => calcularTotais(itens),
     [itens],
   )
+
+  // Cupons válidos para a sacola atual: ativos, não expirados, aplicáveis a
+  // algum item da sacola e com compra mínima atingida.
+  const cuponsDisponiveis = useMemo(() => {
+    const agora = new Date()
+    const productIds = new Set(
+      itens.map((item) => item.productId ?? item.id).filter((id) => id != null),
+    )
+    return cupons.filter((cupom) => {
+      if (!cupom.is_active) return false
+      if (cupom.valid_until && new Date(cupom.valid_until) < agora) return false
+      if (cupom.product_id != null && !productIds.has(cupom.product_id)) return false
+      if (
+        cupom.min_purchase != null &&
+        subtotal < Number(cupom.min_purchase)
+      )
+        return false
+      return true
+    })
+  }, [cupons, itens, subtotal])
+
+  // Cupom efetivamente aplicado: derivado dos disponíveis, o que expira/
+  // deixa de valer sozinho quando a sacola muda (sem efeito nem setState).
+  const cupomAplicado =
+    cuponsDisponiveis.find((c) => c.id === cupomSelecionado?.id) ?? null
+
+  // Desestimativa do desconto do cupom selecionado (mesma regra do backend:
+  // percentage = % sobre o subtotal; fixed = valor absoluto; teto em
+  // max_discount). O servidor recalcula e valida na criação do pedido.
+  const desconto = useMemo(() => {
+    if (!cupomAplicado) return 0
+    if (cupomAplicado.discount_type === 'percentage') {
+      return Math.min(
+        subtotal * (cupomAplicado.discount_value / 100),
+        cupomAplicado.max_discount ?? Infinity,
+      )
+    }
+    return Math.min(cupomAplicado.discount_value, subtotal)
+  }, [cupomAplicado, subtotal])
+
+  const total = Math.max(0, totalBase - desconto)
+
+  // Carrega os cupons disponíveis (público no backend)
+  useEffect(() => {
+    let ativo = true
+    couponService
+      .listar()
+      .then((lista) => {
+        if (ativo) setCupons(Array.isArray(lista) ? lista : [])
+      })
+      .catch(() => {
+        if (ativo) setCupons([])
+      })
+    return () => {
+      ativo = false
+    }
+  }, [])
 
   // Carrega os endereços do usuário
   const carregarEnderecos = useCallback(async () => {
@@ -201,6 +264,7 @@ export default function Checkout({ onIrParaLogin }) {
       const criado = await orderService.criar({
         address_id: enderecoSelecionado.id,
         notes: notasPagamento,
+        ...(cupomAplicado ? { coupon_id: cupomAplicado.id } : {}),
         items: itens.map((item) => ({
           product_id: item.productId ?? item.id,
           quantity: item.quantidade,
@@ -229,6 +293,8 @@ export default function Checkout({ onIrParaLogin }) {
             itens={itens}
             subtotal={subtotal}
             frete={frete}
+            desconto={desconto}
+            cupom={cupomAplicado}
             total={total}
             formatarPreco={formatarPreco}
           />
@@ -310,7 +376,17 @@ export default function Checkout({ onIrParaLogin }) {
 
                   <div className="border-t border-line" />
 
-                  {/* 2. Seletor de Método de Pagamento */}
+                  {/* 2. Seletor de Cupom de Desconto */}
+                  <SecaoCupons
+                    cuponsDisponiveis={cuponsDisponiveis}
+                    cupomSelecionado={cupomSelecionado}
+                    onSelecionarCupom={setCupomSelecionado}
+                    desabilitado={enviando || !autenticado}
+                  />
+
+                  <div className="border-t border-line" />
+
+                  {/* 3. Seletor de Método de Pagamento */}
                   <fieldset disabled={enviando || !autenticado}>
                     <SeletorPagamento
                       tipoPagamento={tipoPagamento}
