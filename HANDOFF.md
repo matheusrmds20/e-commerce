@@ -4,10 +4,12 @@
 > o que o frontend consome, endpoints não usados, e as features já implementadas
 > (Cupons por usuário, Users/Minha Conta, Wishlist segura) e o estado do repositório.
 >
-> Última atualização: **Parte 10 — limpeza de endpoints órfãos** — removidas
-> **11 rotas** nunca consumidas pelo front: 9 de `/coupons` e 2 de `/wishlists`
-> (+ métodos de service/repo/schema e testes). Antes disso: **Parte 9** (edição
-> de produtos no Admin) e **Parte 8** (segurança em `/users`).
+> Última atualização: **Parte 10 — limpeza de endpoints órfãos + `.gitignore`** —
+> removidas **11 rotas** nunca consumidas pelo front (9 de `/coupons`, 2 de
+> `/wishlists`); criado `.gitignore` (raiz + `backend/`), removidos 178 `.pyc`,
+> 2 `.coverage` e os segredos `backend/.env`/`.env.bak` do rastreamento; nova
+> `SECRET_KEY` gerada. **Pendência anotada (seção 8b):** limpar o histórico do
+> git quando o repositório for tornado público.
 
 ---
 
@@ -726,6 +728,38 @@ a SEO/rotas públicas).
   (aproveitou-se para corrigir a ordenação de imports de `schemas/wishlist.py` e
   um whitespace pré-existente em `coupon_service.py`); OpenAPI confirma que as
   11 rotas sumiram (Coupons 13→4 paths, Wishlist 7→5).
+
+---
+
+## 8b. Checklist para tornar o repositório público
+
+> ⚠️ **PENDÊNCIA REGISTRADA PELO USUÁRIO:** quando o repositório for
+> tornado público, **limpar o histórico do git** para remover os segredos que
+> já foram commitados (ver abaixo). Enquanto o repo for privado, a limpeza
+> fica adiada.
+
+### Contexto: segredos no histórico
+Até o commit `9c477c6`, o repositório **rastreava** `backend/.env` e
+`backend/.env.bak`, que contêm segredos em texto puro:
+- `SECRET_KEY` (chave JWT antiga),
+- `DATABASE_URL` e `POSTGRES_PASSWORD` (banco de **teste** local — risco baixo).
+
+No commit `b57eee2` os dois arquivos foram **removidos do rastreamento**
+(`git rm --cached`) e adicionados ao `.gitignore` — mas eles **permanecem no
+histórico** dos commits anteriores.
+
+A `SECRET_KEY` **já foi rotacionada** (nova chave em `backend/.env`, gerada com
+`secrets.token_urlsafe(64)`), o que invalida tokens emitidos com a chave antiga.
+
+### A fazer ANTES de tornar público
+1. **Limpar o histórico** (`git filter-repo --path backend/.env --path backend/.env.bak --invert-paths`
+   ou BFG). Isso reescreve hashes e exige **force-push** coordenado.
+2. Confirmar que `backend/.env` não aparece em `git log --all -- backend/.env`.
+3. (Opcional) rotacionar novamente a `SECRET_KEY` e a senha do banco após a
+   limpeza, por precaução.
+
+> Nota: o `.gitignore` (raiz + `backend/`) e a remoção dos 178 `.pyc`/`__pycache__`
+> e dos 2 `.coverage` **já foram feitos** no commit `b57eee2`.
 
 ---
 
