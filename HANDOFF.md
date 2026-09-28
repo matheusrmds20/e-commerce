@@ -4,10 +4,10 @@
 > o que o frontend consome, endpoints não usados, e as features já implementadas
 > (Cupons por usuário, Users/Minha Conta, Wishlist segura) e o estado do repositório.
 >
-> Última atualização: **Parte 8 — segurança em `/users` concluída** —
-> `POST /users/create` agora exige **admin** (antes era público e criava ADMIN
-> por padrão) e `GET /users/email/{email}` passou a ser **admin-only**
-> (fecha o vazamento de dados por e-mail).
+> Última atualização: **Parte 10 — limpeza de endpoints órfãos** — removidas
+> **11 rotas** nunca consumidas pelo front: 9 de `/coupons` e 2 de `/wishlists`
+> (+ métodos de service/repo/schema e testes). Antes disso: **Parte 9** (edição
+> de produtos no Admin) e **Parte 8** (segurança em `/users`).
 
 ---
 
@@ -25,7 +25,7 @@
 # Backend — testes (a venv está em ./venv)
 cd "C:/Users/mathe/OneDrive/Desktop/E-commerce v1/backend"
 source ../venv/Scripts/activate
-python -m pytest tests/ -q          # atualmente: 600 passed (~14s, cobertura 87%)
+python -m pytest tests/ -q          # atualmente: 561 passed (~13s, cobertura 87%)
 python -m ruff check app/           # há erros PRÉ-EXISTENTES de whitespace
 
 # Migrations (da raiz do repo)
@@ -89,7 +89,7 @@ npm run build
 |---|---|---|
 | `authService` | `login`, `register`, `me`, `logout` | — |
 | `addressService` | `criar`, `listar`, `definirPadrao`, `atualizar`, `excluir` | — |
-| `productService` | `listar`, `obter`, `listarPorDesconto`, `listarPorAtivo`, `listarDestaques`, `listarMaisVendidos`, `listarPaginado`, `recomendacoes`, `criar`, `atualizar`¹, `excluir` | ❌ `listarPorCategoria` (removido na limpeza) |
+| `productService` | `listar`, `obter`, `listarPorDesconto`, `listarPorAtivo`, `listarDestaques`, `listarMaisVendidos`, `listarPaginado`, `recomendacoes`, `criar`, `atualizar`, `excluir` | ❌ `listarPorCategoria` (removido na limpeza) |
 | `categoryService` | `listar` | — |
 | `cartService` | `criar`, `obter`, `adicionarItem`, `atualizarQuantidade`, `removerItem`, `limpar` | — |
 | `orderService` | `criar`, `listar`, `cancelar` | — |
@@ -101,11 +101,11 @@ npm run build
 | `newsletterService` | `inscrever`, `listarInscritos` | — |
 
 > Membros de service órfãos foram **removidos** na limpeza de código morto
-> (exceção: `productService.atualizar` foi mantido — usuário considera que será
-> usado em breve). Também removidos: `mascararCartao` (em `cards.js`) e,
+> (exceção: `productService.atualizar` foi mantido — e **passou a ser usado**
+> na Parte 9, botão "Editar" da aba Acervo). Também removidos: `mascararCartao` (em `cards.js`) e,
 > em `adapters.js`, `itensParaOrderPayload` e `pedidoParaView`.
-> ¹ `productService.atualizar` existe no service mas ainda não é chamado por
-> nenhuma tela (endpoint `PATCH /products/update/{id}` existe no backend).
+> ¹ `productService.atualizar` agora é chamado pelo botão **"Editar"** de cada
+> linha da aba Acervo do Admin (`PATCH /products/update/{id}`).
 > Componentes de `src/components/` foram auditados: **nenhum** está órfão.
 
 ---
@@ -127,8 +127,10 @@ O backend expõe **muito mais** do que o front consome. Agrupado por área:
   (`CATEGORY_NOT_FOUND`/`PRODUCT_NOT_FOUND`) — antes viravam 500.
 - **Públicos e usados:** `list`, `get/{id}`, `paginated`, `recommendations`,
   `featured`, `bestsellers`, `category/{id}`, `discount/{pct}`, `active/{bool}`
-  (os dois últimos alimentam a Home). **`update` existe no service mas ainda não é
-  chamado por nenhuma tela** (mantido de propósito — será usado em breve).
+  (os dois últimos alimentam a Home). **`update` agora é usado** pelo botão
+  "Editar" da aba Acervo do Admin (Parte 9): `PATCH /products/update/{id}`
+  (admin), PATCH parcial — campos vazios são omitidos e o `slug` não é
+  regerado ao editar.
 
 ### Categories (`/categories`) — **escrita restrita a admin na Parte 6b**
 Usados pelo front: `GET /list` (público), `POST /create`, `PATCH /update/{id}`,
@@ -137,10 +139,17 @@ Usados pelo front: `GET /list` (público), `POST /create`, `PATCH /update/{id}`,
 404: `GET /get/{id}`, `GET /name/{name}`, `GET /slug/{slug}`. Duplicado de
 nome/slug → **409 `DUPLICATE_CATEGORY`** (antes os ValueErrors viravam 500).
 
-### Coupons (`/coupons`) — parcialmente usados
+### Coupons (`/coupons`) — **limpo na Parte 10**
 Usados no Admin: `create`, `list`, `update/{id}`, `delete/{id}`.
-**Não usados:** `GET /get/{id}`, `GET /code/{code}`, `GET /product/{id}`, `GET /valid-until/{d}`,
-`GET /max-uses/{n}`, `GET /discount-type/{t}`, `GET /discount-value/{v}`, `GET /min-purchase/{v}`, `GET /max-discount/{v}`.
+**Removidos como órfãos (9 rotas):** `GET /get/{id}`, `GET /code/{code}`,
+`GET /product/{id}`, `GET /valid-until/{d}`, `GET /max-uses/{n}`,
+`GET /discount-type/{t}`, `GET /discount-value/{v}`, `GET /min-purchase/{v}`,
+`GET /max-discount/{v}` — e os métodos de service correspondentes
+(`CouponService.get_by_*`) + lookups órfãos do repo (`get_by_product_id`,
+`get_by_valid_until`, `get_by_max_uses`, `get_by_discount_type`,
+`get_by_discount_value`, `get_by_min_purchase`, `get_by_max_discount`,
+`get_by_created_at`, `get_by_updated_at`). O repo mantém só `get_by_code`
+(usado por `create`/`update`) + `get_by_id`/`get_all` da base.
 
 ### Cart (`/cart`) — **limpo na Parte 5**
 Rotas restantes (todas escopadas ao usuário do token): `POST /create`, `GET /cart/me`,
@@ -173,7 +182,11 @@ O dono vem do **token** (`Depends(get_current_user)`), não mais da query `user_
 (IDOR fechado). Item de terceiro → **403 `WISHLIST_FORBIDDEN`**; admin opera sobre
 qualquer usuário. `GET /wishlists/all` é restrito a admin.
 Usados pelo front: `create`, `list`, `product/{id}` (novo, no DetalheLivro), `delete/{id}`.
-**Ainda não usados:** `GET /get/{id}`, `PATCH /update/{id}`.
+**Removidos como órfãos na Parte 10 (2 rotas):** `GET /get/{id}` e
+`PATCH /update/{id}` — + métodos de service `get_by_id`/`update`
+(e `get_by_created_at`/`get_by_updated_at`, sem rota), lookups do repo
+`get_by_created_at`/`get_by_updated_at` e o schema `WishlistUpdate`.
+O repo mantém `get_by_product_id` + `get_by_id`/`get_by_user_id`/`get_all` da base.
 
 ### Reviews (`/reviews`) — **protegido na Parte 6a (fecha IDOR)**
 O autor vem do **token**; criar/atualizar/excluir exigem Bearer. Avaliação de
@@ -434,11 +447,11 @@ frontend/Papiro/src/api/users.js
 ## 7. Validação atual
 
 > Números citados nas seções 5b–5e e 8 são **snapshots históricos por parte**
-> (mostram a evolução da suíte). O estado **atual** é o abaixo: **600 passed**.
+> (mostram a evolução da suíte). O estado **atual** é o abaixo: **561 passed**.
 
-- **Backend:** `600 passed` (~14s, cobertura 87%; 60 warnings — todos
+- **Backend:** `561 passed` (~13s, cobertura 87%; 60 warnings — todos
   `StarletteDeprecationWarning` de `HTTP_422_UNPROCESSABLE_ENTITY`, cosméticos).
-  (Parte 8: +6 testes de auth em `/users`.)
+  (Parte 10: −39 testes dos endpoints órfãos de coupons/wishlist.)
 - **Frontend:** `npx eslint src/` limpo; `npm run build` OK (warning pré-existente de
   chunk >500 kB). Após a limpeza de código morto: eslint limpo, build OK e grep
   confirmando zero referências aos símbolos removidos.
@@ -621,6 +634,98 @@ Fecha as **duas pendências de segurança** registradas na Parte A de Users.
   `test_create_forbidden_for_customer` e `test_get_by_email_forbidden_for_customer`.
 - **Validação:** **600 passed** (+6); ruff limpo nos arquivos tocados; eslint
   limpo; build OK.
+
+---
+
+## 5g. Feature implementada: editar produto no Admin (Parte 9)
+
+### 5g.1. Conceito
+A aba **Acervo** do Admin só permitia criar e remover livros. Agora cada linha
+(ao lado de "Remover") tem um botão **"Editar"** que abre o **mesmo modal** de
+cadastro em modo edição — fechando a pendência do `productService.atualizar`
+(existia no service desde a Parte 6c mas nenhuma tela o chamava).
+
+### 5g.2. Frontend (`src/pages/Admin.jsx`) — único arquivo alterado
+- **Estado:** novo `livroEditando` (`null` = modo criação).
+- **Handlers:**
+  - `handleNovoLivro()` — abre em criação (limpa form + `livroEditando`).
+  - `handleEditarLivro(livro)` — pré-preenche título/autor/categoria/preço/estoque
+    e abre o modal.
+  - `handleSalvarLivro(e)` — substitui `handleCadastrarLivro`; ramifica:
+    - **criar** (sem `livroEditando`): gera `slug` + `description` default,
+      `is_active: true`, flags falsas; `productService.criar`.
+    - **editar**: envia **apenas** `title`, `author`, `price`, `stock_qty`,
+      `category_id` — e `description` **só se preenchida** (PATCH parcial; campos
+      vazios omitidos). **Não regera o slug.** Chama
+      `productService.atualizar(id, payload)` e atualiza a linha no estado.
+  - `fecharModalLivro()` — fecha e limpa `livroEditando` (X e Cancelar).
+  - `handleRemoverLivro` usa `setLivros(prev => ...)` (sem closure stale).
+- **UI:** botão "Editar" (verde) + "Remover" na coluna Ações; título do modal
+  ("Cadastrar Obra" ⇄ "Editar Obra"), label da Descrição ("(em branco mantém a
+  atual)" no editar) e botão de submit ("Adicionar ao Catálogo" ⇄ "Salvar
+  Alterações"). Os 2 gatilhos de abertura (botão do cabeçalho e "+ Adicionar
+  Livro") usam `handleNovoLivro`.
+
+### 5g.3. Backend
+Nenhuma mudança — `PATCH /products/update/{id}` (admin, `ProductUpdate` parcial)
+ já existia desde a Parte 6c.
+
+### 5g.4. Validação
+- Frontend: `npx eslint src/` limpo; `npm run build` OK (warning de chunk >500 kB
+  é pré-existente).
+- Backend: inalterado (**600 passed**).
+
+---
+
+## 5h. Feature implementada: limpeza de endpoints órfãos (Parte 10)
+
+### 5h.1. Conceito
+Remoção das rotas do backend que **nunca foram consumidas** pelo frontend
+(código morto desde o início do projeto), seguindo o padrão das Partes 4/5/6.
+Escopo desta parte: **Coupons** e **Wishlist**. **Addresses** e **Categories**
+foram mantidos de propósito (decisão do usuário: `GET /addresses/zip/{zip}`
+pode virar autopreenchimento de endereço; as buscas de Categories podem servir
+a SEO/rotas públicas).
+
+### 5h.2. Coupons — 9 rotas removidas
+`GET /get/{id}`, `GET /code/{code}`, `GET /product/{id}`, `GET /valid-until/{d}`,
+`GET /max-uses/{n}`, `GET /discount-type/{t}`, `GET /discount-value/{v}`,
+`GET /min-purchase/{v}`, `GET /max-discount/{v}`.
+- **Router** (`app/api/v1/coupons.py`): removidas as rotas + o import `datetime`
+  (só usado por `valid-until`). Permanecem `create`, `list`, `update/{id}`,
+  `delete/{id}`.
+- **Service** (`app/services/coupon_service.py`): removidos `get_by_id`,
+  `get_by_code`, `get_by_product_id`, `get_by_valid_until`, `get_by_max_uses`,
+  `get_by_discount_type`, `get_by_discount_value`, `get_by_min_purchase`,
+  `get_by_max_discount` + import `datetime`. Permanecem `get_all`, `create`,
+  `update`, `delete`.
+- **Repo** (`app/repositories/coupon_repo.py`): permanece só `get_by_code`
+  (usado por `create`/`update`) — removidos os 7 lookups de filtro + os órfãos
+  `get_by_created_at`/`get_by_updated_at`. `get_by_id`/`get_all` vêm da base.
+
+### 5h.3. Wishlist — 2 rotas removidas
+`GET /get/{id}` e `PATCH /update/{id}`.
+- **Router** (`app/api/v1/wishlist.py`): removidas as rotas + import
+  `WishlistUpdate`. Permanecem `create`, `list`, `all` (admin), `product/{id}`,
+  `delete/{id}`.
+- **Service** (`app/services/wishlist_service.py`): removidos `get_by_id`,
+  `update` e os órfãos `get_by_created_at`/`get_by_updated_at` + import
+  `datetime`. `_ensure_owner_or_admin` **permanece** (usado por `delete`).
+- **Repo** (`app/repositories/wishlist_repo.py`): permanece `get_by_product_id`;
+  removidos `get_by_created_at`/`get_by_updated_at`.
+- **Schema** (`app/schemas/wishlist.py`): removido `WishlistUpdate` (ficou órfão).
+
+### 5h.4. Testes
+- **Coupons:** removidos `TestGetCoupon` e `TestCouponFilters` (HTTP) e os
+  parametrizados `test_get_single_success/not_found` + metade de
+  `test_get_list_*` (service).
+- **Wishlist:** removidos `TestGetWishlistItem` e `TestUpdateWishlistItem`
+  (HTTP) e os casos de `get_by_id`/`update`/`get_by_created_at`/`get_by_updated_at`
+  (service).
+- **Validação:** **561 passed** (era 600; −39); ruff limpo nos arquivos tocados
+  (aproveitou-se para corrigir a ordenação de imports de `schemas/wishlist.py` e
+  um whitespace pré-existente em `coupon_service.py`); OpenAPI confirma que as
+  11 rotas sumiram (Coupons 13→4 paths, Wishlist 7→5).
 
 ---
 

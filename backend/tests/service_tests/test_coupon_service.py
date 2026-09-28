@@ -32,43 +32,6 @@ def create_payload(**kwargs):
 @pytest.mark.parametrize(
     "method,repo_method,lookup",
     [
-        ("get_by_id", "get_by_id", 99),
-        ("get_by_code", "get_by_code", "SEM-CUPOM"),
-        ("get_by_valid_until", "get_by_valid_until", future()),
-        ("get_by_max_uses", "get_by_max_uses", 5),
-        ("get_by_discount_type", "get_by_discount_type", "percentage"),
-        ("get_by_discount_value", "get_by_discount_value", 10.0),
-        ("get_by_min_purchase", "get_by_min_purchase", 100.0),
-        ("get_by_max_discount", "get_by_max_discount", 20.0),
-    ],
-)
-def test_get_single_success(coupon_service, coupon_repo, method, repo_method, lookup):
-    coupon = make_coupon()
-    getattr(coupon_repo, repo_method).return_value = coupon
-
-    assert getattr(coupon_service, method)(lookup) is coupon
-
-
-@pytest.mark.parametrize(
-    "method,repo_method,lookup,message",
-    [
-        ("get_by_id", "get_by_id", 99, "No coupon found with id 99"),
-        ("get_by_code", "get_by_code", "SEM-CUPOM", "No coupon found with code SEM-CUPOM"),
-    ],
-)
-def test_get_single_not_found(coupon_service, coupon_repo, method, repo_method, lookup, message):
-    getattr(coupon_repo, repo_method).return_value = None
-
-    with pytest.raises(ValueError) as exc:
-        getattr(coupon_service, method)(lookup)
-
-    assert str(exc.value) == message
-
-
-@pytest.mark.parametrize(
-    "method,repo_method,lookup",
-    [
-        ("get_by_product_id", "get_by_product_id", 1),
         ("get_all", "get_all", None),
     ],
 )
@@ -87,7 +50,6 @@ def test_get_list_success(coupon_service, coupon_repo, method, repo_method, look
 @pytest.mark.parametrize(
     "method,repo_method,lookup,message",
     [
-        ("get_by_product_id", "get_by_product_id", 1, "No coupons found with product_id 1"),
         ("get_all", "get_all", None, "No coupons found"),
     ],
 )

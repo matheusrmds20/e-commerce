@@ -1,11 +1,9 @@
-from datetime import datetime
-
 import pytest
 
 from app.models.product import Product
 from app.models.user import User, UserRole
 from app.models.wishlist import Wishlist
-from app.schemas.wishlist import WishlistCreate, WishlistUpdate
+from app.schemas.wishlist import WishlistCreate
 
 
 def make_user(**kwargs):
@@ -48,34 +46,6 @@ def make_wishlist(**kwargs):
 
 
 class TestGet:
-    def test_get_by_id_success(self, wishlist_service, wishlist_repo):
-        item = make_wishlist()
-        wishlist_repo.get_by_id.return_value = item
-
-        assert wishlist_service.get_by_id(1, make_user()) is item
-
-    def test_get_by_id_not_found(self, wishlist_service, wishlist_repo):
-        wishlist_repo.get_by_id.return_value = None
-
-        with pytest.raises(ValueError) as exc:
-            wishlist_service.get_by_id(99, make_user())
-
-        assert str(exc.value) == "No wishlist item found with id 99"
-
-    def test_get_by_id_not_owned(self, wishlist_service, wishlist_repo):
-        wishlist_repo.get_by_id.return_value = make_wishlist(user_id=2)
-
-        with pytest.raises(ValueError) as exc:
-            wishlist_service.get_by_id(1, make_user())
-
-        assert str(exc.value) == "Wishlist item is not owned by user"
-
-    def test_get_by_id_admin_can_read_other(self, wishlist_service, wishlist_repo):
-        item = make_wishlist(user_id=2)
-        wishlist_repo.get_by_id.return_value = item
-
-        assert wishlist_service.get_by_id(1, make_admin()) is item
-
     def test_get_by_user_id_success(self, wishlist_service, user_repo):
         user = make_user()
         items = [make_wishlist()]
@@ -168,22 +138,6 @@ class TestGet:
 
         assert str(exc.value) == "No wishlist items found with product_id 1"
 
-    def test_get_by_created_at_empty(self, wishlist_service, wishlist_repo):
-        wishlist_repo.get_by_created_at.return_value = []
-
-        with pytest.raises(ValueError) as exc:
-            wishlist_service.get_by_created_at(datetime.now())
-
-        assert "No wishlist items found" in str(exc.value)
-
-    def test_get_by_updated_at_empty(self, wishlist_service, wishlist_repo):
-        wishlist_repo.get_by_updated_at.return_value = []
-
-        with pytest.raises(ValueError) as exc:
-            wishlist_service.get_by_updated_at(datetime.now())
-
-        assert "No wishlist items found" in str(exc.value)
-
     def test_get_all_success(self, wishlist_service, wishlist_repo):
         items = [make_wishlist()]
         wishlist_repo.get_all.return_value = items
@@ -246,64 +200,6 @@ class TestCreate:
 
         with pytest.raises(ValueError) as exc:
             wishlist_service.create(WishlistCreate(product_id=1), make_user())
-
-        assert "already has product" in str(exc.value)
-
-
-class TestUpdate:
-    def test_success(self, wishlist_service, wishlist_repo, product_repo):
-        item = make_wishlist()
-        wishlist_repo.get_by_id.return_value = item
-        product_repo.get_by_id.return_value = make_product()
-        wishlist_repo.get_by_user_id.return_value = [item]
-        wishlist_repo.update.return_value = item
-
-        result = wishlist_service.update(
-            1, WishlistUpdate(product_id=2), make_user()
-        )
-
-        assert result is item
-        assert item.product_id == 2
-        wishlist_repo.update.assert_called_once_with(item)
-
-    def test_not_found(self, wishlist_service, wishlist_repo):
-        wishlist_repo.get_by_id.return_value = None
-
-        with pytest.raises(ValueError) as exc:
-            wishlist_service.update(99, WishlistUpdate(product_id=2), make_user())
-
-        assert str(exc.value) == "No wishlist item found with id 99"
-
-    def test_not_owned(self, wishlist_service, wishlist_repo):
-        wishlist_repo.get_by_id.return_value = make_wishlist(user_id=2)
-
-        with pytest.raises(ValueError) as exc:
-            wishlist_service.update(1, WishlistUpdate(product_id=2), make_user())
-
-        assert str(exc.value) == "Wishlist item is not owned by user"
-
-    def test_admin_can_update_other(self, wishlist_service, wishlist_repo, product_repo):
-        item = make_wishlist(user_id=2)
-        wishlist_repo.get_by_id.return_value = item
-        product_repo.get_by_id.return_value = make_product()
-        wishlist_repo.get_by_user_id.return_value = [item]
-        wishlist_repo.update.return_value = item
-
-        result = wishlist_service.update(
-            1, WishlistUpdate(product_id=2), make_admin()
-        )
-
-        assert result is item
-
-    def test_duplicate_product(self, wishlist_service, wishlist_repo, product_repo):
-        item = make_wishlist()
-        other = make_wishlist(id=2, product_id=2)
-        wishlist_repo.get_by_id.return_value = item
-        product_repo.get_by_id.return_value = make_product()
-        wishlist_repo.get_by_user_id.return_value = [item, other]
-
-        with pytest.raises(ValueError) as exc:
-            wishlist_service.update(1, WishlistUpdate(product_id=2), make_user())
 
         assert "already has product" in str(exc.value)
 

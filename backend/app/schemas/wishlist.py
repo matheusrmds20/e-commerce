@@ -1,14 +1,11 @@
-from pydantic import BaseModel, Field, ConfigDict
 from datetime import datetime
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class WishlistCreate(BaseModel):
 
     product_id: int = Field(description="ID do produto")
-
-
-class WishlistUpdate(BaseModel):
-    product_id: int | None = Field(None, description="Novo ID do produto")
 
 
 class WishlistResponse(BaseModel):

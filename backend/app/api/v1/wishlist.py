@@ -10,7 +10,7 @@ from app.api.exceptions import (
     WishlistForbiddenException,
 )
 from app.models.user import User
-from app.schemas.wishlist import WishlistCreate, WishlistResponse, WishlistUpdate
+from app.schemas.wishlist import WishlistCreate, WishlistResponse
 from app.services.wishlist_service import WishlistService
 
 wishlist_router = APIRouter()
@@ -69,20 +69,6 @@ def list_wishlist_items(current_user: AuthUser, db: DbSession) -> list:
 
 
 @wishlist_router.get(
-    "/get/{wishlist_id}",
-    response_model=WishlistResponse,
-    summary="Busca um item da wishlist pelo ID (dono ou admin)",
-)
-def get_wishlist_item(
-    wishlist_id: int, current_user: AuthUser, db: DbSession
-) -> WishlistResponse:
-    try:
-        return get_wishlist_service(db).get_by_id(wishlist_id, current_user)
-    except ValueError as exc:
-        raise _traduzir_value_error(exc) from exc
-
-
-@wishlist_router.get(
     "/all",
     response_model=list[WishlistResponse],
     summary="Lista todos os itens de wishlists (restrito a administradores)",
@@ -104,23 +90,6 @@ def get_wishlist_by_product_id(
 ) -> list:
     try:
         return get_wishlist_service(db).get_by_product_id(product_id, current_user)
-    except ValueError as exc:
-        raise _traduzir_value_error(exc) from exc
-
-
-@wishlist_router.patch(
-    "/update/{wishlist_id}",
-    response_model=WishlistResponse,
-    summary="Atualiza um item da wishlist (dono ou admin)",
-)
-def update_wishlist_item(
-    wishlist_id: int,
-    data: WishlistUpdate,
-    current_user: AuthUser,
-    db: DbSession,
-) -> WishlistResponse:
-    try:
-        return get_wishlist_service(db).update(wishlist_id, data, current_user)
     except ValueError as exc:
         raise _traduzir_value_error(exc) from exc
 

@@ -1,7 +1,6 @@
 """Testes HTTP da rota /api/v1/coupons.
 
-Sucesso: 201/200 com payloads válidos (criação, listagem, buscas por id/código/
-produto/validade/uso/tipo/valor e update/delete).
+Sucesso: 201/200 com payloads válidos (criação, listagem e update/delete).
 Erros: validação 422, cupom/produto inexistente 404 e código duplicado 409.
 
 NOTA: o CouponService real lança ``ValueError`` em vez das exceções de domínio
@@ -89,104 +88,6 @@ class TestListCoupons:
 
         assert response.status_code == 200
         assert len(response.json()) == 2
-
-
-class TestGetCoupon:
-    def test_get_by_id_success(self, client):
-        svc = Mock(name="coupon_service")
-        svc.get_by_id.return_value = coupon_payload()
-
-        with patch("app.api.v1.coupons.get_coupon_service", return_value=svc):
-            response = client.get(f"{PREFIX}/get/1")
-
-        assert response.status_code == 200
-        assert response.json()["id"] == 1
-
-    def test_get_by_id_not_found(self, client):
-        svc = Mock(name="coupon_service")
-        svc.get_by_id.side_effect = NotFoundException(
-            "No coupon found with id 999", code="COUPON_NOT_FOUND"
-        )
-
-        with patch("app.api.v1.coupons.get_coupon_service", return_value=svc):
-            response = client.get(f"{PREFIX}/get/999")
-
-        assert_error(response, 404, "COUPON_NOT_FOUND")
-
-    def test_get_by_code_success(self, client):
-        svc = Mock(name="coupon_service")
-        svc.get_by_code.return_value = coupon_payload()
-
-        with patch("app.api.v1.coupons.get_coupon_service", return_value=svc):
-            response = client.get(f"{PREFIX}/code/PROMO10")
-
-        assert response.status_code == 200
-
-    def test_get_by_product_id_success(self, client):
-        svc = Mock(name="coupon_service")
-        svc.get_by_product_id.return_value = [coupon_payload()]
-
-        with patch("app.api.v1.coupons.get_coupon_service", return_value=svc):
-            response = client.get(f"{PREFIX}/product/1")
-
-        assert response.status_code == 200
-        assert len(response.json()) == 1
-
-
-class TestCouponFilters:
-    def test_get_by_valid_until(self, client):
-        svc = Mock(name="coupon_service")
-        svc.get_by_valid_until.return_value = [coupon_payload()]
-
-        with patch("app.api.v1.coupons.get_coupon_service", return_value=svc):
-            response = client.get(f"{PREFIX}/valid-until/2025-12-31T00:00:00")
-
-        assert response.status_code == 200
-
-    def test_get_by_max_uses(self, client):
-        svc = Mock(name="coupon_service")
-        svc.get_by_max_uses.return_value = [coupon_payload()]
-
-        with patch("app.api.v1.coupons.get_coupon_service", return_value=svc):
-            response = client.get(f"{PREFIX}/max-uses/100")
-
-        assert response.status_code == 200
-
-    def test_get_by_discount_type(self, client):
-        svc = Mock(name="coupon_service")
-        svc.get_by_discount_type.return_value = [coupon_payload()]
-
-        with patch("app.api.v1.coupons.get_coupon_service", return_value=svc):
-            response = client.get(f"{PREFIX}/discount-type/percentage")
-
-        assert response.status_code == 200
-
-    def test_get_by_discount_value(self, client):
-        svc = Mock(name="coupon_service")
-        svc.get_by_discount_value.return_value = [coupon_payload()]
-
-        with patch("app.api.v1.coupons.get_coupon_service", return_value=svc):
-            response = client.get(f"{PREFIX}/discount-value/10.0")
-
-        assert response.status_code == 200
-
-    def test_get_by_min_purchase(self, client):
-        svc = Mock(name="coupon_service")
-        svc.get_by_min_purchase.return_value = [coupon_payload()]
-
-        with patch("app.api.v1.coupons.get_coupon_service", return_value=svc):
-            response = client.get(f"{PREFIX}/min-purchase/50.0")
-
-        assert response.status_code == 200
-
-    def test_get_by_max_discount(self, client):
-        svc = Mock(name="coupon_service")
-        svc.get_by_max_discount.return_value = [coupon_payload()]
-
-        with patch("app.api.v1.coupons.get_coupon_service", return_value=svc):
-            response = client.get(f"{PREFIX}/max-discount/30.0")
-
-        assert response.status_code == 200
 
 
 class TestUpdateCoupon:

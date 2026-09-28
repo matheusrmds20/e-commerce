@@ -177,6 +177,8 @@ export default function Admin({ onVoltarParaLoja }) {
   const [statsApi, setStatsApi] = useState(null)
   const [erroAviso, setErroAviso] = useState(null)
   const [modalNovoLivro, setModalNovoLivro] = useState(false)
+  // Livro em edição (null = modal em modo criação)
+  const [livroEditando, setLivroEditando] = useState(null)
   // Estados de Categorias
   const [categoriaEditando, setCategoriaEditando] = useState(null)
   const [modalCategoria, setModalCategoria] = useState(false)
@@ -270,8 +272,39 @@ export default function Admin({ onVoltarParaLoja }) {
     }
   }, [])
 
-  // Cadastrar livro
-  const handleCadastrarLivro = async (e) => {
+  // Fecha o modal de livro (limpa o modo edição)
+  const fecharModalLivro = () => {
+    setModalNovoLivro(false)
+    setLivroEditando(null)
+  }
+
+  // Abre o modal em modo criação (limpa o livro em edição)
+  const handleNovoLivro = () => {
+    setLivroEditando(null)
+    setNovoTitulo('')
+    setNovoAutor('')
+    setNovaCategoriaId(categorias[0]?.id ?? 1)
+    setNovoDescricao('')
+    setNovoPreco('')
+    setNovoEstoque('')
+    setModalNovoLivro(true)
+  }
+
+  // Abre o modal em modo edição, pré-preenchendo o formulário
+  const handleEditarLivro = (livro) => {
+    setLivroEditando(livro)
+    setNovoTitulo(livro.titulo || '')
+    setNovoAutor(livro.autor === 'Autor não informado' ? '' : livro.autor || '')
+    setNovaCategoriaId(livro.categoryId || categorias[0]?.id || 1)
+    setNovoDescricao('')
+    setNovoPreco(livro.preco != null ? String(livro.preco) : '')
+    setNovoEstoque(livro.estoque != null ? String(livro.estoque) : '')
+    setModalNovoLivro(true)
+  }
+
+  // Cria ou atualiza um livro. Em edição envia apenas os campos preenchidos
+  // (o backend aceita PATCH parcial) e NÃO regera o slug.
+  const handleSalvarLivro = async (e) => {
     e.preventDefault()
     if (!novoTitulo.trim() || !novoAutor.trim() || !novoPreco) return
 
@@ -281,48 +314,79 @@ export default function Admin({ onVoltarParaLoja }) {
     const precoNum = parseFloat(novoPreco) || 0
     const estoqueNum = parseInt(novoEstoque, 10) || 1
     const catId = Number(novaCategoriaId) || 1
-    const slug = `${gerarSlug(novoTitulo)}-${Date.now().toString().slice(-4)}`
-    const desc = novoDescricao.trim() || `Edição clássica de ${novoTitulo}, por ${novoAutor}.`
-
-    const payload = {
-      category_id: catId,
-      title: novoTitulo.trim(),
-      slug: slug,
-      description: desc,
-      price: precoNum,
-      author: novoAutor.trim(),
-      stock_qty: estoqueNum,
-      is_active: true,
-      is_featured: false,
-      is_bestseller: false,
-    }
 
     try {
-      const resp = await productService.criar(payload).catch(() => null)
-      const novoId = resp?.id || Date.now()
-      const categoriaNome =
-        categorias.find((c) => c.id === catId)?.name || 'Ficção Clássica'
+      if (livroEditando) {
+        const payload = {
+          title: novoTitulo.trim(),
+          author: novoAutor.trim(),
+          price: precoNum,
+          stock_qty: estoqueNum,
+          category_id: catId,
+        }
+        if (novoDescricao.trim()) payload.description = novoDescricao.trim()
 
-      const novoLivroObj = {
-        id: novoId,
-        titulo: payload.title,
-        autor: payload.author,
-        categoria: categoriaNome,
-        categoryId: catId,
-        preco: precoNum,
-        estoque: estoqueNum,
-        destaque: false,
+        const resp = await productService.atualizar(livroEditando.id, payload)
+        const categoriaNome =
+          categorias.find((c) => c.id === catId)?.name || livroEditando.categoria
+        const atualizado = {
+          ...livroEditando,
+          titulo: resp?.title ?? payload.title,
+          autor: resp?.author ?? payload.author,
+          categoria: resp?.category_name ?? categoriaNome,
+          categoryId: catId,
+          preco: resp?.price != null ? Number(resp.price) : precoNum,
+          estoque: resp?.stock_qty != null ? resp.stock_qty : estoqueNum,
+        }
+        setLivros((prev) =>
+          prev.map((l) => (l.id === livroEditando.id ? atualizado : l)),
+        )
+      } else {
+        const slug = `${gerarSlug(novoTitulo)}-${Date.now().toString().slice(-4)}`
+        const desc = novoDescricao.trim() || `Edição clássica de ${novoTitulo}, por ${novoAutor}.`
+        const payload = {
+          category_id: catId,
+          title: novoTitulo.trim(),
+          slug: slug,
+          description: desc,
+          price: precoNum,
+          author: novoAutor.trim(),
+          stock_qty: estoqueNum,
+          is_active: true,
+          is_featured: false,
+          is_bestseller: false,
+        }
+
+        const resp = await productService.criar(payload)
+        const novoId = resp?.id || Date.now()
+        const categoriaNome =
+          categorias.find((c) => c.id === catId)?.name || 'Ficção Clássica'
+        const novoLivroObj = {
+          id: novoId,
+          titulo: payload.title,
+          autor: payload.author,
+          categoria: categoriaNome,
+          categoryId: catId,
+          preco: precoNum,
+          estoque: estoqueNum,
+          destaque: false,
+        }
+        setLivros((prev) => [novoLivroObj, ...prev])
       }
 
-      setLivros([novoLivroObj, ...livros])
       setNovoTitulo('')
       setNovoAutor('')
       setNovoDescricao('')
       setNovoPreco('')
       setNovoEstoque('')
+      setLivroEditando(null)
       setModalNovoLivro(false)
     } catch {
-      setErroAviso('Erro ao cadastrar via API. Adicionado na visualização local.')
+      setErroAviso(
+        livroEditando
+          ? 'Erro ao atualizar o produto.'
+          : 'Erro ao cadastrar via API. Adicionado na visualização local.',
+      )
     } finally {
       setSalvandoLivro(false)
     }
@@ -332,9 +396,9 @@ export default function Admin({ onVoltarParaLoja }) {
   const handleRemoverLivro = async (id) => {
     try {
       await productService.excluir(id).catch(() => null)
-      setLivros(livros.filter((l) => l.id !== id))
+      setLivros((prev) => prev.filter((l) => l.id !== id))
     } catch {
-      setLivros(livros.filter((l) => l.id !== id))
+      setLivros((prev) => prev.filter((l) => l.id !== id))
     }
   }
 
@@ -770,7 +834,7 @@ export default function Admin({ onVoltarParaLoja }) {
                     ? handleNovoCupom()
                     : abaAtiva === 'categorias'
                       ? handleNovaCategoria()
-                      : setModalNovoLivro(true)
+                      : handleNovoLivro()
                 }
                 hidden={abaAtiva === 'newsletter'}
                 className="px-4 py-2 bg-forest hover:bg-forest-soft text-cream text-xs uppercase tracking-wider font-semibold rounded-sm transition-colors flex items-center gap-2 shadow-sm"
@@ -1020,7 +1084,7 @@ export default function Admin({ onVoltarParaLoja }) {
                 </div>
                 <button
                   type="button"
-                  onClick={() => setModalNovoLivro(true)}
+                  onClick={handleNovoLivro}
                   className="px-4 py-2 bg-forest text-cream text-xs uppercase tracking-wider font-semibold rounded-sm hover:bg-forest-soft transition-colors"
                 >
                   + Adicionar Livro
@@ -1069,13 +1133,22 @@ export default function Admin({ onVoltarParaLoja }) {
                           </span>
                         </td>
                         <td className="py-4 px-6 text-right">
-                          <button
-                            type="button"
-                            onClick={() => handleRemoverLivro(livro.id)}
-                            className="text-xs text-red-700 hover:text-red-900 font-medium transition-colors"
-                          >
-                            Remover
-                          </button>
+                          <div className="flex justify-end gap-3">
+                            <button
+                              type="button"
+                              onClick={() => handleEditarLivro(livro)}
+                              className="text-xs text-forest hover:text-forest-soft font-medium transition-colors"
+                            >
+                              Editar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoverLivro(livro.id)}
+                              className="text-xs text-red-700 hover:text-red-900 font-medium transition-colors"
+                            >
+                              Remover
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -1479,19 +1552,19 @@ export default function Admin({ onVoltarParaLoja }) {
               <div>
                 <span className="label-caps text-gold">Curadoria</span>
                 <h3 className="font-display text-2xl font-bold text-coffee mt-1">
-                  Cadastrar Obra no Acervo
+                  {livroEditando ? 'Editar Obra do Acervo' : 'Cadastrar Obra no Acervo'}
                 </h3>
               </div>
               <button
                 type="button"
-                onClick={() => setModalNovoLivro(false)}
+                onClick={fecharModalLivro}
                 className="text-coffee-faint hover:text-coffee transition-colors"
               >
                 <CloseIcon />
               </button>
             </div>
 
-            <form onSubmit={handleCadastrarLivro} className="mt-6 space-y-4 font-body">
+            <form onSubmit={handleSalvarLivro} className="mt-6 space-y-4 font-body">
               <div>
                 <label className="block text-xs uppercase tracking-wider font-semibold text-coffee-soft mb-1">
                   Título da Obra *
@@ -1522,7 +1595,7 @@ export default function Admin({ onVoltarParaLoja }) {
 
               <div>
                 <label className="block text-xs uppercase tracking-wider font-semibold text-coffee-soft mb-1">
-                  Descrição Curta
+                  Descrição Curta{livroEditando ? ' (em branco mantém a atual)' : ''}
                 </label>
                 <textarea
                   rows="2"
@@ -1595,7 +1668,7 @@ export default function Admin({ onVoltarParaLoja }) {
               <div className="flex justify-end gap-3 pt-4 border-t border-line mt-6">
                 <button
                   type="button"
-                  onClick={() => setModalNovoLivro(false)}
+                  onClick={fecharModalLivro}
                   className="px-4 py-2 border border-line-strong text-coffee-soft text-xs uppercase tracking-wider font-semibold rounded-sm hover:bg-cream-deep transition-colors"
                 >
                   Cancelar
@@ -1605,7 +1678,11 @@ export default function Admin({ onVoltarParaLoja }) {
                   disabled={salvandoLivro}
                   className="px-6 py-2 bg-forest hover:bg-forest-soft text-cream text-xs uppercase tracking-wider font-semibold rounded-sm transition-colors shadow-sm disabled:opacity-50"
                 >
-                  {salvandoLivro ? 'Salvando...' : 'Adicionar ao Catálogo'}
+                  {salvandoLivro
+                    ? 'Salvando...'
+                    : livroEditando
+                      ? 'Salvar Alterações'
+                      : 'Adicionar ao Catálogo'}
                 </button>
               </div>
             </form>
