@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, get_current_user
@@ -41,26 +41,6 @@ def get_user_cart(user: UserDb, db: DbSession) -> CartResponse:
 
 
 
-@cart_router.get(
-    "/get/{cart_id}",
-    response_model=CartResponse,
-    summary="Busca um carrinho pelo ID",
-)
-def get_cart(cart_id: int, user: UserDb, db: DbSession) -> CartResponse:
-    return get_cart_service(db).get_by_id(cart_id, user.id)
-
-
-
-@cart_router.get(
-    "/items/{cart_id}",
-    response_model=list[CartItemResponse],
-    summary="Lista os itens de um carrinho",
-)
-def get_cart_items(cart_id: int, user: UserDb, db: DbSession) -> list:
-    return get_cart_service(db).get_with_items(cart_id, user.id)
-
-
-
 @cart_router.post(
     "/{cart_id}/items/add",
     response_model=CartItemResponse,
@@ -90,21 +70,6 @@ def update_cart_item(
     return get_cart_service(db).update_item(cart_id, user.id, item_id, quantity)
 
 
-@cart_router.patch(
-    "/{cart_id}/items/decrease/{item_id}",
-    response_model=CartItemResponse,
-    summary="Diminui a quantidade de um item",
-)
-def decrease_cart_item(
-    cart_id: int,
-    item_id: int,
-    user : UserDb,
-    db: DbSession,
-    quantity: int ,
-) -> CartItemResponse:
-    return get_cart_service(db).decrease_item(cart_id, user.id, item_id, quantity)
-
-
 @cart_router.delete(
     "/{cart_id}/items/delete/{item_id}",
     response_model=CartItemResponse,
@@ -126,10 +91,3 @@ def clear_cart(cart_id: int, user: UserDb, db: DbSession) -> CartResponse:
 
 
 
-@cart_router.delete(
-    "/delete/{cart_id}",
-    response_model=CartResponse,
-    summary="Exclui um carrinho",
-)
-def delete_cart(cart_id: int, user: UserDb, db: DbSession) -> CartResponse:
-    return get_cart_service(db).delete(cart_id, user.id)

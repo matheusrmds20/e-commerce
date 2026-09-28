@@ -1,4 +1,5 @@
 
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.models.product import Product
@@ -48,22 +49,12 @@ class ProductRepository(BaseRepository[Product]):
         return self.session.query(Product).filter(Product.category_id == category_id).all()
 
     def get_by_title(self, title: str) -> Product | None:
+        """Usado internamente por create/update para unicidade de título."""
         return self.session.query(Product).filter(Product.title == title).first()
 
     def get_by_slug(self, slug: str) -> Product | None:
+        """Usado internamente por create/update para unicidade de slug."""
         return self.session.query(Product).filter(Product.slug == slug).first()
-
-    def get_by_isbn(self, isbn: str) -> Product | None:
-        return self.session.query(Product).filter(Product.isbn == isbn).first()
-
-    def get_by_publisher(self, publisher: str) -> list[Product]:
-        return self.session.query(Product).filter(Product.publisher == publisher).all()
-
-    def get_by_publication_year(self, publication_year: int) -> list[Product]:
-        return self.session.query(Product).filter(Product.publication_year == publication_year).all()
-
-    def get_by_language(self, language: str) -> list[Product]:
-        return self.session.query(Product).filter(Product.language == language).all()
 
     def get_by_discount_pct(self, discount_pct: int) -> list[Product]:
         """Produtos com desconto de **pelo menos** `discount_pct`.
@@ -81,9 +72,6 @@ class ProductRepository(BaseRepository[Product]):
             .all()
         )
 
-    def get_by_stock_qty(self, stock_qty: int) -> list[Product]:
-        return self.session.query(Product).filter(Product.stock_qty == stock_qty).all()
-
     def get_by_is_active(self, is_active: bool) -> list[Product]:
         return self.session.query(Product).filter(Product.is_active == is_active).all()
 
@@ -93,11 +81,17 @@ class ProductRepository(BaseRepository[Product]):
         per_page: int,
         category_id: int | None = None,
         is_active: bool | None = None,
+        search: str | None = None,
     ) -> tuple[list[Product], int]:
         """Catálogo paginado, com filtros opcionais aplicados NO BANCO.
 
         Sobrescreve o `BaseRepository.paginate` (genérico) porque aqui existem
         filtros próprios de produto que o reposiório base não conhece.
+
+        `search` é busca parcial e case-insensitive (`ILIKE %termo%`) sobre
+        título, autor e ISBN — substitui os antigos endpoints de match exato
+        (`/title/{title}`, `/isbn/{isbn}`, ...). O termo é aparado e um valor
+        só de espaços é tratado como "sem busca".
 
         Ponto sutil: a contagem usa **o mesmo filtro** dos itens. Se o `count`
         fosse global, `total_pages` mentiria (ex.: 30 itens na categoria mas
@@ -110,6 +104,15 @@ class ProductRepository(BaseRepository[Product]):
             query = query.filter(Product.category_id == category_id)
         if is_active is not None:
             query = query.filter(Product.is_active.is_(is_active))
+        if search:
+            termo = f"%{search.strip()}%"
+            query = query.filter(
+                or_(
+                    Product.title.ilike(termo),
+                    Product.author.ilike(termo),
+                    Product.isbn.ilike(termo),
+                )
+            )
 
         total = query.count()
         items = (

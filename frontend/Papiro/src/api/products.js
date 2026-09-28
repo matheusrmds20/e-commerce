@@ -48,14 +48,6 @@ export const productService = {
     return data
   },
 
-  /** Lista produtos por categoria. */
-  async listarPorCategoria(categoryId) {
-    return listarOuVazio(async () => {
-      const { data } = await api.get(`/products/category/${categoryId}`)
-      return data
-    })
-  },
-
   /** Lista produtos com ao menos `discountPct` de desconto. */
   async listarPorDesconto(discountPct) {
     return listarOuVazio(async () => {
@@ -106,17 +98,20 @@ export const productService = {
    * `meta` traz `page`, `per_page`, `total` e `total_pages`, permitindo montar
    * a navegação sem uma segunda chamada de contagem. Quando `categoryId` é
    * informado, o backend filtra **antes** de paginar, então `meta.total`
-   * reflete a categoria e não o catálogo inteiro.
+   * reflete a categoria e não o catálogo inteiro. `search` é busca livre
+   * (título/autor/ISBN, `ILIKE %termo%`) aplicada no banco, junto do filtro
+   * de categoria.
    *
-   * @param {{page?: number, perPage?: number, categoryId?: number}} [opcoes]
+   * @param {{page?: number, perPage?: number, categoryId?: number, search?: string}} [opcoes]
    * @returns {Promise<{data: Array, meta: object}>}
    */
-  async listarPaginado({ page = 1, perPage = 20, categoryId } = {}) {
+  async listarPaginado({ page = 1, perPage = 20, categoryId, search } = {}) {
     const { data } = await api.get('/products/paginated', {
       params: {
         page,
         per_page: perPage,
         ...(categoryId ? { category_id: categoryId } : {}),
+        ...(search && search.trim() ? { search: search.trim() } : {}),
       },
     })
     return data

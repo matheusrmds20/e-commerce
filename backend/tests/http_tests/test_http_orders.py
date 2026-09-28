@@ -68,14 +68,6 @@ class TestAuthRequired:
         response = client.get(f"{PREFIX}/list")
         assert response.status_code == 401
 
-    def test_get_requires_auth(self, client):
-        response = client.get(f"{PREFIX}/get/1")
-        assert response.status_code == 401
-
-    def test_items_requires_auth(self, client):
-        response = client.get(f"{PREFIX}/items/1")
-        assert response.status_code == 401
-
     def test_update_requires_auth(self, client):
         response = client.patch(f"{PREFIX}/update/1", json={"status": "processing"})
         assert response.status_code == 401
@@ -253,68 +245,6 @@ class TestListOrders:
             response = client.get(f"{PREFIX}/list")
 
         assert_error(response, 404, "ORDER_NOT_FOUND")
-
-
-class TestGetOrder:
-    def test_get_by_id_success(self, client, auth_user):
-        auth_user(1)
-        svc = Mock(name="order_service")
-        svc.get_by_id.return_value = order_payload()
-
-        with patch("app.api.v1.orders.get_order_service", return_value=svc):
-            response = client.get(f"{PREFIX}/get/1")
-
-        assert response.status_code == 200
-        assert response.json()["id"] == 1
-        svc.get_by_id.assert_called_once_with(1, 1)
-
-    def test_get_by_id_not_found(self, client, auth_user):
-        auth_user(1)
-        svc = Mock(name="order_service")
-        svc.get_by_id.side_effect = NotFoundException(
-            "No order found with id 999", code="ORDER_NOT_FOUND"
-        )
-
-        with patch("app.api.v1.orders.get_order_service", return_value=svc):
-            response = client.get(f"{PREFIX}/get/999")
-
-        assert_error(response, 404, "ORDER_NOT_FOUND")
-
-    def test_get_by_id_not_owned(self, client, auth_user):
-        auth_user(2)
-        svc = Mock(name="order_service")
-        svc.get_by_id.side_effect = ForbiddenException("Order is not owned by user")
-
-        with patch("app.api.v1.orders.get_order_service", return_value=svc):
-            response = client.get(f"{PREFIX}/get/1")
-
-        assert_error(response, 403, "FORBIDDEN")
-
-    def test_get_items_success(self, client, auth_user):
-        auth_user(1)
-        svc = Mock(name="order_service")
-        svc.get_with_items.return_value = [
-            {"id": 1, "order_id": 1, "product_id": 1, "quantity": 2, "price": 59.9}
-        ]
-
-        with patch("app.api.v1.orders.get_order_service", return_value=svc):
-            response = client.get(f"{PREFIX}/items/1")
-
-        assert response.status_code == 200
-        assert len(response.json()) == 1
-        svc.get_with_items.assert_called_once_with(1, 1)
-
-    def test_get_items_not_found(self, client, auth_user):
-        auth_user(1)
-        svc = Mock(name="order_service")
-        svc.get_with_items.side_effect = NotFoundException(
-            "No items found in order with id 999", code="ORDER_ITEM_NOT_FOUND"
-        )
-
-        with patch("app.api.v1.orders.get_order_service", return_value=svc):
-            response = client.get(f"{PREFIX}/items/999")
-
-        assert_error(response, 404, "ORDER_ITEM_NOT_FOUND")
 
 
 class TestUpdateOrder:

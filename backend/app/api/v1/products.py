@@ -3,12 +3,15 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db
+from app.api.deps import get_current_user, get_db
 from app.api.exceptions import (
     BadRequestException,
     CategoryNotFoundException,
+    ConflictException,
+    InsufficientPermissionException,
     ProductNotFoundException,
 )
+from app.models.user import User
 from app.schemas.common import Page
 from app.schemas.product import ProductCreate, ProductResponse, ProductUpdate
 from app.services.product_service import ProductService
@@ -16,6 +19,11 @@ from app.services.product_service import ProductService
 product_router = APIRouter()
 
 DbSession = Annotated[Session, Depends(get_db)]
+
+# Escritas no catálogo exigem Bearer token de administrador. A checagem do
+# papel acontece no service (`_ensure_admin`), que levanta ValueError traduzido
+# pelo `_traduzir_value_error` em 403.
+AuthUser = Annotated[User, Depends(get_current_user)]
 
 # Limite máximo de itens numa vitrine. Evita que um cliente peça a tabela
 # inteira com `?limit=100000`.
@@ -50,20 +58,26 @@ def get_product_service(db: DbSession) -> ProductService:
     return ProductService(db)
 
 
-def _traduzir_value_error(exc: ValueError) -> BadRequestException:
+def _traduzir_value_error(exc: ValueError):
     """Converte os ``ValueError`` do service no erro HTTP correspondente.
 
     Sem esta tradução o handler global devolveria 500 para casos que o cliente
-    precisa distinguir (404 categoria/produto inexistente, 400 dado inválido).
-    Mesmo padrão já usado em `addresses.py` e `orders.py`.
+    precisa distinguir (403 sem permissão, 409 duplicado, 404 inexistente).
+    Mesmo padrão já usado em `addresses.py`, `orders.py` e `categories.py`.
     """
     msg = str(exc)
+
+    if "Admin permission required" in msg:
+        return InsufficientPermissionException()
 
     if "No category found" in msg:
         return CategoryNotFoundException()
 
     if "No product found" in msg:
         return ProductNotFoundException()
+
+    if "already exists" in msg:
+        return ConflictException(msg, code="DUPLICATE_PRODUCT")
 
     return BadRequestException(msg)
 
@@ -74,8 +88,14 @@ def _traduzir_value_error(exc: ValueError) -> BadRequestException:
     status_code=status.HTTP_201_CREATED,
     summary="Cria um novo produto",
 )
-def create_product(data: ProductCreate, db: DbSession) -> ProductResponse:
-    return get_product_service(db).create(data)
+def create_product(
+    data: ProductCreate, current_user: AuthUser, db: DbSession
+) -> ProductResponse:
+    """Cria um produto. Exige admin — sem token 401, sem papel 403."""
+    try:
+        return get_product_service(db).create(data, current_user)
+    except ValueError as exc:
+        raise _traduzir_value_error(exc) from exc
 
 
 @product_router.get(
@@ -100,17 +120,27 @@ def list_products_paginated(
         int | None,
         Query(ge=1, description="Filtra por categoria antes de paginar"),
     ] = None,
+    search: Annotated[
+        str | None,
+        Query(
+            max_length=100,
+            description="Busca livre (título, autor ou ISBN), case-insensitive",
+        ),
+    ] = None,
 ) -> dict:
     """Catálogo paginado no envelope padrão `{ data, meta }`.
 
-    A paginação e o filtro por categoria acontecem no banco (`WHERE` +
-    `offset`/`limit`), então o `meta.total` reflete **o filtro**, não o catálogo
-    inteiro. Sem isso, `total_pages` anunciaria páginas inexistentes.
+    A paginação, a busca livre (`?search=`) e o filtro por categoria acontecem
+    no banco (`WHERE` + `offset`/`limit`), então o `meta.total` reflete **o
+    filtro**, não o catálogo inteiro. Sem isso, `total_pages` anunciaria
+    páginas inexistentes.
 
     Categoria inexistente responde 404 (erro do cliente), não lista vazia.
     """
     try:
-        return get_product_service(db).get_paginated(page, per_page, category_id)
+        return get_product_service(db).get_paginated(
+            page, per_page, category_id, search=search
+        )
     except ValueError as exc:
         raise _traduzir_value_error(exc) from exc
 
@@ -180,33 +210,6 @@ def get_product(product_id: int, db: DbSession) -> ProductResponse:
 
 
 @product_router.get(
-    "/title/{title}",
-    response_model=ProductResponse,
-    summary="Busca um produto pelo título",
-)
-def get_product_by_title(title: str, db: DbSession) -> ProductResponse:
-    return get_product_service(db).get_by_title(title)
-
-
-@product_router.get(
-    "/slug/{slug}",
-    response_model=ProductResponse,
-    summary="Busca um produto pelo slug",
-)
-def get_product_by_slug(slug: str, db: DbSession) -> ProductResponse:
-    return get_product_service(db).get_by_slug(slug)
-
-
-@product_router.get(
-    "/isbn/{isbn}",
-    response_model=ProductResponse,
-    summary="Busca um produto pelo ISBN",
-)
-def get_product_by_isbn(isbn: str, db: DbSession) -> ProductResponse:
-    return get_product_service(db).get_by_isbn(isbn)
-
-
-@product_router.get(
     "/category/{category_id}",
     response_model=list[ProductResponse],
     summary="Lista produtos por categoria",
@@ -216,50 +219,12 @@ def get_products_by_category(category_id: int, db: DbSession) -> list:
 
 
 @product_router.get(
-    "/publisher/{publisher}",
-    response_model=list[ProductResponse],
-    summary="Lista produtos por editora",
-)
-def get_products_by_publisher(publisher: str, db: DbSession) -> list:
-    return get_product_service(db).get_by_publisher(publisher)
-
-
-@product_router.get(
-    "/year/{publication_year}",
-    response_model=list[ProductResponse],
-    summary="Lista produtos por ano de publicação",
-)
-def get_products_by_publication_year(
-    publication_year: int, db: DbSession
-) -> list:
-    return get_product_service(db).get_by_publication_year(publication_year)
-
-
-@product_router.get(
-    "/language/{language}",
-    response_model=list[ProductResponse],
-    summary="Lista produtos por idioma",
-)
-def get_products_by_language(language: str, db: DbSession) -> list:
-    return get_product_service(db).get_by_language(language)
-
-
-@product_router.get(
     "/discount/{discount_pct}",
     response_model=list[ProductResponse],
     summary="Lista produtos por percentual de desconto",
 )
 def get_products_by_discount_pct(discount_pct: int, db: DbSession) -> list:
     return get_product_service(db).get_by_discount_pct(discount_pct)
-
-
-@product_router.get(
-    "/stock/{stock_qty}",
-    response_model=list[ProductResponse],
-    summary="Lista produtos por quantidade de estoque",
-)
-def get_products_by_stock_qty(stock_qty: int, db: DbSession) -> list:
-    return get_product_service(db).get_by_stock_qty(stock_qty)
 
 
 @product_router.get(
@@ -277,9 +242,16 @@ def get_products_by_is_active(is_active: bool, db: DbSession) -> list:
     summary="Atualiza um produto",
 )
 def update_product(
-    product_id: int, data: ProductUpdate, db: DbSession
+    product_id: int,
+    data: ProductUpdate,
+    current_user: AuthUser,
+    db: DbSession,
 ) -> ProductResponse:
-    return get_product_service(db).update(product_id, data)
+    """Atualiza um produto. Exige admin — sem token 401, sem papel 403."""
+    try:
+        return get_product_service(db).update(product_id, data, current_user)
+    except ValueError as exc:
+        raise _traduzir_value_error(exc) from exc
 
 
 @product_router.delete(
@@ -287,5 +259,11 @@ def update_product(
     response_model=ProductResponse,
     summary="Exclui um produto",
 )
-def delete_product(product_id: int, db: DbSession) -> ProductResponse:
-    return get_product_service(db).delete(product_id)
+def delete_product(
+    product_id: int, current_user: AuthUser, db: DbSession
+) -> ProductResponse:
+    """Exclui um produto. Exige admin — sem token 401, sem papel 403."""
+    try:
+        return get_product_service(db).delete(product_id, current_user)
+    except ValueError as exc:
+        raise _traduzir_value_error(exc) from exc

@@ -39,19 +39,6 @@ export const addressService = {
     }
   },
 
-  /** Busca o endereço padrão. */
-  async padrao() {
-    try {
-      const { data } = await api.get('/addresses/default')
-      return data
-    } catch (error) {
-      if (error?.status === 404 || error?.code === 'ADDRESS_NOT_FOUND') {
-        return null
-      }
-      throw error
-    }
-  },
-
   /** Define um endereço como padrão. */
   async definirPadrao(addressId) {
     const { data } = await api.patch(`/addresses/default/set/${addressId}`)

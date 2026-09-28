@@ -90,6 +90,11 @@ def wishlist_repo():
 
 
 @pytest.fixture
+def newsletter_repo():
+    return Mock(name="newsletter_repo")
+
+
+@pytest.fixture
 def user_coupon_repo():
     return Mock(name="user_coupon_repo")
 
@@ -234,6 +239,16 @@ def wishlist_service(db, wishlist_repo, user_repo, product_repo):
         from app.services.wishlist_service import WishlistService
 
         yield WishlistService(db)
+
+
+@pytest.fixture
+def newsletter_service(db, newsletter_repo):
+    with (
+        patch("app.services.newsletter_service.NewsletterRepository", return_value=newsletter_repo),
+    ):
+        from app.services.newsletter_service import NewsletterService
+
+        yield NewsletterService(db)
 
 
 @pytest.fixture

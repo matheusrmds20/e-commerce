@@ -1,96 +1,123 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Path, Query, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db
+from app.api.deps import get_current_user, get_db
+from app.api.exceptions import (
+    ConflictException,
+    NotFoundException,
+    ReviewForbiddenException,
+)
+from app.models.user import User
 from app.schemas.review import ReviewCreate, ReviewResponse, ReviewUpdate
 from app.services.review_service import ReviewService
 
 review_router = APIRouter()
 
 DbSession = Annotated[Session, Depends(get_db)]
-UserId = Annotated[int, Query(description="ID do usuário dono da avaliação")]
+AuthUser = Annotated[User, Depends(get_current_user)]
 
 
 def get_review_service(db: DbSession) -> ReviewService:
     return ReviewService(db)
 
 
+def _traduzir_value_error(exc: ValueError):
+    """Traduz os ``ValueError`` do service em erros HTTP (senão viram 500)."""
+    msg = str(exc)
+
+    if "not owned by user" in msg:
+        return ReviewForbiddenException(msg)
+
+    if "Admin permission required" in msg:
+        return ReviewForbiddenException(
+            "Apenas administradores podem acessar avaliações de outros usuários."
+        )
+
+    if "already reviewed" in msg:
+        return ConflictException(msg, code="DUPLICATE_REVIEW")
+
+    if "No review found" in msg:
+        return NotFoundException(msg, code="REVIEW_NOT_FOUND")
+
+    if "No user found" in msg:
+        return NotFoundException(msg, code="USER_NOT_FOUND")
+
+    return NotFoundException(msg, code="PRODUCT_NOT_FOUND")
+
+
 @review_router.post(
     "/create",
     response_model=ReviewResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="Cria uma avaliação",
+    summary="Cria uma avaliação para o usuário autenticado",
 )
-def create_review(user_id: UserId, data: ReviewCreate, db: DbSession) -> ReviewResponse:
-    return get_review_service(db).create(user_id, data)
+def create_review(
+    data: ReviewCreate, current_user: AuthUser, db: DbSession
+) -> ReviewResponse:
+    try:
+        return get_review_service(db).create(current_user, data)
+    except ValueError as exc:
+        raise _traduzir_value_error(exc) from exc
 
 
 @review_router.get(
     "/list",
     response_model=list[ReviewResponse],
-    summary="Lista todas as avaliações",
+    summary="Lista as avaliações do usuário autenticado (admin pode alvejar ?user_id=)",
 )
-def list_reviews(db: DbSession) -> list:
-    return get_review_service(db).get_all()
-
-
-@review_router.get(
-    "/get/{review_id}",
-    response_model=ReviewResponse,
-    summary="Busca uma avaliação pelo ID",
-)
-def get_review(review_id: int, user_id: UserId, db: DbSession) -> ReviewResponse:
-    return get_review_service(db).get_by_id(review_id, user_id)
-
-
-@review_router.get(
-    "/user/{user_id}",
-    response_model=list[ReviewResponse],
-    summary="Lista as avaliações de um usuário",
-)
-def get_reviews_by_user(user_id: int, db: DbSession) -> list:
-    return get_review_service(db).get_by_user_id(user_id)
+def list_reviews(
+    current_user: AuthUser,
+    db: DbSession,
+    user_id: Annotated[
+        int | None,
+        Query(ge=1, description="Alvo (apenas administradores)"),
+    ] = None,
+) -> list:
+    """Minhas avaliações. Com ``user_id``, restrito a administradores."""
+    try:
+        return get_review_service(db).get_by_user_id(current_user, user_id)
+    except ValueError as exc:
+        raise _traduzir_value_error(exc) from exc
 
 
 @review_router.get(
     "/product/{product_id}",
     response_model=list[ReviewResponse],
-    summary="Lista as avaliações de um produto",
+    summary="Lista as avaliações de um produto (público)",
 )
 def get_reviews_by_product(product_id: int, db: DbSession) -> list:
-    return get_review_service(db).get_by_product_id(product_id)
-
-
-@review_router.get(
-    "/rating/{rating}",
-    response_model=list[ReviewResponse],
-    summary="Lista avaliações por nota",
-)
-def get_reviews_by_rating(
-    rating: Annotated[int, Path(ge=1, le=5, description="Nota da avaliação")],
-    db: DbSession,
-) -> list:
-    return get_review_service(db).get_by_rating(rating)
+    try:
+        return get_review_service(db).get_by_product_id(product_id)
+    except ValueError as exc:
+        raise _traduzir_value_error(exc) from exc
 
 
 @review_router.patch(
     "/update/{review_id}",
     response_model=ReviewResponse,
-    summary="Atualiza uma avaliação",
+    summary="Atualiza uma avaliação (autor ou admin)",
 )
 def update_review(
-    review_id: int, data: ReviewUpdate, user_id: UserId, db: DbSession
+    review_id: int,
+    data: ReviewUpdate,
+    current_user: AuthUser,
+    db: DbSession,
 ) -> ReviewResponse:
-    return get_review_service(db).update(review_id, user_id, data)
+    try:
+        return get_review_service(db).update(review_id, data, current_user)
+    except ValueError as exc:
+        raise _traduzir_value_error(exc) from exc
 
 
 @review_router.delete(
     "/delete/{review_id}",
     response_model=ReviewResponse,
-    summary="Exclui uma avaliação",
+    summary="Exclui uma avaliação (autor ou admin)",
 )
-def delete_review(review_id: int, user_id: UserId, db: DbSession) -> ReviewResponse:
-    return get_review_service(db).delete(review_id, user_id)
-
+def delete_review(review_id: int, current_user: AuthUser, db: DbSession) -> ReviewResponse:
+    try:
+        return get_review_service(db).delete(review_id, current_user)
+    except ValueError as exc:
+        raise _traduzir_value_error(exc) from exc

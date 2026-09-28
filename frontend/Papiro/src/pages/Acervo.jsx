@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import BookCard from '../components/BookCard'
 import Migalhas from '../components/Migalhas'
 import Paginacao from '../components/Paginacao'
@@ -14,13 +14,17 @@ const ITENS_POR_PAGINA = 12
  * Acervo — catálogo completo com paginação e filtro por categoria.
  *
  * Fluxo:
- * 1. `GET /products/paginated?page&per_page&category_id` devolve
- *    `{ data, meta }`. A paginação **e** o filtro acontecem no banco, então
- *    `meta.total` reflete a categoria selecionada — não o catálogo inteiro.
- * 2. As categorias vêm de `GET /categories/list` e alimentam o filtro.
- * 3. Trocar de categoria reseta para a página 1: manter a página atual ao
- *    filtrar poderia cair em um intervalo vazio (ex.: estava na página 3, a
- *    categoria só tem 1 página).
+ * 1. `GET /products/paginated?page&per_page&category_id&search` devolve
+ *    `{ data, meta }`. A paginação, a busca livre e o filtro acontecem no
+ *    banco, então `meta.total` reflete os filtros ativos — não o catálogo
+ *    inteiro.
+ * 2. A busca (`?search=`) casa por título, autor ou ISBN, case-insensitive.
+ *    O termo é comitado com debounce (300ms) para não disparar uma
+ *    requisição por tecla.
+ * 3. As categorias vêm de `GET /categories/list` e alimentam o filtro.
+ * 4. Trocar de categoria ou termo reseta para a página 1: manter a página
+ *    atual ao filtrar poderia cair em um intervalo vazio (ex.: estava na
+ *    página 3, a categoria só tem 1 página).
  *
  * O catálogo é buscado no servidor a cada mudança de página **ou** de filtro;
  * as categorias ficam em cache no estado (buscadas uma única vez).
@@ -32,12 +36,21 @@ export default function Acervo({ onAbrirLivro }) {
   // `null` = "Todas as categorias". Guardamos o id, não o nome.
   const [categoriaId, setCategoriaId] = useState(null)
 
+  // Busca livre. `termoBusca` é o que está na caixa; `busca` é o termo
+  // efetivamente enviado ao backend, comitado após um debounce curto.
+  const [termoBusca, setTermoBusca] = useState('')
+  const [busca, setBusca] = useState(null)
+  const timerBusca = useRef(null)
+  // Espelho do termo comitado para comparar sem reler o state (o debounce
+  // roda fora do render e precisa saber se o termo mudou de fato).
+  const buscaRef = useRef(null)
+
   const [pagina, setPagina] = useState(1)
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState(null)
 
-  /** Busca uma página do catálogo, opcionalmente filtrada por categoria. */
-  const carregarProdutos = useCallback(async (alvo, catId) => {
+  /** Busca uma página do catálogo, com filtros opcionais (categoria + termo). */
+  const carregarProdutos = useCallback(async (alvo, catId, buscaAtiva) => {
     setCarregando(true)
     setErro(null)
     try {
@@ -45,6 +58,7 @@ export default function Acervo({ onAbrirLivro }) {
         page: alvo,
         perPage: ITENS_POR_PAGINA,
         categoryId: catId ?? undefined,
+        search: buscaAtiva ?? undefined,
       })
 
       const metaResp = resp?.meta ?? null
@@ -85,11 +99,49 @@ export default function Acervo({ onAbrirLivro }) {
     }
   }, [])
 
-  // Recarrega quando muda a página ou o filtro.
+  // Recarrega quando muda a página, o filtro ou o termo de busca.
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    carregarProdutos(pagina, categoriaId)
-  }, [pagina, categoriaId, carregarProdutos])
+    carregarProdutos(pagina, categoriaId, busca)
+  }, [pagina, categoriaId, busca, carregarProdutos])
+
+  /**
+   * Comita um termo como busca ativa. Só reseta para a página 1 quando o
+   * termo **muda de fato** — digitar e apagar dentro da janela do debounce
+   * (ou alternar espaços) deixaria o filtro igual, e resetar a página nesse
+   * caso jogaria o usuário de volta à página 1 sem motivo.
+   */
+  const comitarTermo = useCallback((termo) => {
+    const limpo = termo.trim()
+    const novo = limpo ? limpo : null
+    if (buscaRef.current === novo) return
+    buscaRef.current = novo
+    setBusca(novo)
+    setPagina(1)
+  }, [])
+
+  // Debounce do termo digitado: comita a busca 300ms após a última tecla.
+  useEffect(() => {
+    timerBusca.current = setTimeout(() => {
+      comitarTermo(termoBusca)
+    }, 300)
+    return () => clearTimeout(timerBusca.current)
+  }, [termoBusca, comitarTermo])
+
+  /** Comita o termo na hora (Enter) e cancela o debounce pendente. */
+  const comitarBusca = () => {
+    clearTimeout(timerBusca.current)
+    comitarTermo(termoBusca)
+  }
+
+  /** Limpa a busca: volta a exibir o catálogo inteiro. */
+  const limparBusca = () => {
+    clearTimeout(timerBusca.current)
+    buscaRef.current = null
+    setTermoBusca('')
+    setBusca(null)
+    setPagina(1)
+  }
 
   /** Troca de página e volta ao topo da listagem. */
   const trocarPagina = (destino) => {
@@ -110,6 +162,7 @@ export default function Acervo({ onAbrirLivro }) {
   const totalPaginas = meta?.total_pages ?? 0
   const totalItens = meta?.total ?? 0
   const filtrando = categoriaId != null
+  const buscando = busca != null
   const nomeDoFiltro =
     categorias.find((c) => c.id === categoriaId)?.name ?? ''
 
@@ -134,6 +187,36 @@ export default function Acervo({ onAbrirLivro }) {
       </section>
 
       <section className="mx-auto max-w-[1400px] px-5 py-12 sm:px-8 sm:py-16">
+        {/* Busca livre: comita no debounce ou no Enter. */}
+        <form
+          role="search"
+          onSubmit={(e) => {
+            e.preventDefault()
+            comitarBusca()
+          }}
+        >
+          <div className="relative w-full max-w-md">
+            <input
+              type="search"
+              value={termoBusca}
+              onChange={(e) => setTermoBusca(e.target.value)}
+              placeholder="Buscar por título, autor ou ISBN…"
+              aria-label="Buscar no acervo"
+              className="w-full rounded-sm border border-line-strong bg-cream-soft px-4 py-2.5 pr-10 font-body text-[0.9rem] text-coffee placeholder:text-coffee-faint focus:border-forest focus:outline-none"
+            />
+            {termoBusca && (
+              <button
+                type="button"
+                onClick={limparBusca}
+                aria-label="Limpar busca"
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 font-body text-xl leading-none text-coffee-soft transition-colors hover:text-forest"
+              >
+                ×
+              </button>
+            )}
+          </div>
+        </form>
+
         {/* Barra de estado + filtros */}
         <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
           <p className="font-body text-[0.85rem] text-coffee-soft">
@@ -142,10 +225,12 @@ export default function Acervo({ onAbrirLivro }) {
               : totalItens > 0
                 ? `${totalItens} ${totalItens === 1 ? 'título' : 'títulos'}${
                     filtrando ? ` em ${nomeDoFiltro}` : ' no acervo'
-                  }`
-                : filtrando
-                  ? `Nenhum título em ${nomeDoFiltro}`
-                  : 'Nenhum título no acervo'}
+                  }${buscando ? ` para “${busca}”` : ''}`
+                : buscando
+                  ? `Nenhum título para “${busca}”`
+                  : filtrando
+                    ? `Nenhum título em ${nomeDoFiltro}`
+                    : 'Nenhum título no acervo'}
             {meta && totalPaginas > 1 && !carregando && (
               <span className="text-coffee-faint">
                 {' '}
@@ -233,7 +318,7 @@ export default function Acervo({ onAbrirLivro }) {
             </p>
             <button
               type="button"
-              onClick={() => carregarProdutos(pagina, categoriaId)}
+              onClick={() => carregarProdutos(pagina, categoriaId, busca)}
               className="mt-6 rounded-sm bg-forest px-6 py-3 font-body text-xs font-semibold uppercase tracking-[0.2em] text-cream-soft transition-colors hover:bg-forest-soft"
             >
               Tentar de novo
@@ -245,16 +330,29 @@ export default function Acervo({ onAbrirLivro }) {
         {!carregando && !erro && produtos.length === 0 && (
           <div className="mt-12 rounded-md border border-dashed border-line-strong bg-cream-soft/60 px-6 py-16 text-center">
             <p className="font-display text-2xl text-coffee">
-              {filtrando
-                ? `Nenhum título em ${nomeDoFiltro}`
-                : 'O acervo ainda está vazio'}
+              {buscando
+                ? `Nenhum título para “${busca}”`
+                : filtrando
+                  ? `Nenhum título em ${nomeDoFiltro}`
+                  : 'O acervo ainda está vazio'}
             </p>
             <p className="mt-2 font-body text-sm text-coffee-soft">
-              {filtrando
-                ? 'Escolha outra categoria ou veja o acervo completo.'
-                : 'Assim que a curadoria publicar títulos, eles aparecem aqui.'}
+              {buscando
+                ? 'Tente outro termo ou limpe a busca para ver o acervo completo.'
+                : filtrando
+                  ? 'Escolha outra categoria ou veja o acervo completo.'
+                  : 'Assim que a curadoria publicar títulos, eles aparecem aqui.'}
             </p>
-            {filtrando && (
+            {buscando && (
+              <button
+                type="button"
+                onClick={limparBusca}
+                className="mt-6 rounded-sm border border-forest px-6 py-3 font-body text-xs font-semibold uppercase tracking-[0.2em] text-forest transition-colors hover:bg-forest hover:text-cream-soft"
+              >
+                Limpar busca
+              </button>
+            )}
+            {filtrando && !buscando && (
               <button
                 type="button"
                 onClick={() => filtrarPor(null)}

@@ -3,10 +3,12 @@ from sqlalchemy.orm import Session
 from app.api.exceptions import (
     BadRequestException,
     EmailAlreadyExistsException,
+    ForbiddenException,
+    InsufficientPermissionException,
     UserNotFoundException,
 )
 from app.core.security import hash_password, verify_password
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.repositories.user_repo import UserRepository
 from app.schemas.auth import MessageResponse
 from app.schemas.user import (
@@ -27,7 +29,29 @@ class UserService:
         if existing is not None and existing.id != exclude_user_id:
             raise EmailAlreadyExistsException()
 
-    def create(self, data: AdminUserCreate | CustomerUserCreate) -> UserResponse:
+    def _ensure_owner_or_admin(self, current_user: User, user_id: int) -> None:
+        """Garante que o usuário autenticado só acesse os próprios dados.
+
+        Administradores podem operar sobre qualquer usuário. Qualquer outra
+        tentativa vira 403 ``USER_FORBIDDEN``.
+        """
+        if current_user.role == UserRole.ADMIN:
+            return
+        if current_user.id != user_id:
+            raise ForbiddenException(
+                "Você não tem permissão para acessar os dados de outro usuário.",
+                code="USER_FORBIDDEN",
+            )
+
+    def _ensure_admin(self, current_user: User) -> None:
+        """Restringe a operação a administradores (403 ``INSUFFICIENT_PERMISSION``)."""
+        if current_user.role != UserRole.ADMIN:
+            raise InsufficientPermissionException()
+
+    def create(
+        self, data: AdminUserCreate | CustomerUserCreate, current_user: User
+    ) -> UserResponse:
+        self._ensure_admin(current_user)
         with self.session.begin():
 
             self._check_email_available(data.email)
@@ -43,7 +67,8 @@ class UserService:
 
             return user
 
-    def get_by_id(self, user_id: int) -> UserResponse:
+    def get_by_id(self, user_id: int, current_user: User) -> UserResponse:
+        self._ensure_admin(current_user)
         user = self.user_repo.get_by_id(user_id)
 
         if user is None:
@@ -51,7 +76,8 @@ class UserService:
 
         return user
 
-    def get_by_email(self, email: str) -> UserResponse:
+    def get_by_email(self, email: str, current_user: User) -> UserResponse:
+        self._ensure_admin(current_user)
         user = self.user_repo.get_by_email(email)
 
         if user is None:
@@ -59,7 +85,10 @@ class UserService:
 
         return user
 
-    def update(self, user_id: int, data: UserUpdate) -> UserResponse:
+    def update(
+        self, user_id: int, data: UserUpdate, current_user: User
+    ) -> UserResponse:
+        self._ensure_owner_or_admin(current_user, user_id)
         with self.session.begin():
             user = self.user_repo.get_by_id(user_id)
 
@@ -77,7 +106,14 @@ class UserService:
 
             return user
 
-    def change_password(self, user_id: int, current_password: str, new_password: str) -> MessageResponse:
+    def change_password(
+        self,
+        user_id: int,
+        current_password: str,
+        new_password: str,
+        current_user: User,
+    ) -> MessageResponse:
+        self._ensure_owner_or_admin(current_user, user_id)
         with self.session.begin():
             user = self.user_repo.get_by_id(user_id)
 
@@ -93,7 +129,8 @@ class UserService:
 
             return MessageResponse(message="Senha alterada com sucesso.")
 
-    def deactivate(self, user_id: int) -> UserResponse:
+    def deactivate(self, user_id: int, current_user: User) -> UserResponse:
+        self._ensure_owner_or_admin(current_user, user_id)
         with self.session.begin():
             user = self.user_repo.get_by_id(user_id)
 

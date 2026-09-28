@@ -1,7 +1,7 @@
 """Testes HTTP da rota /api/v1/cart.
 
-Sucesso: 201/200 com payloads válidos (criação, busca, itens, add, update,
-decrease, remove, clear e delete).
+Sucesso: 201/200 com payloads válidos (criação, busca, add, update,
+remove e clear).
 Erros: validação 422, usuário/produto/carrinho/item inexistente 404, item de
 outro usuário 403, carrinho já existente 409 e estoque insuficiente 409.
 
@@ -22,7 +22,6 @@ from helpers import assert_error, assert_validation_error, cart_item_payload, ca
 
 from app.api.exceptions import (
     ConflictException,
-    ForbiddenException,
     InsufficientStockException,
     NotFoundException,
     ProductNotFoundException,
@@ -150,54 +149,6 @@ class TestGetCart:
 
         assert_error(response, 404, "CART_NOT_FOUND")
 
-    def test_get_by_id_success(self, client, auth_user):
-        auth_user(1)
-        svc = Mock(name="cart_service")
-        svc.get_by_id.return_value = cart_payload()
-
-        with patch("app.api.v1.cart.get_cart_service", return_value=svc):
-            response = client.get(f"{PREFIX}/get/1")
-
-        assert response.status_code == 200
-        svc.get_by_id.assert_called_once_with(1, 1)
-
-    def test_get_by_id_not_found(self, client, auth_user):
-        auth_user(1)
-        svc = Mock(name="cart_service")
-        svc.get_by_id.side_effect = NotFoundException(
-            "No cart found with id 999", code="CART_NOT_FOUND"
-        )
-
-        with patch("app.api.v1.cart.get_cart_service", return_value=svc):
-            response = client.get(f"{PREFIX}/get/999")
-
-        assert_error(response, 404, "CART_NOT_FOUND")
-
-    def test_get_by_id_ownership_forbidden(self, client, auth_user):
-        """Usuário 2 tenta abrir o carrinho 1 → 403."""
-        auth_user(2)
-        svc = Mock(name="cart_service")
-        svc.get_by_id.side_effect = ForbiddenException("Cart is not owned by user")
-
-        with patch("app.api.v1.cart.get_cart_service", return_value=svc):
-            response = client.get(f"{PREFIX}/get/1")
-
-        assert_error(response, 403, "FORBIDDEN")
-        # O id do token (2) é repassado ao service, não um id de query.
-        svc.get_by_id.assert_called_once_with(1, 2)
-
-    def test_get_items_success(self, client, auth_user):
-        auth_user(1)
-        svc = Mock(name="cart_service")
-        svc.get_with_items.return_value = [cart_item_payload()]
-
-        with patch("app.api.v1.cart.get_cart_service", return_value=svc):
-            response = client.get(f"{PREFIX}/items/1")
-
-        assert response.status_code == 200
-        assert len(response.json()) == 1
-        svc.get_with_items.assert_called_once_with(1, 1)
-
 
 class TestAddItem:
     def test_add_item_success(self, client, auth_user):
@@ -272,13 +223,9 @@ class TestUpdateItem:
         assert response.json()["quantity"] == 5
         svc.update_item.assert_called_once_with(1, 1, 1, 5)
 
-    def test_update_quantity_zero_reaches_service(self, client, auth_user):
-        """quantity=0 NÃO é barrado hoje: chega ao service.
-
-        O parâmetro é `quantity: int` sem `Query(ge=1)`, então 0 é aceito na
-        validação e o service grava a quantidade. Documentado como pendência
-        (ver PLANO_ARQUITETURA.md, seção 10.2.1): idealmente seria 422.
-        """
+    def test_update_quantity_zero_removes_item(self, client, auth_user):
+        """quantity=0 remove o item (consistente com o comportamento anterior
+        do decrease_item): o service apaga o cart_item em vez de gravar 0."""
         auth_user(1)
         svc = Mock(name="cart_service")
         svc.update_item.return_value = cart_item_payload(quantity=0)
@@ -306,49 +253,6 @@ class TestUpdateItem:
             response = client.patch(f"{PREFIX}/1/items/update/999?quantity=3")
 
         assert_error(response, 404, "CART_ITEM_NOT_FOUND")
-
-
-class TestDecreaseItem:
-    def test_decrease_success(self, client, auth_user):
-        auth_user(1)
-        svc = Mock(name="cart_service")
-        svc.decrease_item.return_value = cart_item_payload(quantity=1)
-
-        with patch("app.api.v1.cart.get_cart_service", return_value=svc):
-            response = client.patch(f"{PREFIX}/1/items/decrease/1?quantity=1")
-
-        assert response.status_code == 200
-        assert response.json()["quantity"] == 1
-        svc.decrease_item.assert_called_once_with(1, 1, 1, 1)
-
-    def test_decrease_with_explicit_quantity(self, client, auth_user):
-        auth_user(1)
-        svc = Mock(name="cart_service")
-        svc.decrease_item.return_value = cart_item_payload(quantity=1)
-
-        with patch("app.api.v1.cart.get_cart_service", return_value=svc):
-            response = client.patch(f"{PREFIX}/1/items/decrease/1?quantity=2")
-
-        assert response.status_code == 200
-        svc.decrease_item.assert_called_once_with(1, 1, 1, 2)
-
-    def test_decrease_quantity_missing(self, client, auth_user):
-        """quantity não tem default: é obrigatório."""
-        auth_user(1)
-        response = client.patch(f"{PREFIX}/1/items/decrease/1")
-        assert response.status_code == 422
-
-    def test_decrease_zero_reaches_service(self, client, auth_user):
-        """quantity=0 não é barrado na validação (ver test_update_quantity_zero_*)."""
-        auth_user(1)
-        svc = Mock(name="cart_service")
-        svc.decrease_item.return_value = cart_item_payload(quantity=1)
-
-        with patch("app.api.v1.cart.get_cart_service", return_value=svc):
-            response = client.patch(f"{PREFIX}/1/items/decrease/1?quantity=0")
-
-        assert response.status_code == 200
-        svc.decrease_item.assert_called_once_with(1, 1, 1, 0)
 
 
 class TestRemoveItem:
@@ -402,28 +306,3 @@ class TestClearCart:
 
         assert_error(response, 404, "CART_NOT_FOUND")
 
-
-class TestDeleteCart:
-    def test_delete_success(self, client, auth_user):
-        auth_user(1)
-        svc = Mock(name="cart_service")
-        svc.delete.return_value = cart_payload()
-
-        with patch("app.api.v1.cart.get_cart_service", return_value=svc):
-            response = client.delete(f"{PREFIX}/delete/1")
-
-        assert response.status_code == 200
-        assert response.json()["id"] == 1
-        svc.delete.assert_called_once_with(1, 1)
-
-    def test_delete_not_found(self, client, auth_user):
-        auth_user(1)
-        svc = Mock(name="cart_service")
-        svc.delete.side_effect = NotFoundException(
-            "No cart found with id 999", code="CART_NOT_FOUND"
-        )
-
-        with patch("app.api.v1.cart.get_cart_service", return_value=svc):
-            response = client.delete(f"{PREFIX}/delete/999")
-
-        assert_error(response, 404, "CART_NOT_FOUND")

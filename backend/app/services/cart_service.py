@@ -28,17 +28,6 @@ class CartService:
         self.cart_item_repo.delete(cart_item)
         
 
-    def get_by_id(self, cart_id: int, user_id: int) -> dict:
-        cart = self.cart_repo.get_by_id(cart_id)
-
-        if not cart:
-            raise ValueError(f"No cart found with id {cart_id}")
-
-        if cart.user_id != user_id:
-            raise ValueError("Cart is not owned by user")
-
-        return cart
-
     def get_by_user_id(self, user_id: int) -> dict:
         user = self.user_repo.get_by_id(user_id)
 
@@ -51,23 +40,6 @@ class CartService:
             raise ValueError(f"No cart found with user_id {user_id}")
 
         return cart
-
-    def get_with_items(self, cart_id: int, user_id: int) -> list:
-        cart = self.cart_repo.get_by_id(cart_id)
-
-        if not cart:
-            raise ValueError(f"No cart found with id {cart_id}")
-
-        if cart.user_id != user_id:
-            raise ValueError("Cart is not owned by user")
-
-        items = self.cart_repo.get_with_items(cart_id)
-
-        if not items:
-            raise ValueError(f"No items found in cart with id {cart_id}")
-
-        return items
-
 
     def create(self, user_id: int) -> CartCreate:
         with self.session.begin():
@@ -141,6 +113,12 @@ class CartService:
             if not cart_item:
                 raise ValueError(f"No cart item found with id {item_id}")
 
+            if quantity <= 0:
+                # Consistente com o antigo `decrease_item`: zerar a quantidade
+                # remove o item do carrinho em vez de gravar 0.
+                self.cart_item_repo.delete(cart_item)
+                return cart_item
+
             if quantity > cart_item.quantity:
                 product = self.product_repo.get_by_id_for_update(cart_item.product_id)
 
@@ -177,32 +155,6 @@ class CartService:
             self.cart_item_repo.delete(cart_item)
             return cart_item
 
-    def decrease_item(self, cart_id: int, user_id: int, item_id: int, quantity: int):
-        with self.session.begin():
-
-            cart = self.cart_repo.get_by_id(cart_id)
-
-            if not cart:
-                raise ValueError(f"No cart found with id {cart_id}")
-
-            if cart.user_id != user_id:
-                raise ValueError("Cart is not owned by user")
-
-            cart_item = self.cart_item_repo.get_by_id(item_id)
-
-            if not cart_item:
-                raise ValueError(f"No cart item found with id {item_id}")
-
-
-            if cart_item.quantity - quantity <= 0:
-                self.cart_item_repo.delete(cart_item)
-                return cart_item
-
-            self.cart_item_repo.decrease_quantity(cart_item, quantity)
-
-            return cart_item
-
-
     def clear(self, cart_id: int, user_id: int):
         with self.session.begin():
 
@@ -221,17 +173,4 @@ class CartService:
 
             return cart
 
-    def delete(self, cart_id: int, user_id: int):
-        with self.session.begin():
-
-            cart = self.cart_repo.get_by_id(cart_id)
-
-            if cart is None:
-                raise ValueError(f"No cart found with id {cart_id}")
-
-            if cart.user_id != user_id:
-                raise ValueError("Cart is not owned by user")
-
-            self.cart_repo.delete(cart)
-            return cart
 

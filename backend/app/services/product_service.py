@@ -1,4 +1,5 @@
 from app.models.product import Product
+from app.models.user import User, UserRole
 from app.repositories.category_repo import CategoryRepository
 from app.repositories.product_repo import ProductRepository
 
@@ -9,35 +10,21 @@ class ProductService:
         self.category_repo = CategoryRepository(db)
         self.session = db
 
+    @staticmethod
+    def _ensure_admin(current_user: User) -> None:
+        """Escritas no catálogo exigem papel admin.
+
+        Mesma regra (e mesma mensagem) de `CategoryService`: o roteador traduz
+        este ValueError em 403 `INSUFFICIENT_PERMISSION`.
+        """
+        if current_user.role != UserRole.ADMIN:
+            raise ValueError("Admin permission required to manage products")
+
     def get_by_id(self, product_id: int) -> dict:
         product = self.repo.get_by_id(product_id)
 
         if product is None:
             raise ValueError(f"No product found with id {product_id}")
-
-        return product
-
-    def get_by_title(self, title: str) -> dict:
-        product = self.repo.get_by_title(title)
-
-        if product is None:
-            raise ValueError(f"No product found with title '{title}'")
-
-        return product
-
-    def get_by_slug(self, slug: str) -> dict:
-        product = self.repo.get_by_slug(slug)
-
-        if product is None:
-            raise ValueError(f"No product found with slug '{slug}'")
-
-        return product
-
-    def get_by_isbn(self, isbn: str) -> dict:
-        product = self.repo.get_by_isbn(isbn)
-
-        if product is None:
-            raise ValueError(f"No product found with ISBN '{isbn}'")
 
         return product
 
@@ -49,31 +36,6 @@ class ProductService:
 
         return products
 
-    def get_by_publisher(self, publisher: str) -> list:
-        products = self.repo.get_by_publisher(publisher)
-
-        if not products:
-            raise ValueError(f"No products found with publisher '{publisher}'")
-
-        return products
-
-    def get_by_publication_year(self, publication_year: int) -> list:
-        products = self.repo.get_by_publication_year(publication_year)
-
-        if not products:
-            raise ValueError(f"No products found with publication_year {publication_year}")
-
-        return products
-
-
-    def get_by_language(self, language: str) -> list:
-        products = self.repo.get_by_language(language)
-
-        if not products:
-            raise ValueError(f"No products found with language '{language}'")
-
-        return products
-
     def get_by_discount_pct(self, discount_pct: int) -> list:
         """Produtos com desconto de pelo menos `discount_pct`.
 
@@ -82,14 +44,6 @@ class ProductService:
         de estourar 500.
         """
         return self.repo.get_by_discount_pct(discount_pct)
-
-    def get_by_stock_qty(self, stock_qty: int) -> list:
-        products = self.repo.get_by_stock_qty(stock_qty)
-
-        if not products:
-            raise ValueError(f"No products found with stock_qty {stock_qty}")
-
-        return products
 
     def get_by_is_active(self, is_active: bool) -> list:
         products = self.repo.get_by_is_active(is_active)
@@ -132,12 +86,17 @@ class ProductService:
         page: int = 1,
         per_page: int = 20,
         category_id: int | None = None,
+        search: str | None = None,
     ) -> dict:
         """Catálogo paginado no formato do envelope `Page[T]`.
 
-        Retorna `{"data": [...], "meta": {...}}`. A paginação e o filtro por
-        categoria acontecem no banco (`WHERE` + `offset`/`limit`), então o custo
-        não cresce com o tamanho do catálogo.
+        Retorna `{"data": [...], "meta": {...}}`. A paginação, a busca e o
+        filtro por categoria acontecem no banco (`WHERE` + `offset`/`limit`),
+        então o custo não cresce com o tamanho do catálogo.
+
+        `search` é um termo livre, case-insensitive (`ILIKE %termo%`), aplicado
+        a título, autor e ISBN — busca parcial, não match exato. `meta.total`
+        reflete o filtro aplicado, não o catálogo inteiro.
 
         Quando `category_id` é informado, a categoria precisa existir: um id
         inválido é erro do cliente (404), não um catálogo vazio.
@@ -147,7 +106,7 @@ class ProductService:
             if categoria is None:
                 raise ValueError(f"No category found with id {category_id}")
 
-        items, total = self.repo.paginate(page, per_page, category_id)
+        items, total = self.repo.paginate(page, per_page, category_id, search=search)
         total_pages = (total + per_page - 1) // per_page if per_page else 0
 
         return {
@@ -169,8 +128,10 @@ class ProductService:
         return products
 
 
-    def create(self, data) -> dict:
+    def create(self, data, current_user: User) -> dict:
+        """Cria um produto. Exige papel admin (roteador traduz ValueError)."""
         with self.session.begin():
+            self._ensure_admin(current_user)
 
             category = self.category_repo.get_by_id(data.category_id)
 
@@ -213,8 +174,10 @@ class ProductService:
 
             return product
 
-    def update(self, product_id: int, data) -> dict:
+    def update(self, product_id: int, data, current_user: User) -> dict:
+        """Atualiza um produto. Exige papel admin."""
         with self.session.begin():
+            self._ensure_admin(current_user)
 
             product = self.repo.get_by_id(product_id)
 
@@ -243,8 +206,10 @@ class ProductService:
 
             return product
 
-    def delete(self, product_id: int) -> dict:
+    def delete(self, product_id: int, current_user: User) -> dict:
+        """Exclui um produto. Exige papel admin."""
         with self.session.begin():
+            self._ensure_admin(current_user)
 
             product = self.repo.get_by_id(product_id)
 

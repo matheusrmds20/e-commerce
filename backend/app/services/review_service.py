@@ -1,37 +1,58 @@
 from app.models.review import Review
+from app.models.user import User, UserRole
 from app.repositories.product_repo import ProductRepository
 from app.repositories.review_repo import ReviewRepository
 from app.repositories.user_repo import UserRepository
 
 
 class ReviewService:
+    """Regras de avaliações.
+
+    SEGURANÇA: o autor da avaliação NÃO vem mais da query string (``user_id``),
+    e sim do usuário autenticado (``current_user``, resolvido do token pela
+    rota). Isso fecha o IDOR que permitia criar/editar/excluir avaliações em
+    nome de outra pessoa. Um cliente comum só lê/altera as próprias
+    avaliações; administradores podem operar sobre qualquer uma. Violações de
+    posse viram ``ReviewForbiddenException`` na camada de API.
+    """
+
     def __init__(self, db):
         self.repo = ReviewRepository(db)
         self.user_repo = UserRepository(db)
         self.product_repo = ProductRepository(db)
         self.session = db
 
-    def get_by_id(self, review_id: int, user_id: int) -> dict:
-        review = self.repo.get_by_id(review_id)
+    @staticmethod
+    def _is_admin(current_user: User) -> bool:
+        return current_user.role == UserRole.ADMIN
 
-        if review is None:
-            raise ValueError(f"No review found with id {review_id}")
-
-        if review.user_id != user_id:
+    def _ensure_owner_or_admin(self, current_user: User, user_id: int) -> None:
+        """Garante que o autenticado só acesse a própria avaliação (ou seja admin)."""
+        if self._is_admin(current_user):
+            return
+        if current_user.id != user_id:
             raise ValueError("Review is not owned by user")
 
-        return review
+    def get_by_user_id(
+        self, current_user: User, user_id: int | None = None
+    ) -> list:
+        """Lista as avaliações de um usuário ("minhas avaliações").
 
-    def get_by_user_id(self, user_id: int) -> list:
-        user = self.user_repo.get_by_id(user_id)
+        Sem ``user_id`` devolve as do próprio autenticado. Com ``user_id``
+        diferente, só administradores são aceitos.
+        """
+        alvo = current_user.id if user_id is None else user_id
+        self._ensure_owner_or_admin(current_user, alvo)
+
+        user = self.user_repo.get_by_id(alvo)
 
         if user is None:
-            raise ValueError(f"No user found with id {user_id}")
+            raise ValueError(f"No user found with id {alvo}")
 
         reviews = user.reviews
 
         if not reviews:
-            raise ValueError(f"No reviews found with user_id {user_id}")
+            raise ValueError(f"No reviews found with user_id {alvo}")
 
         return reviews
 
@@ -45,47 +66,30 @@ class ReviewService:
         # erro. Retornar [] mantém o endpoint de listagem idempotente para a UI.
         return self.repo.get_by_product_id(product_id)
 
-    def get_by_rating(self, rating: int) -> list:
-        reviews = self.repo.get_by_rating(rating)
-
-        if not reviews:
-            raise ValueError(f"No reviews found with rating {rating}")
-
-        return reviews
-
-    def get_all(self) -> list:
-        reviews = self.repo.get_all()
-
-        if not reviews:
-            raise ValueError("No reviews found")
-
-        return reviews
-
-
-
-    def create(self, user_id: int, data) -> dict:
+    def create(self, current_user: User, data) -> Review:
         with self.session.begin():
-
-            user = self.user_repo.get_by_id(user_id)
+            user = self.user_repo.get_by_id(current_user.id)
 
             if user is None:
-                raise ValueError(f"No user found with id {user_id}")
+                raise ValueError(f"No user found with id {current_user.id}")
 
             product = self.product_repo.get_by_id(data.product_id)
 
             if product is None:
                 raise ValueError(f"No product found with id {data.product_id}")
 
-            existing_review = self.repo.get_by_user_id_and_product_id(user_id, data.product_id)
-            
+            existing_review = self.repo.get_by_user_id_and_product_id(
+                current_user.id, data.product_id
+            )
+
             if existing_review is not None:
                 raise ValueError(
-                    f"User {user_id} already reviewed product {data.product_id}"
+                    f"User {current_user.id} already reviewed product {data.product_id}"
                 )
 
             review = self.repo.create(
                 Review(
-                    user_id=user_id,
+                    user_id=current_user.id,
                     product_id=data.product_id,
                     rating=data.rating,
                     comment=data.comment,
@@ -94,16 +98,14 @@ class ReviewService:
 
             return review
 
-    def update(self, review_id: int, user_id: int, data) -> dict:
+    def update(self, review_id: int, data, current_user: User) -> Review:
         with self.session.begin():
-
             review = self.repo.get_by_id(review_id)
 
             if review is None:
                 raise ValueError(f"No review found with id {review_id}")
 
-            if review.user_id != user_id:
-                raise ValueError("Review is not owned by user")
+            self._ensure_owner_or_admin(current_user, review.user_id)
 
             for field, value in data.model_dump(exclude_unset=True).items():
                 setattr(review, field, value)
@@ -113,17 +115,14 @@ class ReviewService:
             self.session.refresh(review)
             return review
 
-    def delete(self, review_id: int, user_id: int) -> dict:
+    def delete(self, review_id: int, current_user: User) -> Review:
         with self.session.begin():
-
             review = self.repo.get_by_id(review_id)
 
             if review is None:
                 raise ValueError(f"No review found with id {review_id}")
 
-            if review.user_id != user_id:
-                raise ValueError("Review is not owned by user")
+            self._ensure_owner_or_admin(current_user, review.user_id)
 
             self.repo.delete(review)
             return review
-

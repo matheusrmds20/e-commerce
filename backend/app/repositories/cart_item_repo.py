@@ -32,15 +32,6 @@ class CartItemRepository(BaseRepository[CartItem]):
 
 
 
-    def decrease_quantity(self, cart_item, quantity: int) -> CartItem:
-
-        cart_item.quantity -= quantity
-
-        self.session.add(cart_item)
-        self.session.flush()
-        self.session.refresh(cart_item)
-        return cart_item
-
     def update_quantity(self, cart_item, quantity: int) -> CartItem:
         cart_item.quantity = quantity
 

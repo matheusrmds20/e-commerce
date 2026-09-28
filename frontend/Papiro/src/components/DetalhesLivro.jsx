@@ -116,6 +116,72 @@ function FormularioAvaliacao({ enviando, onAvaliar }) {
 }
 
 /**
+ * Formulário de edição de uma avaliação — nota + comentário pré-preenchidos.
+ */
+function FormularioEdicaoAvaliacao({ notaInicial, textoInicial, enviando, onSalvar, onCancelar }) {
+  const [nota, setNota] = useState(notaInicial)
+  const [texto, setTexto] = useState(textoInicial)
+
+  const enviar = (event) => {
+    event.preventDefault()
+    if (texto.trim().length < 3) return
+    onSalvar({ rating: nota, comment: texto.trim() })
+  }
+
+  return (
+    <form
+      onSubmit={enviar}
+      className="mt-3 rounded-md border border-line bg-cream-soft p-4"
+    >
+      <div className="flex items-center gap-3">
+        <span className="font-body text-[0.88rem] text-coffee-soft">Nota:</span>
+        <div className="flex items-center gap-1">
+          {[1, 2, 3, 4, 5].map((valor) => (
+            <button
+              key={valor}
+              type="button"
+              onClick={() => setNota(valor)}
+              aria-label={`${valor} estrela${valor > 1 ? 's' : ''}`}
+              aria-pressed={nota === valor}
+              className={`font-display text-[1.4rem] leading-none transition-colors duration-200 ${
+                valor <= nota ? 'text-gold' : 'text-coffee-faint'
+              }`}
+            >
+              ★
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <textarea
+        value={texto}
+        onChange={(event) => setTexto(event.target.value)}
+        rows={3}
+        maxLength={500}
+        className="mt-3 w-full resize-none rounded-sm border border-line-strong bg-cream-soft px-3 py-2.5 font-body text-sm text-coffee placeholder:text-coffee-faint focus:border-forest focus:outline-none"
+      />
+
+      <div className="mt-3 flex gap-3">
+        <button
+          type="submit"
+          disabled={enviando || texto.trim().length < 3}
+          className="rounded-sm bg-forest px-5 py-2.5 font-body text-xs font-semibold uppercase tracking-[0.2em] text-cream-soft transition-colors duration-300 hover:bg-forest-soft disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {enviando ? 'Salvando…' : 'Salvar'}
+        </button>
+        <button
+          type="button"
+          onClick={onCancelar}
+          className="rounded-sm border border-line-strong px-5 py-2.5 font-body text-xs font-semibold uppercase tracking-[0.2em] text-coffee-soft transition-colors duration-300 hover:text-coffee"
+        >
+          Cancelar
+        </button>
+      </div>
+    </form>
+  )
+}
+
+/**
  * DetalhesLivro — três seções retráteis: descrição, ficha e avaliações.
  *
  * Props:
@@ -123,7 +189,8 @@ function FormularioAvaliacao({ enviando, onAvaliar }) {
  * - `ficha`: produto normalizado (fonte dos dados técnicos).
  * - `avaliacoes`: lista já normalizada (`avaliacaoParaView`).
  * - `autenticado`, `enviando`, `feedback`: estado do fluxo de avaliação.
- * - `onAvaliar({rating, comment})`, `onExcluirAvaliacao(reviewId)`: ações.
+ * - `onAvaliar({rating, comment})`, `onEditarAvaliacao(reviewId, {rating, comment})`,
+ *   `onExcluirAvaliacao(reviewId)`: ações.
  */
 export default function DetalhesLivro({
   descricao = [],
@@ -133,9 +200,11 @@ export default function DetalhesLivro({
   enviando = false,
   feedback = null,
   onAvaliar,
+  onEditarAvaliacao,
   onExcluirAvaliacao,
 }) {
   const [aberta, setAberta] = useState('descricao')
+  const [edicao, setEdicao] = useState(null)
 
   const alternar = (id) => setAberta((atual) => (atual === id ? null : id))
 
@@ -224,19 +293,47 @@ export default function DetalhesLivro({
                 <span className="font-display text-[1.15rem] font-medium text-coffee">
                   {item.nome}
                 </span>
-                {item.proprio && onExcluirAvaliacao && (
-                  <button
-                    type="button"
-                    onClick={() => onExcluirAvaliacao(item.id)}
-                    className="ml-auto font-body text-[0.78rem] font-medium text-coffee-faint transition-colors duration-300 hover:text-caramel-dark"
-                  >
-                    Excluir
-                  </button>
+                {item.proprio && (onExcluirAvaliacao || onEditarAvaliacao) && (
+                  <span className="ml-auto flex gap-4">
+                    {item.proprio && onEditarAvaliacao && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setEdicao({ id: item.id, nota: item.nota, texto: item.texto ?? '' })
+                        }
+                        className="font-body text-[0.78rem] font-medium text-coffee-faint transition-colors duration-300 hover:text-coffee"
+                      >
+                        Editar
+                      </button>
+                    )}
+                    {item.proprio && onExcluirAvaliacao && (
+                      <button
+                        type="button"
+                        onClick={() => onExcluirAvaliacao(item.id)}
+                        className="font-body text-[0.78rem] font-medium text-coffee-faint transition-colors duration-300 hover:text-caramel-dark"
+                      >
+                        Excluir
+                      </button>
+                    )}
+                  </span>
                 )}
               </div>
-              <p className="mt-1.5 font-body text-[0.92rem] font-normal leading-relaxed text-coffee-soft">
-                {item.texto || 'Sem comentário.'}
-              </p>
+              {edicao?.id === item.id && onEditarAvaliacao ? (
+                <FormularioEdicaoAvaliacao
+                  notaInicial={edicao.nota}
+                  textoInicial={edicao.texto}
+                  enviando={enviando}
+                  onSalvar={({ rating, comment }) => {
+                    onEditarAvaliacao(item.id, { rating, comment })
+                    setEdicao(null)
+                  }}
+                  onCancelar={() => setEdicao(null)}
+                />
+              ) : (
+                <p className="mt-1.5 font-body text-[0.92rem] font-normal leading-relaxed text-coffee-soft">
+                  {item.texto || 'Sem comentário.'}
+                </p>
+              )}
             </li>
           ))}
         </ul>

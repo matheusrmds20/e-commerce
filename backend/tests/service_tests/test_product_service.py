@@ -2,7 +2,21 @@ import pytest
 
 from app.models.category import Category
 from app.models.product import Product
+from app.models.user import User, UserRole
 from app.schemas.product import ProductCreate, ProductUpdate
+
+
+def make_user(role=UserRole.ADMIN, **kwargs):
+    fields = dict(
+        id=99,
+        email="admin@example.com",
+        full_name="Admin",
+        password_hash="hashed",
+        role=role,
+        is_active=True,
+    )
+    fields.update(kwargs)
+    return User(**fields)
 
 
 def make_product(**kwargs):
@@ -48,9 +62,6 @@ def create_payload(**kwargs):
     "method,repo_method,lookup",
     [
         ("get_by_id", "get_by_id", 99),
-        ("get_by_title", "get_by_title", "não existe"),
-        ("get_by_slug", "get_by_slug", "sem-slug"),
-        ("get_by_isbn", "get_by_isbn", "000000"),
     ],
 )
 def test_get_single_success(product_service, product_repo, method, repo_method, lookup):
@@ -64,9 +75,6 @@ def test_get_single_success(product_service, product_repo, method, repo_method, 
     "method,repo_method,lookup,message",
     [
         ("get_by_id", "get_by_id", 99, "No product found with id 99"),
-        ("get_by_title", "get_by_title", "não existe", "No product found with title 'não existe'"),
-        ("get_by_slug", "get_by_slug", "sem-slug", "No product found with slug 'sem-slug'"),
-        ("get_by_isbn", "get_by_isbn", "000000", "No product found with ISBN '000000'"),
     ],
 )
 def test_get_single_not_found(product_service, product_repo, method, repo_method, lookup, message):
@@ -82,11 +90,7 @@ def test_get_single_not_found(product_service, product_repo, method, repo_method
     "method,repo_method,lookup",
     [
         ("get_by_category_id", "get_by_category_id", 1),
-        ("get_by_publisher", "get_by_publisher", "Editora X"),
-        ("get_by_publication_year", "get_by_publication_year", 2020),
-        ("get_by_language", "get_by_language", "pt-BR"),
         ("get_by_discount_pct", "get_by_discount_pct", 10),
-        ("get_by_stock_qty", "get_by_stock_qty", 5),
         ("get_by_is_active", "get_by_is_active", True),
         ("get_all", "get_all", None),
     ],
@@ -107,12 +111,8 @@ def test_get_list_success(product_service, product_repo, method, repo_method, lo
     "method,repo_method,lookup,message",
     [
         ("get_by_category_id", "get_by_category_id", 1, "No products found with category_id 1"),
-        ("get_by_publisher", "get_by_publisher", "Editora X", "No products found with publisher 'Editora X'"),
-        ("get_by_publication_year", "get_by_publication_year", 2020, "No products found with publication_year 2020"),
-        ("get_by_language", "get_by_language", "pt-BR", "No products found with language 'pt-BR'"),
         # `get_by_discount_pct` NÃO entra aqui: lista vazia é resposta válida
         # (ausência de promoção não é erro). Coberto em TestVitrine.
-        ("get_by_stock_qty", "get_by_stock_qty", 5, "No products found with stock_qty 5"),
         ("get_by_is_active", "get_by_is_active", True, "No products found with is_active True"),
         ("get_all", "get_all", None, "No products found"),
     ],
@@ -138,7 +138,7 @@ class TestCreate:
         product_repo.get_by_slug.return_value = None
         product_repo.create.return_value = product
 
-        result = product_service.create(create_payload())
+        result = product_service.create(create_payload(), make_user())
 
         assert result is product
         created = product_repo.create.call_args[0][0]
@@ -152,7 +152,7 @@ class TestCreate:
         category_repo.get_by_id.return_value = None
 
         with pytest.raises(ValueError) as exc:
-            product_service.create(create_payload())
+            product_service.create(create_payload(), make_user())
 
         assert str(exc.value) == "No category found with id 1"
 
@@ -161,7 +161,7 @@ class TestCreate:
         product_repo.get_by_title.return_value = make_product()
 
         with pytest.raises(ValueError) as exc:
-            product_service.create(create_payload())
+            product_service.create(create_payload(), make_user())
 
         assert "already exists" in str(exc.value)
 
@@ -171,7 +171,7 @@ class TestCreate:
         product_repo.get_by_slug.return_value = make_product()
 
         with pytest.raises(ValueError) as exc:
-            product_service.create(create_payload())
+            product_service.create(create_payload(), make_user())
 
         assert "already exists" in str(exc.value)
 
@@ -182,7 +182,7 @@ class TestUpdate:
         product_repo.get_by_id.return_value = product
         product_repo.update.return_value = product
 
-        result = product_service.update(1, ProductUpdate(price=99.0))
+        result = product_service.update(1, ProductUpdate(price=99.0), make_user())
 
         assert result is product
         assert product.price == 99.0
@@ -192,7 +192,7 @@ class TestUpdate:
         product_repo.get_by_id.return_value = None
 
         with pytest.raises(ValueError) as exc:
-            product_service.update(1, ProductUpdate(price=99.0))
+            product_service.update(1, ProductUpdate(price=99.0), make_user())
 
         assert str(exc.value) == "No product found with id 1"
 
@@ -203,7 +203,7 @@ class TestUpdate:
         product_repo.get_by_title.return_value = other
 
         with pytest.raises(ValueError) as exc:
-            product_service.update(1, ProductUpdate(title="Outro Livro"))
+            product_service.update(1, ProductUpdate(title="Outro Livro"), make_user())
 
         assert "already exists" in str(exc.value)
 
@@ -212,7 +212,7 @@ class TestUpdate:
         category_repo.get_by_id.return_value = None
 
         with pytest.raises(ValueError) as exc:
-            product_service.update(1, ProductUpdate(category_id=99))
+            product_service.update(1, ProductUpdate(category_id=99), make_user())
 
         assert str(exc.value) == "No category found with id 99"
 
@@ -222,7 +222,7 @@ class TestDelete:
         product = make_product()
         product_repo.get_by_id.return_value = product
 
-        result = product_service.delete(1)
+        result = product_service.delete(1, make_user())
 
         assert result is product
         product_repo.delete.assert_called_once_with(product)
@@ -231,10 +231,40 @@ class TestDelete:
         product_repo.get_by_id.return_value = None
 
         with pytest.raises(ValueError) as exc:
-            product_service.delete(1)
+            product_service.delete(1, make_user())
 
         assert str(exc.value) == "No product found with id 1"
 
+
+class TestAdminPermission:
+    """create/update/delete exigem papel admin (mesma regra de categorias).
+
+    A checagem acontece antes de qualquer acesso ao repo, então um customer
+    não consegue nem sondar a existência de um produto via 404 vs 200.
+    """
+
+    def test_create_customer_forbidden(self, product_service, product_repo):
+        with pytest.raises(ValueError) as exc:
+            product_service.create(create_payload(), make_user(role=UserRole.CUSTOMER))
+
+        assert "Admin permission required" in str(exc.value)
+        product_repo.create.assert_not_called()
+
+    def test_update_customer_forbidden(self, product_service, product_repo):
+        with pytest.raises(ValueError) as exc:
+            product_service.update(
+                1, ProductUpdate(price=10.0), make_user(role=UserRole.CUSTOMER)
+            )
+
+        assert "Admin permission required" in str(exc.value)
+        product_repo.update.assert_not_called()
+
+    def test_delete_customer_forbidden(self, product_service, product_repo):
+        with pytest.raises(ValueError) as exc:
+            product_service.delete(1, make_user(role=UserRole.CUSTOMER))
+
+        assert "Admin permission required" in str(exc.value)
+        product_repo.delete.assert_not_called()
 
 class TestVitrine:
     """Métodos de vitrine: get_featured e get_bestsellers.
@@ -303,7 +333,7 @@ class TestPaginacao:
             "total_pages": 3,
         }
         assert len(result["data"]) == 1
-        product_repo.paginate.assert_called_once_with(2, 20, None)
+        product_repo.paginate.assert_called_once_with(2, 20, None, search=None)
 
     def test_paginated_total_pages_arredonda_para_cima(
         self, product_service, product_repo
@@ -364,7 +394,17 @@ class TestPaginacaoComFiltro:
 
         product_service.get_paginated(page=1, per_page=12, category_id=3)
 
-        product_repo.paginate.assert_called_once_with(1, 12, 3)
+        product_repo.paginate.assert_called_once_with(1, 12, 3, search=None)
+
+    def test_paginated_passa_search(
+        self, product_service, product_repo, category_repo
+    ):
+        """O termo livre é repassado ao repo para filtrar no banco."""
+        product_repo.paginate.return_value = ([], 0)
+
+        product_service.get_paginated(page=1, per_page=12, search="tolkien")
+
+        product_repo.paginate.assert_called_once_with(1, 12, None, search="tolkien")
 
     def test_paginated_total_reflete_o_filtro(
         self, product_service, product_repo, category_repo

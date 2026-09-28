@@ -4,18 +4,16 @@ import { ApiError, toApiError } from './client'
 /**
  * Newsletter / "Carta do Livreiro".
  *
- * ⚠️ O backend ATUAL NÃO POSSUI este endpoint (nem modelo de inscrição).
- * Este módulo existe para deixar o contrato pronto: quando a API implementar
- * `POST /newsletter/subscribe`, a Home passa a funcionar sem mudanças na UI.
- *
- * Enquanto isso, a chamada retorna 404 e o componente Newsletter trata como
- * "recurso indisponível" — sem fingir sucesso.
+ * - `inscrever(email)` — público; inscreve um e-mail na carta mensal.
+ *   409 => e-mail já inscrito (mensagem amigável).
+ * - `listarInscritos()` — restrito a administradores; base da aba
+ *   Newsletter do painel admin.
  */
 export const newsletterService = {
   /**
    * Inscreve um e-mail na carta mensal.
    * @param {string} email
-   * @returns {Promise<{ email: string }>}
+   * @returns {Promise<{ id: number, email: string, subscribed_at: string }>}
    */
   async inscrever(email) {
     try {
@@ -23,17 +21,24 @@ export const newsletterService = {
       return data
     } catch (error) {
       const apiError = toApiError(error)
-      // 404 => endpoint ainda não implementado no backend.
-      if (apiError.status === 404) {
+      if (apiError.status === 409) {
         throw new ApiError({
-          message:
-            'A assinatura da Carta ainda não está disponível. Em breve abriremos as inscrições.',
-          code: 'NEWSLETTER_UNAVAILABLE',
-          status: 404,
+          message: 'Este e-mail já está inscrito na Carta do Livreiro.',
+          code: 'NEWSLETTER_ALREADY_SUBSCRIBED',
+          status: 409,
         })
       }
       throw apiError
     }
+  },
+
+  /**
+   * Lista todos os inscritos da newsletter (admin).
+   * @returns {Promise<Array<{ id: number, email: string, subscribed_at: string }>>}
+   */
+  async listarInscritos() {
+    const { data } = await api.get('/newsletter/list')
+    return data
   },
 }
 

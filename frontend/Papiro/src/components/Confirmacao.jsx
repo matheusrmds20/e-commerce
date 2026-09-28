@@ -10,6 +10,7 @@ export default function Confirmacao({
   descricao,
   textoConfirmar = 'Excluir',
   textoCancelar = 'Cancelar',
+  textoOcupado = 'Excluindo…',
   ocupado = false,
   erro = null,
   onConfirmar,
@@ -78,7 +79,7 @@ export default function Confirmacao({
             onClick={onConfirmar}
             className="rounded-sm bg-[#a4533f] px-6 py-3 font-body text-[0.7rem] font-semibold uppercase tracking-[0.2em] text-cream-soft shadow-md transition-all duration-300 hover:bg-[#8f4636] disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {ocupado ? 'Excluindo…' : textoConfirmar}
+            {ocupado ? textoOcupado : textoConfirmar}
           </button>
         </div>
       </div>

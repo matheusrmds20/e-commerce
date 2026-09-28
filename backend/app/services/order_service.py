@@ -156,17 +156,6 @@ class OrderService:
 
     
 
-    def get_by_id(self, order_id: int, user_id: int) -> dict:
-        order = self.repo.get_by_id(order_id)
-
-        if not order:
-            raise ValueError(f"No order found with id {order_id}")
-
-        if order.user_id != user_id:
-            raise ValueError("Order is not owned by user")
-
-        return order
-
     def get_by_user_id(self, user_id: int) -> list:
         user = self.user_repo.get_by_id(user_id)
 
@@ -179,23 +168,6 @@ class OrderService:
             raise ValueError(f"No orders found with user_id {user_id}")
 
         return orders
-
-    def get_with_items(self, order_id: int, user_id: int) -> list:
-        order = self.repo.get_by_id(order_id)
-
-        if not order:
-            raise ValueError(f"No order found with id {order_id}")
-
-        if order.user_id != user_id:
-            raise ValueError("Order is not owned by user")
-
-        items = self.repo.get_with_items(order_id)
-
-        if not items:
-            raise ValueError(f"No items found in order with id {order_id}")
-
-        return items
-
 
     def create(self, user_id: int, data) -> Order:
         with self.session.begin():

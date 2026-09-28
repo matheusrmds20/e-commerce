@@ -86,7 +86,7 @@ export default function PainelCompra({
           }`}
         >
           <HeartIcon filled={nosDesejos} />{' '}
-          {nosDesejos ? 'Nos seus desejos' : 'Adicionar aos desejos'}
+          {nosDesejos ? 'Remover dos desejos' : 'Adicionar aos desejos'}
         </button>
       </div>
     </div>

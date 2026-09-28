@@ -157,6 +157,34 @@ class CouponNotAssignedException(ForbiddenException):
         super().__init__(message, code="COUPON_NOT_ASSIGNED")
 
 
+class WishlistForbiddenException(ForbiddenException):
+    """O item de wishlist pertence a outro usuário.
+
+    Fecha o IDOR das rotas `/wishlists`, que antes aceitavam `user_id` arbitrário
+    na query string. Agora o dono vem do token e só ele (ou um admin) pode
+    ler/alterar o item.
+    """
+
+    def __init__(
+        self, message: str = "Este item da lista de desejos pertence a outro usuário."
+    ) -> None:
+        super().__init__(message, code="WISHLIST_FORBIDDEN")
+
+
+class ReviewForbiddenException(ForbiddenException):
+    """A avaliação pertence a outro usuário.
+
+    Fecha o IDOR das rotas `/reviews`, que antes aceitavam `user_id` arbitrário
+    na query string. Agora o autor vem do token e só ele (ou um admin) pode
+    ler/alterar/excluir a avaliação.
+    """
+
+    def __init__(
+        self, message: str = "Esta avaliação pertence a outro usuário."
+    ) -> None:
+        super().__init__(message, code="REVIEW_FORBIDDEN")
+
+
 # ---------------------------------------------------------------------------
 # 404 - Not Found
 # ---------------------------------------------------------------------------

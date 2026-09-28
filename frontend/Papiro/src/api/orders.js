@@ -4,12 +4,9 @@ import api from './client'
  * Endpoints de pedidos.
  *
  * Contrato atual do backend (FastAPI):
- *   POST   /orders/create        -> cria o pedido (201). Corpo: OrderCreate.
- *   GET    /orders/list          -> lista os pedidos do usuário autenticado.
- *   GET    /orders/get/{id}      -> busca um pedido.
- *   GET    /orders/items/{id}    -> lista os itens de um pedido.
- *   PATCH  /orders/update/{id}   -> atualiza (status, endereço, itens...).
- *   DELETE /orders/delete/{id}   -> exclui.
+ *   POST  /orders/create       -> cria o pedido (201). Corpo: OrderCreate.
+ *   GET   /orders/list         -> lista os pedidos do usuário autenticado.
+ *   PATCH /orders/update/{id}  -> atualiza um pedido (usado para cancelar).
  *
  * AUTENTICAÇÃO: todas as rotas exigem Bearer token e derivam o `user_id` do
  * usuário autenticado (`Depends(get_current_user)`). Não se envia mais
@@ -34,27 +31,17 @@ export const orderService = {
     return data
   },
 
-  /** Busca um pedido pelo ID. */
-  async obter(orderId) {
-    const { data } = await api.get(`/orders/get/${orderId}`)
-    return data
-  },
-
-  /** Lista os itens de um pedido. */
-  async itens(orderId) {
-    const { data } = await api.get(`/orders/items/${orderId}`)
-    return data
-  },
-
-  /** Atualiza um pedido (ex: status). */
-  async atualizar(orderId, updateData) {
-    const { data } = await api.patch(`/orders/update/${orderId}`, updateData)
-    return data
-  },
-
-  /** Exclui um pedido. */
-  async excluir(orderId) {
-    const { data } = await api.delete(`/orders/delete/${orderId}`)
+  /**
+   * Cancela um pedido do usuário autenticado.
+   *
+   * Usa `PATCH /orders/update/{id}` com `{ status: 'cancelled' }`. O backend
+   * valida a posse (403) e recusa cancelar um pedido já cancelado (400).
+   * @param {number} orderId
+   */
+  async cancelar(orderId) {
+    const { data } = await api.patch(`/orders/update/${orderId}`, {
+      status: 'cancelled',
+    })
     return data
   },
 }

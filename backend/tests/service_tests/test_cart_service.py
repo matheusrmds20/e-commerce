@@ -47,30 +47,6 @@ def make_user(**kwargs):
     return User(**fields)
 
 
-class TestGetByID:
-    def test_success(self, cart_service, cart_repo):
-        cart = make_cart()
-        cart_repo.get_by_id.return_value = cart
-
-        assert cart_service.get_by_id(1, 1) is cart
-
-    def test_not_found(self, cart_service, cart_repo):
-        cart_repo.get_by_id.return_value = None
-
-        with pytest.raises(ValueError) as exc:
-            cart_service.get_by_id(1, 1)
-
-        assert str(exc.value) == "No cart found with id 1"
-
-    def test_not_owned(self, cart_service, cart_repo):
-        cart_repo.get_by_id.return_value = make_cart(user_id=2)
-
-        with pytest.raises(ValueError) as exc:
-            cart_service.get_by_id(1, 1)
-
-        assert str(exc.value) == "Cart is not owned by user"
-
-
 class TestGetByUserID:
     def test_success(self, cart_service, user_repo):
         user = make_user()
@@ -97,40 +73,6 @@ class TestGetByUserID:
             cart_service.get_by_user_id(1)
 
         assert str(exc.value) == "No cart found with user_id 1"
-
-
-class TestGetWithItems:
-    def test_success(self, cart_service, cart_repo):
-        cart_repo.get_by_id.return_value = make_cart()
-        items = [make_cart_item()]
-        cart_repo.get_with_items.return_value = items
-
-        assert cart_service.get_with_items(1, 1) == items
-
-    def test_not_found(self, cart_service, cart_repo):
-        cart_repo.get_by_id.return_value = None
-
-        with pytest.raises(ValueError) as exc:
-            cart_service.get_with_items(1, 1)
-
-        assert str(exc.value) == "No cart found with id 1"
-
-    def test_not_owned(self, cart_service, cart_repo):
-        cart_repo.get_by_id.return_value = make_cart(user_id=2)
-
-        with pytest.raises(ValueError) as exc:
-            cart_service.get_with_items(1, 1)
-
-        assert str(exc.value) == "Cart is not owned by user"
-
-    def test_no_items(self, cart_service, cart_repo):
-        cart_repo.get_by_id.return_value = make_cart()
-        cart_repo.get_with_items.return_value = []
-
-        with pytest.raises(ValueError) as exc:
-            cart_service.get_with_items(1, 1)
-
-        assert str(exc.value) == "No items found in cart with id 1"
 
 
 class TestCreate:
@@ -259,33 +201,25 @@ class TestUpdateItem:
         assert result is item
         cart_item_repo.update_quantity.assert_called_once_with(item, 5)
 
+    def test_zero_quantity_removes_item(self, cart_service, cart_repo, cart_item_repo):
+        """quantity <= 0 remove o item em vez de gravar 0 (consistente com o
+        comportamento do antigo decrease_item)."""
+        cart_repo.get_by_id.return_value = make_cart()
+        item = make_cart_item()
+        cart_item_repo.get_by_id.return_value = item
+
+        result = cart_service.update_item(1, 1, 1, 0)
+
+        assert result is item
+        cart_item_repo.delete.assert_called_once_with(item)
+        cart_item_repo.update_quantity.assert_not_called()
+
     def test_item_not_found(self, cart_service, cart_repo, cart_item_repo):
         cart_repo.get_by_id.return_value = make_cart()
         cart_item_repo.get_by_id.return_value = None
 
         with pytest.raises(ValueError) as exc:
             cart_service.update_item(1, 1, 99, 5)
-
-        assert str(exc.value) == "No cart item found with id 99"
-
-
-class TestDecreaseItem:
-    def test_success(self, cart_service, cart_repo, cart_item_repo):
-        cart_repo.get_by_id.return_value = make_cart()
-        item = make_cart_item()
-        cart_item_repo.get_by_id.return_value = item
-
-        result = cart_service.decrease_item(1, 1, 1, 1)
-
-        assert result is item
-        cart_item_repo.decrease_quantity.assert_called_once_with(item, 1)
-
-    def test_item_not_found(self, cart_service, cart_repo, cart_item_repo):
-        cart_repo.get_by_id.return_value = make_cart()
-        cart_item_repo.get_by_id.return_value = None
-
-        with pytest.raises(ValueError) as exc:
-            cart_service.decrease_item(1, 1, 99, 1)
 
         assert str(exc.value) == "No cart item found with id 99"
 
@@ -329,33 +263,6 @@ class TestClear:
             cart_service.clear(1, 1)
 
         assert str(exc.value) == "No cart found with id 1"
-
-
-class TestDelete:
-    def test_success(self, cart_service, cart_repo):
-        cart = make_cart()
-        cart_repo.get_by_id.return_value = cart
-
-        result = cart_service.delete(1, 1)
-
-        assert result is cart
-        cart_repo.delete.assert_called_once_with(cart)
-
-    def test_not_found(self, cart_service, cart_repo):
-        cart_repo.get_by_id.return_value = None
-
-        with pytest.raises(ValueError) as exc:
-            cart_service.delete(1, 1)
-
-        assert str(exc.value) == "No cart found with id 1"
-
-    def test_not_owned(self, cart_service, cart_repo):
-        cart_repo.get_by_id.return_value = make_cart(user_id=2)
-
-        with pytest.raises(ValueError) as exc:
-            cart_service.delete(1, 1)
-
-        assert str(exc.value) == "Cart is not owned by user"
 
 
 class TestLockDeEstoque:

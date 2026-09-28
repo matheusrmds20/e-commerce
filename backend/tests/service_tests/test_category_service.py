@@ -1,7 +1,21 @@
 import pytest
 
 from app.models.category import Category
+from app.models.user import User, UserRole
 from app.schemas.category import CategoryCreate, CategoryUpdate
+
+
+def make_user(role=UserRole.ADMIN, **kwargs):
+    fields = dict(
+        id=99,
+        email="admin@example.com",
+        full_name="Admin",
+        password_hash="hashed",
+        role=role,
+        is_active=True,
+    )
+    fields.update(kwargs)
+    return User(**fields)
 
 
 def make_category(**kwargs):
@@ -78,7 +92,7 @@ class TestCreate:
         category_repo.get_by_slug.return_value = None
         category_repo.create.return_value = category
 
-        result = category_service.create(create_payload())
+        result = category_service.create(create_payload(), make_user())
 
         assert result is category
         created = category_repo.create.call_args[0][0]
@@ -89,7 +103,7 @@ class TestCreate:
         category_repo.get_by_name.return_value = make_category()
 
         with pytest.raises(ValueError) as exc:
-            category_service.create(create_payload())
+            category_service.create(create_payload(), make_user())
 
         assert "already exists" in str(exc.value)
 
@@ -98,7 +112,7 @@ class TestCreate:
         category_repo.get_by_slug.return_value = make_category()
 
         with pytest.raises(ValueError) as exc:
-            category_service.create(create_payload())
+            category_service.create(create_payload(), make_user())
 
         assert "already exists" in str(exc.value)
 
@@ -111,7 +125,7 @@ class TestUpdate:
         category_repo.get_by_slug.return_value = None
         category_repo.update.return_value = category
 
-        result = category_service.update(1, CategoryUpdate(name="Terror"))
+        result = category_service.update(1, CategoryUpdate(name="Terror"), make_user())
 
         assert result is category
         assert category.name == "Terror"
@@ -121,7 +135,7 @@ class TestUpdate:
         category_repo.get_by_id.return_value = None
 
         with pytest.raises(ValueError) as exc:
-            category_service.update(1, CategoryUpdate(name="Terror"))
+            category_service.update(1, CategoryUpdate(name="Terror"), make_user())
 
         assert str(exc.value) == "No category found with id 1"
 
@@ -132,7 +146,7 @@ class TestUpdate:
         category_repo.get_by_name.return_value = other
 
         with pytest.raises(ValueError) as exc:
-            category_service.update(1, CategoryUpdate(name="Terror"))
+            category_service.update(1, CategoryUpdate(name="Terror"), make_user())
 
         assert "already exists" in str(exc.value)
 
@@ -144,9 +158,34 @@ class TestUpdate:
         category_repo.get_by_slug.return_value = other
 
         with pytest.raises(ValueError) as exc:
-            category_service.update(1, CategoryUpdate(slug="terror"))
+            category_service.update(1, CategoryUpdate(slug="terror"), make_user())
 
         assert "already exists" in str(exc.value)
+
+
+class TestAdminPermission:
+    def test_create_customer_forbidden(self, category_service, category_repo):
+        with pytest.raises(ValueError) as exc:
+            category_service.create(create_payload(), make_user(role=UserRole.CUSTOMER))
+
+        assert "Admin permission required" in str(exc.value)
+        category_repo.create.assert_not_called()
+
+    def test_update_customer_forbidden(self, category_service, category_repo):
+        with pytest.raises(ValueError) as exc:
+            category_service.update(
+                1, CategoryUpdate(name="Terror"), make_user(role=UserRole.CUSTOMER)
+            )
+
+        assert "Admin permission required" in str(exc.value)
+        category_repo.update.assert_not_called()
+
+    def test_delete_customer_forbidden(self, category_service, category_repo):
+        with pytest.raises(ValueError) as exc:
+            category_service.delete(1, make_user(role=UserRole.CUSTOMER))
+
+        assert "Admin permission required" in str(exc.value)
+        category_repo.delete.assert_not_called()
 
 
 class TestDelete:
@@ -154,7 +193,7 @@ class TestDelete:
         category = make_category()
         category_repo.get_by_id.return_value = category
 
-        result = category_service.delete(1)
+        result = category_service.delete(1, make_user())
 
         assert result is category
         category_repo.delete.assert_called_once_with(category)
@@ -163,6 +202,6 @@ class TestDelete:
         category_repo.get_by_id.return_value = None
 
         with pytest.raises(ValueError) as exc:
-            category_service.delete(1)
+            category_service.delete(1, make_user())
 
         assert str(exc.value) == "No category found with id 1"

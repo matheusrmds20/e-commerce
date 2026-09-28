@@ -3,18 +3,21 @@ import api from './client'
 /**
  * Endpoints de avaliações.
  *
- * Contrato do backend (FastAPI):
- *   GET    /reviews/product/{product_id}       -> lista avaliações do produto (público)
- *   POST   /reviews/create?user_id={id}        -> cria avaliação (user_id na query)
- *   PATCH  /reviews/update/{review_id}?user_id -> atualiza (dono da avaliação)
- *   DELETE /reviews/delete/{review_id}?user_id -> exclui (dono da avaliação)
+ * Contrato do backend (FastAPI) — o dono vem do TOKEN, não de `user_id`:
+ *   GET    /reviews/list                -> avaliações do usuário autenticado
+ *                                           (admin pode alvejar ?user_id=)
+ *   GET    /reviews/product/{id}        -> lista avaliações do produto (público)
+ *   POST   /reviews/create              -> cria avaliação para o usuário do token
+ *   PATCH  /reviews/update/{review_id}  -> atualiza (autor ou admin)
+ *   DELETE /reviews/delete/{review_id}  -> exclui (autor ou admin)
  *
  * Observações:
- * - `GET /reviews/product/{id}` responde 400 quando o produto não tem
- *   avaliações (o service lança ValueError). O chamador deve tratar isso como
- *   "lista vazia", e não como falha.
- * - O `user_id` NÃO vem do token nestas rotas: ele é passado explicitamente na
- *   query string. O token Bearer é anexado pelo interceptor quando existir.
+ * - `GET /reviews/product/{id}` responde 404 quando o produto não existe e
+ *   200 com a lista (possivelmente vazia) quando existe. Chamadores tratam
+ *   falha como "lista vazia".
+ * - Avaliação de outro usuário em update/delete → 403 `REVIEW_FORBIDDEN`.
+ * - Avaliação duplicada (mesmo usuário/produto) → 409 `DUPLICATE_REVIEW`.
+ * - Rotas removidas do backend: `GET /get/{id}` e `GET /rating/{rating}`.
  */
 export const reviewService = {
   /**
@@ -28,39 +31,42 @@ export const reviewService = {
   },
 
   /**
-   * Cria uma avaliação para um produto.
-   * @param {number} userId
+   * Lista as avaliações do usuário autenticado ("minhas avaliações").
+   * @param {number} [userId] alvo alternativo — apenas administradores.
+   * @returns {Promise<Array>} ReviewResponse[]
+   */
+  async listarMinhas(userId) {
+    const { data } = await api.get('/reviews/list', {
+      params: userId ? { user_id: userId } : undefined,
+    })
+    return data
+  },
+
+  /**
+   * Cria uma avaliação para o produto (o autor vem do token).
    * @param {{ product_id: number, rating: number, comment?: string }} payload
    */
-  async criar(userId, payload) {
-    const { data } = await api.post('/reviews/create', payload, {
-      params: { user_id: userId },
-    })
+  async criar(payload) {
+    const { data } = await api.post('/reviews/create', payload)
     return data
   },
 
   /**
-   * Atualiza uma avaliação existente.
+   * Atualiza uma avaliação própria (ou qualquer uma, se admin).
    * @param {number} reviewId
-   * @param {number} userId
    * @param {{ rating?: number, comment?: string }} payload
    */
-  async atualizar(reviewId, userId, payload) {
-    const { data } = await api.patch(`/reviews/update/${reviewId}`, payload, {
-      params: { user_id: userId },
-    })
+  async atualizar(reviewId, payload) {
+    const { data } = await api.patch(`/reviews/update/${reviewId}`, payload)
     return data
   },
 
   /**
-   * Exclui uma avaliação.
+   * Exclui uma avaliação própria (ou qualquer uma, se admin).
    * @param {number} reviewId
-   * @param {number} userId
    */
-  async excluir(reviewId, userId) {
-    const { data } = await api.delete(`/reviews/delete/${reviewId}`, {
-      params: { user_id: userId },
-    })
+  async excluir(reviewId) {
+    const { data } = await api.delete(`/reviews/delete/${reviewId}`)
     return data
   },
 }

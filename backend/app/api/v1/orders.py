@@ -16,7 +16,6 @@ from app.api.exceptions import (
 from app.models.user import User
 from app.schemas.order import (
     OrderCreate,
-    OrderItemResponse,
     OrderResponse,
     OrderUpdate,
 )
@@ -95,32 +94,6 @@ def create_order(
 def list_orders(user: UserDb, db: DbSession) -> list:
     try:
         return get_order_service(db).get_by_user_id(user.id)
-    except ValueError as exc:
-        raise _traduzir_value_error(exc) from exc
-
-
-@order_router.get(
-    "/get/{order_id}",
-    response_model=OrderResponse,
-    summary="Busca um pedido pelo ID",
-)
-def get_order(order_id: int, user: UserDb, db: DbSession) -> OrderResponse:
-    try:
-        return get_order_service(db).get_by_id(order_id, user.id)
-    except ValueError as exc:
-        raise _traduzir_value_error(exc) from exc
-
-
-@order_router.get(
-    "/items/{order_id}",
-    response_model=list[OrderItemResponse],
-    summary="Lista os itens de um pedido",
-)
-def get_order_items(
-    order_id: int, user: UserDb, db: DbSession
-) -> list:
-    try:
-        return get_order_service(db).get_with_items(order_id, user.id)
     except ValueError as exc:
         raise _traduzir_value_error(exc) from exc
 

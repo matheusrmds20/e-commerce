@@ -45,6 +45,7 @@ export default function DetalheLivro({ productId = 1 }) {
   const [enviando, setEnviando] = useState(false)
   const [feedback, setFeedback] = useState(null)
   const [nosDesejos, setNosDesejos] = useState(false)
+  const [wishlistItemId, setWishlistItemId] = useState(null)
   const [feedbackDesejos, setFeedbackDesejos] = useState(null)
 
   /** Carrega produto + avaliações. As avaliações nunca derrubam a página. */
@@ -85,15 +86,20 @@ export default function DetalheLivro({ productId = 1 }) {
   }, [carregar])
 
   // Verifica se o produto já está na wishlist do usuário logado.
+  // Usa `GET /wishlists/product/{id}` (escopado ao usuário pelo token) em vez
+  // de baixar a lista inteira; guarda o id do item para permitir remoção.
   useEffect(() => {
     if (!autenticado || !produto) return
     let ativo = true
     wishlistService
-      .listar(usuario.id)
-      .then((lista) => {
-        if (ativo) {
-          setNosDesejos(lista.some((item) => item.product_id === produto.id))
-        }
+      .buscarPorProduto(produto.id)
+      .then((itens) => {
+        if (!ativo) return
+        const item = (itens ?? []).find(
+          (i) => i.user_id === usuario?.id,
+        )
+        setNosDesejos(Boolean(item))
+        setWishlistItemId(item?.id ?? null)
       })
       .catch(() => {})
     return () => {
@@ -122,8 +128,8 @@ export default function DetalheLivro({ productId = 1 }) {
     }
   }, [adicionar, produto])
 
-  /** Adiciona (ou confirma) o produto na wishlist do usuário logado. */
-  const adicionarAosDesejos = useCallback(async () => {
+  /** Adiciona ou remove o produto da wishlist (toggle). */
+  const alternarDesejo = useCallback(async () => {
     if (!produto) return
     if (!autenticado) {
       setFeedbackDesejos({
@@ -132,12 +138,52 @@ export default function DetalheLivro({ productId = 1 }) {
       })
       return
     }
-    if (nosDesejos) return
 
     setFeedbackDesejos(null)
+
+    // Remoção: já está nos desejos. Se por algum motivo não temos o id do item
+    // (ex.: vindo de um 409), resolvemos via `buscarPorProduto` antes de remover.
+    if (nosDesejos) {
+      let itemId = wishlistItemId
+      if (itemId == null) {
+        try {
+          const itens = await wishlistService.buscarPorProduto(produto.id)
+          itemId = (itens ?? []).find((i) => i.user_id === usuario?.id)?.id ?? null
+        } catch {
+          itemId = null
+        }
+      }
+
+      if (itemId == null) {
+        setFeedbackDesejos({
+          tipo: 'erro',
+          texto: 'Não foi possível localizar o item para remover.',
+        })
+        return
+      }
+
+      try {
+        await wishlistService.excluir(itemId)
+        setNosDesejos(false)
+        setWishlistItemId(null)
+        setFeedbackDesejos({
+          tipo: 'sucesso',
+          texto: 'Removido da sua lista de desejos.',
+        })
+      } catch (error) {
+        setFeedbackDesejos({
+          tipo: 'erro',
+          texto: error?.message ?? 'Não foi possível remover o desejo.',
+        })
+      }
+      return
+    }
+
+    // Adição.
     try {
-      await wishlistService.adicionar(usuario.id, produto.id)
+      const criado = await wishlistService.adicionar(produto.id)
       setNosDesejos(true)
+      setWishlistItemId(criado?.id ?? null)
       setFeedbackDesejos({
         tipo: 'sucesso',
         texto: 'Guardado na sua lista de desejos.',
@@ -154,7 +200,7 @@ export default function DetalheLivro({ productId = 1 }) {
         texto: error?.message ?? 'Não foi possível guardar o desejo.',
       })
     }
-  }, [autenticado, usuario, produto, nosDesejos])
+  }, [autenticado, usuario, produto, nosDesejos, wishlistItemId])
 
   /** Publica uma nova avaliação do usuário logado. */
   const enviarAvaliacao = useCallback(
@@ -163,7 +209,7 @@ export default function DetalheLivro({ productId = 1 }) {
       setEnviando(true)
       setFeedback(null)
       try {
-        await reviewService.criar(usuario.id, {
+        await reviewService.criar({
           product_id: produto.id,
           rating,
           comment,
@@ -179,16 +225,35 @@ export default function DetalheLivro({ productId = 1 }) {
         setEnviando(false)
       }
     },
-    [autenticado, usuario, produto, carregar],
+    [autenticado, produto, carregar],
+  )
+
+  /** Salva a edição de uma avaliação do próprio usuário. */
+  const salvarEdicaoAvaliacao = useCallback(
+    async (reviewId, { rating, comment }) => {
+      if (!autenticado || !produto) return
+      setFeedback(null)
+      try {
+        await reviewService.atualizar(reviewId, { rating, comment })
+        await carregar()
+        setFeedback({ tipo: 'sucesso', texto: 'Avaliação atualizada.' })
+      } catch (error) {
+        setFeedback({
+          tipo: 'erro',
+          texto: error?.message ?? 'Não foi possível atualizar a avaliação.',
+        })
+      }
+    },
+    [autenticado, produto, carregar],
   )
 
   /** Remove uma avaliação do próprio usuário. */
   const excluirAvaliacao = useCallback(
     async (reviewId) => {
-      if (!autenticado || !usuario) return
+      if (!autenticado) return
       setFeedback(null)
       try {
-        await reviewService.excluir(reviewId, usuario.id)
+        await reviewService.excluir(reviewId)
         await carregar()
         setFeedback({ tipo: 'sucesso', texto: 'Avaliação removida.' })
       } catch (error) {
@@ -198,7 +263,7 @@ export default function DetalheLivro({ productId = 1 }) {
         })
       }
     },
-    [autenticado, usuario, carregar],
+    [autenticado, carregar],
   )
 
   if (carregando) {
@@ -283,7 +348,7 @@ export default function DetalheLivro({ productId = 1 }) {
                 stockQty={produto.stockQty}
                 onAdicionar={adicionarASacola}
                 feedback={feedback}
-                onAdicionarDesejos={adicionarAosDesejos}
+                onAdicionarDesejos={alternarDesejo}
                 nosDesejos={nosDesejos}
                 feedbackDesejos={feedbackDesejos}
               />
@@ -301,6 +366,7 @@ export default function DetalheLivro({ productId = 1 }) {
             enviando={enviando}
             feedback={feedback}
             onAvaliar={enviarAvaliacao}
+            onEditarAvaliacao={salvarEdicaoAvaliacao}
             onExcluirAvaliacao={excluirAvaliacao}
           />
         </div>

@@ -34,13 +34,6 @@ export function formatarNumeroCartao(valor = '') {
   return limpo.replace(/(\d{4})(?=\d)/g, '$1 ')
 }
 
-/** Mascara o número do cartão mostrando apenas os 4 últimos dígitos */
-export function mascararCartao(numero = '') {
-  const limpo = String(numero).replace(/\D/g, '')
-  const ultimos4 = limpo.slice(-4) || '••••'
-  return `•••• •••• •••• ${ultimos4}`
-}
-
 export const cardService = {
   /**
    * Lista os cartões cadastrados do usuário.

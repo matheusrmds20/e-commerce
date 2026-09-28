@@ -149,36 +149,3 @@ export function calcularTotais(itens) {
   return { subtotal, frete, total: subtotal + frete }
 }
 
-/**
- * Converte os itens do carrinho (view) no payload de `OrderItemCreate`.
- * @param {Array<{productId: number, quantidade: number}>} itens
- */
-export function itensParaOrderPayload(itens) {
-  return (itens ?? []).map((item) => ({
-    product_id: item.productId,
-    quantity: item.quantidade,
-  }))
-}
-
-/**
- * Converte a resposta do backend (`OrderResponse`) no shape da tela.
- * @param {object} order OrderResponse
- */
-export function pedidoParaView(order) {
-  return {
-    id: order.id,
-    status: order.status,
-    subtotal: order.subtotal,
-    desconto: order.discount_amount,
-    frete: order.shipping_cost,
-    total: order.total,
-    criadoEm: order.created_at,
-    observacoes: order.notes ?? '',
-    itens: (order.order_items ?? []).map((item) => ({
-      id: item.id,
-      productId: item.product_id,
-      quantidade: item.quantity,
-      preco: item.price,
-    })),
-  }
-}

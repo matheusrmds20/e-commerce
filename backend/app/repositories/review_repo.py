@@ -17,7 +17,4 @@ class ReviewRepository(BaseRepository[Review]):
     def get_by_product_id(self, product_id: int) -> list[Review]:
         return self.session.query(Review).filter(Review.product_id == product_id).all()
 
-    def get_by_rating(self, rating: int) -> list[Review]:
-        return self.session.query(Review).filter(Review.rating == rating).all()
-
 

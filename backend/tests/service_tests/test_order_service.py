@@ -111,30 +111,6 @@ def order_create_payload(**kwargs):
     return OrderCreate(**fields)
 
 
-class TestGetByID:
-    def test_success(self, order_service, order_repo):
-        order = make_order()
-        order_repo.get_by_id.return_value = order
-
-        assert order_service.get_by_id(1, 1) is order
-
-    def test_not_found(self, order_service, order_repo):
-        order_repo.get_by_id.return_value = None
-
-        with pytest.raises(ValueError) as exc:
-            order_service.get_by_id(1, 1)
-
-        assert str(exc.value) == "No order found with id 1"
-
-    def test_not_owned(self, order_service, order_repo):
-        order_repo.get_by_id.return_value = make_order(user_id=2)
-
-        with pytest.raises(ValueError) as exc:
-            order_service.get_by_id(1, 1)
-
-        assert str(exc.value) == "Order is not owned by user"
-
-
 class TestGetByUserID:
     def test_success(self, order_service, user_repo):
         user = make_user()
@@ -161,24 +137,6 @@ class TestGetByUserID:
             order_service.get_by_user_id(1)
 
         assert str(exc.value) == "No orders found with user_id 1"
-
-
-class TestGetWithItems:
-    def test_success(self, order_service, order_repo):
-        order_repo.get_by_id.return_value = make_order()
-        items = [make_order_item()]
-        order_repo.get_with_items.return_value = items
-
-        assert order_service.get_with_items(1, 1) == items
-
-    def test_no_items(self, order_service, order_repo):
-        order_repo.get_by_id.return_value = make_order()
-        order_repo.get_with_items.return_value = []
-
-        with pytest.raises(ValueError) as exc:
-            order_service.get_with_items(1, 1)
-
-        assert str(exc.value) == "No items found in order with id 1"
 
 
 class TestCreate:

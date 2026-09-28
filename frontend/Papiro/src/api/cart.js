@@ -7,10 +7,14 @@ import api from './client'
  *   POST   /cart/create                        -> cria o carrinho do usuário.
  *   GET    /cart/cart/me                       -> busca o carrinho (com itens).
  *   POST   /cart/{cart_id}/items/add           -> adiciona item.
- *   PATCH  /cart/{cart_id}/items/update/{id}   -> define a quantidade.
- *   PATCH  /cart/{cart_id}/items/decrease/{id} -> diminui a quantidade.
+ *   PATCH  /cart/{cart_id}/items/update/{id}   -> define a quantidade (0 remove).
  *   DELETE /cart/{cart_id}/items/delete/{id}   -> remove o item.
  *   DELETE /cart/{cart_id}/items/clear         -> esvazia o carrinho.
+ *
+ * Endpoints removidos na Parte 5 (órfãos, sem uso no front):
+ *   GET /cart/get/{id}, GET /cart/items/{id},
+ *   PATCH /cart/{id}/items/decrease/{id} e DELETE /cart/delete/{id}.
+ * Para decrementar, use `atualizarQuantidade` com o valor absoluto.
  *
  * AUTENTICAÇÃO: todas as rotas exigem Bearer token e derivam o `user_id` do
  * usuário autenticado (`Depends(get_current_user)`). O `user_id` NÃO vai mais

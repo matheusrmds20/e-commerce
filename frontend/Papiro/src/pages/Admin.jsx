@@ -1,10 +1,12 @@
 import { useState, useMemo, useEffect } from 'react'
 import { CloseIcon, SearchIcon } from '../components/Icons'
 import ModalCupom from '../components/ModalCupom'
+import ModalCategoria from '../components/ModalCategoria'
 import productService from '../api/products'
 import categoryService from '../api/categories'
 import adminService from '../api/admin'
 import couponService from '../api/coupons'
+import newsletterService from '../api/newsletter'
 
 const PEDIDOS_FALLBACK = [
   {
@@ -166,6 +168,8 @@ export default function Admin({ onVoltarParaLoja }) {
   const [livros, setLivros] = useState(LIVROS_FALLBACK)
   const [clientes, setClientes] = useState(CLIENTES_FALLBACK)
   const [categorias, setCategorias] = useState([])
+  // Estados de Newsletter
+  const [inscritos, setInscritos] = useState([])
   // Estados de Cupons
   const [cupons, setCupons] = useState([])
   const [cupomEditando, setCupomEditando] = useState(null)
@@ -173,6 +177,9 @@ export default function Admin({ onVoltarParaLoja }) {
   const [statsApi, setStatsApi] = useState(null)
   const [erroAviso, setErroAviso] = useState(null)
   const [modalNovoLivro, setModalNovoLivro] = useState(false)
+  // Estados de Categorias
+  const [categoriaEditando, setCategoriaEditando] = useState(null)
+  const [modalCategoria, setModalCategoria] = useState(false)
   const [salvandoLivro, setSalvandoLivro] = useState(false)
   const [modalCupom, setModalCupom] = useState(false)
   // Form novo livro
@@ -218,7 +225,13 @@ export default function Admin({ onVoltarParaLoja }) {
           setNovaCategoriaId(categoriasApi[0].id)
         }
 
-        // 4. Todos os Pedidos (/admin/orders)
+        // 3b. Inscritos da Newsletter (/newsletter/list)
+        const inscritosApi = await newsletterService.listarInscritos().catch(() => [])
+        if (ativo && Array.isArray(inscritosApi)) {
+          setInscritos(inscritosApi)
+        }
+
+        // 5. Todos os Pedidos (/admin/orders)
         const pedidosAdmin = await adminService.listarPedidos().catch(() => [])
         if (ativo && Array.isArray(pedidosAdmin) && pedidosAdmin.length > 0) {
           const formatados = pedidosAdmin.map((p) => ({
@@ -408,6 +421,48 @@ export default function Admin({ onVoltarParaLoja }) {
     }
   }
 
+  // ===================== Categorias =====================
+
+  // Recarrega a lista de categorias do backend.
+  const recarregarCategorias = async () => {
+    const categoriasApi = await categoryService.listar().catch(() => [])
+    if (Array.isArray(categoriasApi)) setCategorias(categoriasApi)
+  }
+
+  // Abre o modal de categoria em modo criação
+  const handleNovaCategoria = () => {
+    setCategoriaEditando(null)
+    setModalCategoria(true)
+  }
+
+  // Abre o modal de categoria em modo edição
+  const handleEditarCategoria = (categoria) => {
+    setCategoriaEditando(categoria)
+    setModalCategoria(true)
+  }
+
+  // Cria/atualiza uma categoria (o modal devolve payload + id)
+  const handleSalvarCategoria = async (payload, categoriaId) => {
+    if (categoriaId) {
+      await categoryService.atualizar(categoriaId, payload)
+    } else {
+      await categoryService.criar(payload)
+    }
+    await recarregarCategorias()
+    setModalCategoria(false)
+  }
+
+  // Exclui uma categoria
+  const handleExcluirCategoria = async (categoria) => {
+    if (!window.confirm(`Excluir a categoria "${categoria.name}"?`)) return
+    try {
+      await categoryService.excluir(categoria.id)
+      await recarregarCategorias()
+    } catch (err) {
+      setErroAviso(err.message || 'Erro ao excluir a categoria.')
+    }
+  }
+
   // Atualizar status do pedido
   const handleAtualizarStatusPedido = async (rawId, idFormatted, novoStatus) => {
     try {
@@ -468,6 +523,22 @@ export default function Admin({ onVoltarParaLoja }) {
         c.discount_type?.toLowerCase().includes(busca)
     )
   }, [cupons, termoBusca])
+
+  const categoriasFiltradas = useMemo(() => {
+    if (!termoBusca.trim()) return categorias
+    const busca = termoBusca.toLowerCase()
+    return categorias.filter(
+      (c) =>
+        c.name?.toLowerCase().includes(busca) ||
+        c.slug?.toLowerCase().includes(busca),
+    )
+  }, [categorias, termoBusca])
+
+  const inscritosFiltradas = useMemo(() => {
+    if (!termoBusca.trim()) return inscritos
+    const t = termoBusca.toLowerCase()
+    return inscritos.filter((i) => i.email?.toLowerCase().includes(t))
+  }, [inscritos, termoBusca])
 
   // KPIs
   const faturamento = statsApi?.total_revenue ?? pedidos.reduce((a, b) => a + (b.total || 0), 0)
@@ -588,6 +659,42 @@ export default function Admin({ onVoltarParaLoja }) {
                 {cupons.length}
               </span>
             </button>
+
+            <button
+              type="button"
+              onClick={() => setAbaAtiva('categorias')}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-sm text-left transition-colors duration-200 ${
+                abaAtiva === 'categorias'
+                  ? 'bg-gold text-forest font-semibold shadow-sm'
+                  : 'text-cream-soft hover:bg-forest-soft hover:text-cream'
+              }`}
+            >
+              <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
+              </svg>
+              Categorias
+              <span className="ml-auto text-xs px-2 py-0.5 rounded-full bg-forest-soft text-gold font-medium">
+                {categorias.length}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setAbaAtiva('newsletter')}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-sm text-left transition-colors duration-200 ${
+                abaAtiva === 'newsletter'
+                  ? 'bg-gold text-forest font-semibold shadow-sm'
+                  : 'text-cream-soft hover:bg-forest-soft hover:text-cream'
+              }`}
+            >
+              <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+              </svg>
+              Newsletter
+              <span className="ml-auto text-xs px-2 py-0.5 rounded-full bg-forest-soft text-gold font-medium">
+                {inscritos.length}
+              </span>
+            </button>
           </nav>
         </div>
 
@@ -626,6 +733,8 @@ export default function Admin({ onVoltarParaLoja }) {
                 {abaAtiva === 'pedidos' && 'Acompanhamento de Todos os Pedidos'}
                 {abaAtiva === 'clientes' && 'Gestão de Leitores'}
                 {abaAtiva === 'descontos' && 'Gestão de Cupons e Descontos'}
+                {abaAtiva === 'categorias' && 'Gestão de Categorias do Acervo'}
+                {abaAtiva === 'newsletter' && 'Inscritos da Carta do Livreiro'}
               </span>
             </div>
             <h2 className="font-display text-2xl font-bold text-coffee mt-0.5">
@@ -634,6 +743,8 @@ export default function Admin({ onVoltarParaLoja }) {
               {abaAtiva === 'pedidos' && 'Controle de Pedidos'}
               {abaAtiva === 'clientes' && 'Leitores Cadastrados'}
               {abaAtiva === 'descontos' && 'Cupons de Desconto'}
+              {abaAtiva === 'categorias' && 'Categorias do Acervo'}
+              {abaAtiva === 'newsletter' && 'Newsletter'}
             </h2>
           </div>
 
@@ -657,12 +768,15 @@ export default function Admin({ onVoltarParaLoja }) {
                 onClick={() =>
                   abaAtiva === 'descontos'
                     ? handleNovoCupom()
-                    : setModalNovoLivro(true)
+                    : abaAtiva === 'categorias'
+                      ? handleNovaCategoria()
+                      : setModalNovoLivro(true)
                 }
+                hidden={abaAtiva === 'newsletter'}
                 className="px-4 py-2 bg-forest hover:bg-forest-soft text-cream text-xs uppercase tracking-wider font-semibold rounded-sm transition-colors flex items-center gap-2 shadow-sm"
               >
                 <span className="text-gold font-bold text-base leading-none">+</span>
-                {abaAtiva === 'descontos' ? 'Novo Cupom' : 'Novo Livro'}
+                {abaAtiva === 'descontos' ? 'Novo Cupom' : abaAtiva === 'categorias' ? 'Nova Categoria' : 'Novo Livro'}
               </button>
             </div>
           )}
@@ -709,6 +823,22 @@ export default function Admin({ onVoltarParaLoja }) {
             }`}
           >
             Cupons ({cupons.length})
+          </button>
+          <button
+            onClick={() => setAbaAtiva('categorias')}
+            className={`py-3 px-4 font-body text-xs uppercase tracking-wider font-semibold whitespace-nowrap border-b-2 ${
+              abaAtiva === 'categorias' ? 'border-forest text-forest' : 'border-transparent text-coffee-faint'
+            }`}
+          >
+            Categorias ({categorias.length})
+          </button>
+          <button
+            onClick={() => setAbaAtiva('newsletter')}
+            className={`py-3 px-4 font-body text-xs uppercase tracking-wider font-semibold whitespace-nowrap border-b-2 ${
+              abaAtiva === 'newsletter' ? 'border-forest text-forest' : 'border-transparent text-coffee-faint'
+            }`}
+          >
+            Newsletter ({inscritos.length})
           </button>
         </div>
 
@@ -1206,6 +1336,138 @@ export default function Admin({ onVoltarParaLoja }) {
               </div>
             </section>
           )}
+
+          {/* ===================== ABA: CATEGORIAS ===================== */}
+          {abaAtiva === 'categorias' && (
+            <section className="bg-cream-soft rounded-sm border border-line shadow-sm overflow-hidden">
+              <div className="p-6 border-b border-line flex flex-wrap justify-between items-center gap-4">
+                <div>
+                  <h3 className="font-display text-xl font-bold text-coffee">
+                    Categorias do Acervo
+                  </h3>
+                  <p className="font-body text-xs text-coffee-faint">
+                    {categoriasFiltradas.length} categoria(s) cadastrada(s)
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleNovaCategoria}
+                  className="px-4 py-2 bg-forest text-cream text-xs uppercase tracking-wider font-semibold rounded-sm hover:bg-forest-soft transition-colors"
+                >
+                  + Nova Categoria
+                </button>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left font-body text-sm">
+                  <thead className="bg-cream-tint/60 text-[0.72rem] uppercase tracking-[0.16em] text-coffee-faint border-b border-line">
+                    <tr>
+                      <th className="py-3.5 px-6 font-semibold">ID</th>
+                      <th className="py-3.5 px-6 font-semibold">Nome</th>
+                      <th className="py-3.5 px-6 font-semibold">Slug</th>
+                      <th className="py-3.5 px-6 font-semibold">Descrição</th>
+                      <th className="py-3.5 px-6 font-semibold">Status</th>
+                      <th className="py-3.5 px-6 font-semibold text-right">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-line text-coffee-soft">
+                    {categoriasFiltradas.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="py-10 px-6 text-center text-xs text-coffee-faint">
+                          Nenhuma categoria cadastrada. Use “+ Nova Categoria” para começar.
+                        </td>
+                      </tr>
+                    ) : (
+                      categoriasFiltradas.map((categoria) => (
+                        <tr key={categoria.id} className="hover:bg-cream-deep/40 transition-colors">
+                          <td className="py-4 px-6 font-mono text-xs text-coffee">#{categoria.id}</td>
+                          <td className="py-4 px-6 font-medium text-coffee">{categoria.name}</td>
+                          <td className="py-4 px-6 font-mono text-xs text-coffee-faint">{categoria.slug}</td>
+                          <td className="py-4 px-6 text-xs text-coffee-faint max-w-[24rem] truncate">
+                            {categoria.description || '—'}
+                          </td>
+                          <td className="py-4 px-6">
+                            <span
+                              className={`text-xs font-semibold px-2 py-0.5 rounded ${
+                                categoria.is_active !== false
+                                  ? 'bg-forest-tint text-forest'
+                                  : 'bg-red-100 text-red-800'
+                              }`}
+                            >
+                              {categoria.is_active !== false ? 'Ativa' : 'Inativa'}
+                            </span>
+                          </td>
+                          <td className="py-4 px-6 text-right whitespace-nowrap">
+                            <button
+                              type="button"
+                              onClick={() => handleEditarCategoria(categoria)}
+                              className="text-xs text-forest hover:text-forest-soft font-medium transition-colors mr-4"
+                            >
+                              Editar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleExcluirCategoria(categoria)}
+                              className="text-xs text-red-700 hover:text-red-900 font-medium transition-colors"
+                            >
+                              Excluir
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          )}
+          {abaAtiva === 'newsletter' && (
+            <section className="bg-cream-soft rounded-sm border border-line shadow-sm overflow-hidden">
+              <div className="p-6 border-b border-line flex flex-wrap justify-between items-center gap-4">
+                <div>
+                  <h3 className="font-display text-xl font-bold text-coffee">
+                    Inscritos da Carta do Livreiro
+                  </h3>
+                  <p className="font-body text-xs text-coffee-faint">
+                    {inscritosFiltradas.length} inscrito(s) na newsletter
+                  </p>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left font-body text-sm">
+                  <thead className="bg-cream-tint/60 text-[0.72rem] uppercase tracking-[0.16em] text-coffee-faint border-b border-line">
+                    <tr>
+                      <th className="py-3.5 px-6 font-semibold">ID</th>
+                      <th className="py-3.5 px-6 font-semibold">E-mail</th>
+                      <th className="py-3.5 px-6 font-semibold">Inscrição</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-line text-coffee-soft">
+                    {inscritosFiltradas.length === 0 ? (
+                      <tr>
+                        <td colSpan={3} className="py-10 px-6 text-center text-xs text-coffee-faint">
+                          Nenhum inscrito ainda. A newsletter aceita visitantes pela Home.
+                        </td>
+                      </tr>
+                    ) : (
+                      inscritosFiltradas.map((inscrito) => (
+                        <tr key={inscrito.id} className="hover:bg-cream-deep/40 transition-colors">
+                          <td className="py-4 px-6 font-mono text-xs text-coffee">#{inscrito.id}</td>
+                          <td className="py-4 px-6 font-medium text-coffee">{inscrito.email}</td>
+                          <td className="py-4 px-6 text-xs text-coffee-faint">
+                            {inscrito.subscribed_at
+                              ? new Date(inscrito.subscribed_at).toLocaleDateString('pt-BR')
+                              : '-'}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          )}
         </div>
       </main>
 
@@ -1360,6 +1622,15 @@ export default function Admin({ onVoltarParaLoja }) {
           produtos={livros}
           usuarios={clientes}
           vinculosIniciais={vinculosCupom}
+        />
+      )}
+
+      {/* Modal: Nova/Editar Categoria */}
+      {modalCategoria && (
+        <ModalCategoria
+          onClose={() => setModalCategoria(false)}
+          onSalvar={handleSalvarCategoria}
+          categoriaParaEditar={categoriaEditando}
         />
       )}
     </div>

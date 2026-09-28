@@ -1,12 +1,25 @@
-from app.repositories.category_repo import CategoryRepository
 from app.models.category import Category
-
+from app.models.user import User, UserRole
+from app.repositories.category_repo import CategoryRepository
 
 
 class CategoryService:
+    """Regras de categorias.
+
+    SEGURANÇA: leitura (get_by_*/get_all) continua pública — o catálogo precisa
+    listar categorias sem login. Escrita (create/update/delete) passou a exigir
+    **administrador** (o usuário vem do token, resolvido pela rota). Antes
+    qualquer anônimo podia criar/excluir categorias.
+    """
+
     def __init__(self, db):
         self.repo = CategoryRepository(db)
         self.session = db
+
+    @staticmethod
+    def _ensure_admin(current_user: User) -> None:
+        if current_user.role != UserRole.ADMIN:
+            raise ValueError("Admin permission required to manage categories")
 
     def get_by_id(self, category_id: int) -> Category:
         category = self.repo.get_by_id(category_id)
@@ -40,8 +53,9 @@ class CategoryService:
 
         return categories
 
-    def create(self, data) -> Category:
+    def create(self, data, current_user: User) -> Category:
         with self.session.begin():
+            self._ensure_admin(current_user)
 
             existing_name = self.repo.get_by_name(data.name)
             if existing_name is not None:
@@ -64,8 +78,9 @@ class CategoryService:
 
             return category
 
-    def update(self, category_id: int, data) -> Category:
+    def update(self, category_id: int, data, current_user: User) -> Category:
         with self.session.begin():
+            self._ensure_admin(current_user)
 
             category = self.repo.get_by_id(category_id)
 
@@ -89,8 +104,9 @@ class CategoryService:
 
             return category
 
-    def delete(self, category_id: int) -> Category:
+    def delete(self, category_id: int, current_user: User) -> Category:
         with self.session.begin():
+            self._ensure_admin(current_user)
 
             category = self.repo.get_by_id(category_id)
 
