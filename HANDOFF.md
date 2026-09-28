@@ -91,11 +91,11 @@ npm run build
 |---|---|---|
 | `authService` | `login`, `register`, `me`, `logout` | — |
 | `addressService` | `criar`, `listar`, `definirPadrao`, `atualizar`, `excluir` | — |
-| `productService` | `listar`, `obter`, `listarPorDesconto`, `listarPorAtivo`, `listarDestaques`, `listarMaisVendidos`, `listarPaginado`, `recomendacoes`, `criar`, `atualizar`, `excluir` | ❌ `listarPorCategoria` (removido na limpeza) |
-| `categoryService` | `listar` | — |
+| `productService` | `listar`, `obter`, `listarPorDesconto`, `listarPorAtivo`, `listarDestaques`, `listarMaisVendidos`, `listarPaginado`, `recomendacoes`, `criar`, `atualizar`, `excluir` | — |
+| `categoryService` | `listar`, `criar`, `atualizar`, `excluir` | — |
 | `cartService` | `criar`, `obter`, `adicionarItem`, `atualizarQuantidade`, `removerItem`, `limpar` | — |
 | `orderService` | `criar`, `listar`, `cancelar` | — |
-| `reviewService` | `listarPorProduto`, `criar`, `excluir` | — |
+| `reviewService` | `listarPorProduto`, `listarMinhas`, `criar`, `atualizar`, `excluir` | — |
 | `wishlistService` | `adicionar`, `listar`, `buscarPorProduto`, `excluir` (todos sem `userId` — auth por token) | — |
 | `couponService` | `listar`, `criar`, `atualizar`, `excluir`, `meusCupons`, `vinculosDoCupom`, `atribuir`, `removerVinculo` | — |
 | `adminService` | `obterEstatisticas`, `listarPedidos`, `atualizarStatusPedido`, `listarUsuarios` | — |
@@ -106,8 +106,7 @@ npm run build
 > (exceção: `productService.atualizar` foi mantido — e **passou a ser usado**
 > na Parte 9, botão "Editar" da aba Acervo). Também removidos: `mascararCartao` (em `cards.js`) e,
 > em `adapters.js`, `itensParaOrderPayload` e `pedidoParaView`.
-> ¹ `productService.atualizar` agora é chamado pelo botão **"Editar"** de cada
-> linha da aba Acervo do Admin (`PATCH /products/update/{id}`).
+> `productService.listarPorCategoria` também foi removido (sem chamadores).
 > Componentes de `src/components/` foram auditados: **nenhum** está órfão.
 
 ---
@@ -140,6 +139,8 @@ Usados pelo front: `GET /list` (público), `POST /create`, `PATCH /update/{id}`,
 `INSUFFICIENT_PERMISSION` sem papel). Também públicos e agora com tradução de
 404: `GET /get/{id}`, `GET /name/{name}`, `GET /slug/{slug}`. Duplicado de
 nome/slug → **409 `DUPLICATE_CATEGORY`** (antes os ValueErrors viravam 500).
+Os três GETs de lookup (`get`/`name`/`slug`) **não são consumidos pelo front**,
+mas foram **mantidos de propósito** na Parte 10 (podem servir a SEO/rotas públicas).
 
 ### Coupons (`/coupons`) — **limpo na Parte 10**
 Usados no Admin: `create`, `list`, `update/{id}`, `delete/{id}`.
@@ -198,8 +199,9 @@ terceiro → **403 `REVIEW_FORBIDDEN`**; admin opera sobre qualquer uma.
 `GET /user/{user_id}` (virou `/list` autenticado). **Novo em uso:**
 `PATCH /update/{id}` (editar review).
 
-### Addresses (`/addresses`) — não usados
-`GET /get/{address_id}`, `GET /zip/{zip_code}`.
+### Addresses (`/addresses`) — **não usados (mantidos por decisão)**
+`GET /get/{address_id}`, `GET /zip/{zip_code}`. **Mantidos de propósito** na
+Parte 10 (o `zip` pode alimentar autopreenchimento de endereço no futuro).
 
 ### Auth / Admin / User-coupons
 100% cobertos (todos usados). **Novo:** `/user-coupons` (ver seção 5).
