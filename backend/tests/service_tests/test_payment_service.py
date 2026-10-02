@@ -172,19 +172,29 @@ class TestCreateCheckout:
             "/api/v1/payments/webhook/"
         )
 
-    def test_create_checkout_usa_init_point_de_producao(
+    def test_create_checkout_usa_sandbox_init_point(
         self, payment_service, order_repo, payment_repo, payment_gateway
     ):
-        """O checkout usa sempre o ``init_point`` (produção).
-
-        O projeto opera em produção: não há mais distinção HTTP/HTTPS nem uso
-        do ``sandbox_init_point``.
-        """
+        """O checkout usa o ``sandbox_init_point`` (ambiente de teste)."""
         self._setup_success(order_repo, payment_repo)
         payment_gateway.create_preference.return_value = {
             "id": "PREF1",
             "init_point": "https://mp/real",
             "sandbox_init_point": "https://mp/sandbox",
+        }
+
+        result = payment_service.create_checkout(1, 1)
+
+        assert result["checkout_url"] == "https://mp/sandbox"
+
+    def test_create_checkout_fallback_para_init_point(
+        self, payment_service, order_repo, payment_repo, payment_gateway
+    ):
+        """Sem ``sandbox_init_point``, cai no ``init_point``."""
+        self._setup_success(order_repo, payment_repo)
+        payment_gateway.create_preference.return_value = {
+            "id": "PREF1",
+            "init_point": "https://mp/real",
         }
 
         result = payment_service.create_checkout(1, 1)
@@ -198,7 +208,7 @@ class TestCreateCheckout:
         self._setup_success(order_repo, payment_repo)
         payment_gateway.create_preference.return_value = {
             "id": "PREF1",
-            "init_point": "https://mp/real",
+            "sandbox_init_point": "https://mp/sandbox",
         }
 
         payment_service.create_checkout(1, 1)
@@ -206,10 +216,10 @@ class TestCreateCheckout:
         preference_data = payment_gateway.create_preference.call_args.args[0]
         assert "auto_return" not in preference_data
 
-    def test_create_checkout_sem_init_point_retorna_none(
+    def test_create_checkout_sem_urls_retorna_none(
         self, payment_service, order_repo, payment_repo, payment_gateway
     ):
-        """Sem ``init_point`` na resposta, ``checkout_url`` fica None."""
+        """Sem nenhuma URL na resposta, ``checkout_url`` fica None."""
         self._setup_success(order_repo, payment_repo)
         payment_gateway.create_preference.return_value = {"id": "PREF1"}
 

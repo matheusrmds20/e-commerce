@@ -132,8 +132,11 @@ class PaymentService:
 
 
 
-        # Produção: usa o init_point real (não o sandbox_init_point).
-        checkout_url = preference.get("init_point")
+        # Sandbox: usa o sandbox_init_point (checkout de teste). Faz fallback
+        # para o init_point caso o MP não retorne o campo em sandbox.
+        checkout_url = preference.get("sandbox_init_point") or preference.get(
+            "init_point"
+        )
 
 
 
