@@ -63,14 +63,6 @@ class TestGet:
 
         assert address_service.get_by_user_id(1) == addresses
 
-    def test_get_by_user_id_empty(self, address_service, address_repo):
-        address_repo.get_by_user_id.return_value = []
-
-        with pytest.raises(ValueError) as exc:
-            address_service.get_by_user_id(1)
-
-        assert str(exc.value) == "No addresses found with user_id 1"
-
     def test_get_by_zip_code_success(self, address_service, address_repo):
         address = make_address()
         address_repo.get_by_zip_code.return_value = address

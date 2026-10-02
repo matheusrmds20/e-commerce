@@ -28,7 +28,7 @@ class AddressService:
     def get_by_user_id(self, user_id: int) -> list:
         addresses = self.repo.get_by_user_id(user_id)
 
-        if not addresses:
+        if addresses is None:
             raise ValueError(f"No addresses found with user_id {user_id}")
 
 

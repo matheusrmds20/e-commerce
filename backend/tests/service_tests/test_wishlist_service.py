@@ -78,16 +78,6 @@ class TestGet:
 
         assert str(exc.value) == "No user found with id 1"
 
-    def test_get_by_user_id_no_items(self, wishlist_service, user_repo):
-        user = make_user()
-        user.wishlist_items = []
-        user_repo.get_by_id.return_value = user
-
-        with pytest.raises(ValueError) as exc:
-            wishlist_service.get_by_user_id(make_user())
-
-        assert str(exc.value) == "No wishlist items found with user_id 1"
-
     def test_get_by_product_id_success(self, wishlist_service, product_repo, wishlist_repo):
         product_repo.get_by_id.return_value = make_product()
         items = [make_wishlist()]
@@ -128,15 +118,6 @@ class TestGet:
             wishlist_service.get_by_product_id(99, make_user())
 
         assert str(exc.value) == "No product found with id 99"
-
-    def test_get_by_product_id_no_items(self, wishlist_service, product_repo, wishlist_repo):
-        product_repo.get_by_id.return_value = make_product()
-        wishlist_repo.get_by_product_id.return_value = []
-
-        with pytest.raises(ValueError) as exc:
-            wishlist_service.get_by_product_id(1, make_user())
-
-        assert str(exc.value) == "No wishlist items found with product_id 1"
 
     def test_get_all_success(self, wishlist_service, wishlist_repo):
         items = [make_wishlist()]

@@ -3,7 +3,6 @@ import ResumoPedido from '../components/ResumoPedido'
 import SeletorEndereco from '../components/SeletorEndereco'
 import SeletorPagamento from '../components/SeletorPagamento'
 import ModalEndereco from '../components/ModalEndereco'
-import ModalCartao from '../components/ModalCartao'
 import SecaoCupons from '../components/SecaoCupons'
 import { LockIcon } from '../components/Icons'
 import { useCart } from '../context/cart-context'
@@ -11,12 +10,12 @@ import { useAuth } from '../context/auth-context'
 import { calcularTotais, formatarPreco } from '../api/adapters'
 import addressService from '../api/addresses'
 import orderService from '../api/orders'
-import cardService from '../api/cards'
+import paymentService from '../api/payments'
 import couponService from '../api/coupons'
 
 export default function Checkout({ onIrParaLogin }) {
   const { itens, carregando: carrinhoCarregando, recarregar } = useCart()
-  const { usuario, autenticado } = useAuth()
+  const { autenticado } = useAuth()
 
   // Estados de Endereços
   const [enderecos, setEnderecos] = useState([])
@@ -28,21 +27,8 @@ export default function Checkout({ onIrParaLogin }) {
     endereco: null,
   })
 
-  // Estados de Pagamento e Cartões
+  // Método de pagamento (o processamento em si é feito no Mercado Pago)
   const [tipoPagamento, setTipoPagamento] = useState('cartao') // 'cartao' | 'pix' | 'boleto'
-  const [cartoes, setCartoes] = useState(() =>
-    cardService.listar(usuario?.id || 'guest'),
-  )
-  const [cartaoSelecionado, setCartaoSelecionado] = useState(() => {
-    const lista = cardService.listar(usuario?.id || 'guest')
-    const padrao = lista.find((c) => c.isDefault)
-    return padrao || lista[0] || null
-  })
-  const [modalCartaoAberto, setModalCartaoAberto] = useState(false)
-  const [modalCartaoConfig, setModalCartaoConfig] = useState({
-    modo: 'lista',
-    cartao: null,
-  })
 
   // Estados de Observações e Envio
   const [observacoes, setObservacoes] = useState('')
@@ -147,21 +133,6 @@ export default function Checkout({ onIrParaLogin }) {
     }
   }, [autenticado])
 
-  // Carrega os cartões salvos do usuário
-  const carregarCartoes = useCallback(() => {
-    const userId = usuario?.id || 'guest'
-    const lista = cardService.listar(userId)
-    setCartoes(lista)
-
-    setCartaoSelecionado((atual) => {
-      if (atual && lista.some((c) => c.id === atual.id)) {
-        return lista.find((c) => c.id === atual.id)
-      }
-      const padrao = lista.find((c) => c.isDefault)
-      return padrao || lista[0] || null
-    })
-  }, [usuario?.id])
-
   useEffect(() => {
     let ativo = true
     async function carregar() {
@@ -204,11 +175,6 @@ export default function Checkout({ onIrParaLogin }) {
     setModalEnderecoAberto(true)
   }
 
-  const abrirModalCartao = ({ modo = 'lista', cartao = null } = {}) => {
-    setModalCartaoConfig({ modo, cartao })
-    setModalCartaoAberto(true)
-  }
-
   // Finalização do Pedido
   const handleSubmit = async (event) => {
     event.preventDefault()
@@ -241,28 +207,16 @@ export default function Checkout({ onIrParaLogin }) {
       return
     }
 
-    if (tipoPagamento === 'cartao' && !cartaoSelecionado) {
-      setErroGeral({
-        message: 'Por favor, selecione ou cadastre um cartão de crédito.',
-        code: 'MISSING_CARD',
-      })
-      abrirModalCartao({ modo: cartoes.length === 0 ? 'novo' : 'lista' })
-      return
-    }
-
     setEnviando(true)
 
     try {
       // Monta resumo do pagamento para as notas do pedido
       let notasPagamento = `Pagamento: ${tipoPagamento.toUpperCase()}`
-      if (tipoPagamento === 'cartao' && cartaoSelecionado) {
-        notasPagamento += ` (${cartaoSelecionado.bandeiraNome} final ${cartaoSelecionado.ultimos4})`
-      }
       if (observacoes.trim()) {
         notasPagamento += ` | Obs: ${observacoes.trim()}`
       }
 
-      // Criação do pedido com os itens reais da sacola e endereço selecionado
+      // 1. Cria o pedido com os itens reais da sacola e endereço selecionado
       const criado = await orderService.criar({
         address_id: enderecoSelecionado.id,
         notes: notasPagamento,
@@ -276,9 +230,26 @@ export default function Checkout({ onIrParaLogin }) {
       setPedido(criado)
       // O backend esvazia o carrinho no checkout; sincroniza o badge/estado.
       await recarregar()
+
+      // 2. Cria a preferência no Mercado Pago e redireciona o cliente.
+      //    O processamento do pagamento acontece no domínio do MP.
+      const checkout = await paymentService.criarCheckout(criado.id)
+
+      if (!checkout?.checkout_url) {
+        throw new Error('Não foi possível obter a URL de pagamento.')
+      }
+
+      // Guarda o id do pedido para a página de retorno consultar o status
+      // mesmo que o Mercado Pago não devolva o external_reference.
+      try {
+        sessionStorage.setItem('papiro.ultimo_pedido', String(criado.id))
+      } catch {
+        /* sessionStorage indisponível — a página de retorno cai no fallback */
+      }
+
+      window.location.href = checkout.checkout_url
     } catch (error) {
       setErroGeral(error)
-    } finally {
       setEnviando(false)
     }
   }
@@ -334,34 +305,33 @@ export default function Checkout({ onIrParaLogin }) {
                 </div>
               )}
 
-              {/* Sucesso / Pedido Confirmado */}
+              {/* Pedido criado — aguardando redirecionamento ao Mercado Pago */}
               {pedido ? (
                 <div className="mt-6 rounded-md border border-forest/40 bg-forest/[0.06] p-6 text-center">
                   <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-forest text-cream-soft font-bold text-xl shadow-sm mb-3">
                     ✓
                   </div>
                   <h3 className="font-display text-2xl font-normal text-coffee">
-                    Pedido #{pedido.id} confirmado com sucesso!
+                    Pedido #{pedido.id} criado!
                   </h3>
                   <p className="font-body text-sm text-coffee-soft mt-2">
-                    Total pago:{' '}
+                    Estamos te redirecionando para o Mercado Pago para concluir o
+                    pagamento de{' '}
                     <strong className="text-coffee font-semibold">
                       {formatarPreco(pedido.total)}
                     </strong>
+                    .
                   </p>
-                  <p className="font-body text-xs text-coffee-faint mt-1">
-                    Um e-mail de confirmação foi enviado com os detalhes do envio.
+                  <p className="font-body text-xs text-coffee-faint mt-3">
+                    Não foi redirecionado?{' '}
+                    <button
+                      type="button"
+                      onClick={() => window.location.reload()}
+                      className="font-semibold text-forest underline underline-offset-2 hover:text-forest-soft"
+                    >
+                      Tente novamente
+                    </button>
                   </p>
-                  {enderecoSelecionado && (
-                    <div className="mt-4 rounded-sm bg-cream-soft border border-line p-3 text-left">
-                      <p className="font-body text-xs font-semibold text-coffee">
-                        Endereço de entrega selecionado:
-                      </p>
-                      <p className="font-body text-xs text-coffee-soft mt-0.5">
-                        {enderecoSelecionado.street}, {enderecoSelecionado.number} • {enderecoSelecionado.city}/{enderecoSelecionado.state}
-                      </p>
-                    </div>
-                  )}
                 </div>
               ) : (
                 <form onSubmit={handleSubmit} noValidate className="mt-8 space-y-8">
@@ -393,10 +363,6 @@ export default function Checkout({ onIrParaLogin }) {
                     <SeletorPagamento
                       tipoPagamento={tipoPagamento}
                       onMudarTipoPagamento={setTipoPagamento}
-                      cartoes={cartoes}
-                      cartaoSelecionadoId={cartaoSelecionado?.id}
-                      onSelecionarCartao={(card) => setCartaoSelecionado(card)}
-                      onAbrirModalCartao={abrirModalCartao}
                     />
                   </fieldset>
 
@@ -426,12 +392,12 @@ export default function Checkout({ onIrParaLogin }) {
                       disabled={enviando || Boolean(pedido) || carrinhoCarregando || !autenticado}
                       className="w-full rounded-sm bg-forest py-4 font-body text-xs font-semibold uppercase tracking-[0.2em] text-cream-soft shadow-md transition-all duration-300 ease-[var(--ease-cozy)] hover:bg-forest-soft hover:shadow-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                      {enviando ? 'Processando pedido…' : 'Concluir compra'}
+                      {enviando ? 'Redirecionando ao pagamento…' : 'Concluir compra'}
                     </button>
 
                     <p className="mt-4 flex items-center justify-center gap-2 font-body text-[0.8rem] font-medium text-coffee-faint">
                       <LockIcon className="h-4 w-4" />
-                      Ambiente seguro com criptografia de ponta a ponta.
+                      Pagamento processado com segurança pelo Mercado Pago.
                     </p>
                   </div>
                 </form>
@@ -451,19 +417,6 @@ export default function Checkout({ onIrParaLogin }) {
         onRecarregarEnderecos={carregarEnderecos}
         modoInicial={modalEnderecoConfig.modo}
         enderecoParaEditar={modalEnderecoConfig.endereco}
-      />
-
-      {/* Modal de CRUD de Cartões de Pagamento */}
-      <ModalCartao
-        isOpen={modalCartaoAberto}
-        onClose={() => setModalCartaoAberto(false)}
-        userId={usuario?.id}
-        cartoes={cartoes}
-        cartaoSelecionadoId={cartaoSelecionado?.id}
-        onSelecionarCartao={(card) => setCartaoSelecionado(card)}
-        onRecarregarCartoes={carregarCartoes}
-        modoInicial={modalCartaoConfig.modo}
-        cartaoParaEditar={modalCartaoConfig.cartao}
       />
     </main>
   )

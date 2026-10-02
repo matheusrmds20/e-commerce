@@ -110,6 +110,20 @@ def order_item_repo():
 
 
 @pytest.fixture
+def payment_repo():
+    return Mock(name="payment_repo")
+
+
+@pytest.fixture
+def payment_gateway():
+    """Mock do MercadoPagoGateway.
+
+    Isola os testes de service de qualquer chamada HTTP real ao Mercado Pago.
+    """
+    return Mock(name="payment_gateway")
+
+
+@pytest.fixture
 def auth_service(db, user_repo):
     with (
         patch("app.services.auth_service.UserRepository", return_value=user_repo),
@@ -261,3 +275,16 @@ def user_coupon_service(db, user_coupon_repo, user_repo, coupon_repo):
         from app.services.user_coupon_service import UserCouponService
 
         yield UserCouponService(db)
+
+
+@pytest.fixture
+def payment_service(db, payment_repo, user_repo, order_repo, payment_gateway):
+    with (
+        patch("app.services.payment_service.PaymentRepository", return_value=payment_repo),
+        patch("app.services.payment_service.UserRepository", return_value=user_repo),
+        patch("app.services.payment_service.OrderRepository", return_value=order_repo),
+        patch("app.services.payment_service.MercadoPagoGateway", return_value=payment_gateway),
+    ):
+        from app.services.payment_service import PaymentService
+
+        yield PaymentService(db)

@@ -128,16 +128,6 @@ class TestGetByUserID:
 
         assert str(exc.value) == "No user found with id 1"
 
-    def test_no_orders(self, order_service, user_repo):
-        user = make_user()
-        user.orders = []
-        user_repo.get_by_id.return_value = user
-
-        with pytest.raises(ValueError) as exc:
-            order_service.get_by_user_id(1)
-
-        assert str(exc.value) == "No orders found with user_id 1"
-
 
 class TestCreate:
     def _setup(self, address_repo, product_repo, order_item_repo, order_repo):

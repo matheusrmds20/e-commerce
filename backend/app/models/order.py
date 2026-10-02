@@ -44,3 +44,4 @@ class Order(Base):
     addresses = relationship("Address", back_populates="orders")
     coupon = relationship("Coupon", back_populates="orders")
     order_items = relationship("OrderItem", back_populates="orders")
+    payments = relationship("Payment", back_populates="orders")

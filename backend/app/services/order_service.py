@@ -164,7 +164,7 @@ class OrderService:
 
         orders = user.orders
 
-        if not orders:
+        if orders is None:
             raise ValueError(f"No orders found with user_id {user_id}")
 
         return orders

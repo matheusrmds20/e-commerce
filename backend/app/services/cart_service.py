@@ -36,7 +36,7 @@ class CartService:
 
         cart = user.cart
 
-        if not cart:
+        if cart is None:
             raise ValueError(f"No cart found with user_id {user_id}")
 
         return cart

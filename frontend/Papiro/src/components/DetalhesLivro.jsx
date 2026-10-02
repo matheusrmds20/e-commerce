@@ -197,6 +197,7 @@ export default function DetalhesLivro({
   ficha = {},
   avaliacoes = [],
   autenticado = false,
+  comprou = false,
   enviando = false,
   feedback = null,
   onAvaliar,
@@ -209,6 +210,7 @@ export default function DetalhesLivro({
   const alternar = (id) => setAberta((atual) => (atual === id ? null : id))
 
   const fichaTecnica = montarFicha(ficha)
+  const jaAvaliou = avaliacoes.some((item) => item.proprio)
 
   return (
     <div className="grid gap-x-10 lg:grid-cols-3">
@@ -272,12 +274,8 @@ export default function DetalhesLivro({
           </p>
         )}
 
-        {autenticado ? (
+        {comprou && !jaAvaliou && (
           <FormularioAvaliacao enviando={enviando} onAvaliar={onAvaliar} />
-        ) : (
-          <p className="mb-6 font-body text-[0.88rem] text-coffee-soft">
-            Entre na sua conta para avaliar este livro.
-          </p>
         )}
 
         <ul className="flex flex-col gap-5">

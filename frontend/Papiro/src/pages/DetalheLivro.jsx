@@ -15,6 +15,7 @@ import {
 import { useAuth } from '../context/auth-context'
 import { useCart } from '../context/cart-context'
 import wishlistService from '../api/wishlist'
+import orderService from '../api/orders'
 
 /**
  * DetalheLivro — página de produto ligada à API.
@@ -47,6 +48,7 @@ export default function DetalheLivro({ productId = 1 }) {
   const [nosDesejos, setNosDesejos] = useState(false)
   const [wishlistItemId, setWishlistItemId] = useState(null)
   const [feedbackDesejos, setFeedbackDesejos] = useState(null)
+  const [comprou, setComprou] = useState(false)
 
   /** Carrega produto + avaliações. As avaliações nunca derrubam a página. */
   const carregar = useCallback(async () => {
@@ -84,6 +86,32 @@ export default function DetalheLivro({ productId = 1 }) {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     carregar()
   }, [carregar])
+
+  // Verifica se o usuário autenticado já comprou este livro.
+  useEffect(() => {
+    if (!autenticado || !produto?.id) {
+      setComprou(false)
+      return
+    }
+    let ativo = true
+    orderService
+      .listar()
+      .then((pedidos) => {
+        if (!ativo) return
+        const comprouLivro = (pedidos ?? []).some(
+          (p) =>
+            p.status !== 'cancelled' &&
+            p.order_items?.some((item) => item.product_id === produto.id),
+        )
+        setComprou(comprouLivro)
+      })
+      .catch(() => {
+        if (ativo) setComprou(false)
+      })
+    return () => {
+      ativo = false
+    }
+  }, [autenticado, produto?.id])
 
   // Verifica se o produto já está na wishlist do usuário logado.
   // Usa `GET /wishlists/product/{id}` (escopado ao usuário pelo token) em vez
@@ -363,6 +391,7 @@ export default function DetalheLivro({ productId = 1 }) {
             ficha={produto}
             avaliacoes={avaliacoes}
             autenticado={autenticado}
+            comprou={comprou}
             enviando={enviando}
             feedback={feedback}
             onAvaliar={enviarAvaliacao}

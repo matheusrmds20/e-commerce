@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useAuth } from '../context/auth-context'
 import addressService from '../api/addresses'
 import orderService from '../api/orders'
-import cardService, { detectarBandeira } from '../api/cards'
+import paymentService from '../api/payments'
 import productService from '../api/products'
 import wishlistService from '../api/wishlist'
 import { formatarPreco, precoFinal } from '../api/adapters'
@@ -10,7 +10,6 @@ import userService from '../api/users'
 import { toApiError } from '../api/client'
 import Field from '../components/Field'
 import ModalEndereco from '../components/ModalEndereco'
-import ModalCartao from '../components/ModalCartao'
 import Confirmacao from '../components/Confirmacao'
 
 /* ------------------------------------------------------------------ */
@@ -1050,108 +1049,127 @@ function AbaEnderecos() {
 /* Aba: Pagamentos                                                     */
 /* ------------------------------------------------------------------ */
 
-function AbaPagamentos() {
-  const { usuario } = useAuth()
-  // Cartões vivem no localStorage — lemos a cada render; o "versão" força
-  // recarga após operações de CRUD feitas dentro do modal.
-  const [, setVersao] = useState(0)
-  const cartoes = cardService.listar(usuario?.id)
-  const [modalAberto, setModalAberto] = useState(false)
-  const [modoModal, setModoModal] = useState('lista')
-  const [cartaoEdicao, setCartaoEdicao] = useState(null)
-  const [paraExcluir, setParaExcluir] = useState(null)
+const ROTULO_STATUS_PAGAMENTO = {
+  pending: 'Aguardando confirmação',
+  approved: 'Aprovado',
+  rejected: 'Recusado',
+}
 
-  const abrirModal = ({ modo = 'lista', cartao = null } = {}) => {
-    setModoModal(modo)
-    setCartaoEdicao(cartao)
-    setModalAberto(true)
-  }
+const ESTILO_STATUS_PAGAMENTO = {
+  pending: 'bg-gold/15 text-gold-dark',
+  approved: 'bg-forest/15 text-forest',
+  rejected: 'bg-[#a4533f]/15 text-[#a4533f]',
+}
+
+function AbaPagamentos() {
+  // Os pagamentos são processados pelo Mercado Pago; aqui apenas listamos o
+  // histórico (status por pedido), consultado via GET /payments/order/{id}.
+  const [pagamentos, setPagamentos] = useState([])
+  const [carregando, setCarregando] = useState(true)
+  const [erro, setErro] = useState(null)
+
+  useEffect(() => {
+    let ativo = true
+
+    async function carregar() {
+      try {
+        setCarregando(true)
+        const pedidos = await orderService.listar()
+        const lista = Array.isArray(pedidos) ? pedidos : []
+
+        // Busca os pagamentos de cada pedido; pedidos sem pagamento geram 500
+        // no backend (ValueError) — tratamos como lista vazia, sem quebrar.
+        const resultados = await Promise.all(
+          lista.map(async (pedido) => {
+            try {
+              const pagos = await paymentService.listarPorPedido(pedido.id)
+              return Array.isArray(pagos) ? pagos : []
+            } catch {
+              return []
+            }
+          }),
+        )
+
+        if (!ativo) return
+        const achatado = resultados
+          .flat()
+          .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+        setPagamentos(achatado)
+        setErro(null)
+      } catch (err) {
+        if (ativo) setErro(err?.message ?? 'Não foi possível carregar os pagamentos.')
+      } finally {
+        if (ativo) setCarregando(false)
+      }
+    }
+
+    carregar()
+    return () => {
+      ativo = false
+    }
+  }, [])
 
   return (
     <>
       <div className="flex items-center justify-between">
         <h2 className="font-display text-3xl text-coffee">Pagamentos</h2>
-        <button
-          type="button"
-          onClick={() => abrirModal({ modo: 'novo' })}
-          className="rounded-sm border border-line-strong px-5 py-2.5 font-body text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-coffee-soft transition-colors duration-300 hover:border-gold hover:text-caramel"
-        >
-          Novo cartão
-        </button>
       </div>
 
-      {cartoes?.length === 0 && (
+      <p className="mt-3 max-w-2xl font-body text-[0.88rem] leading-relaxed text-coffee-soft">
+        Seus pagamentos são processados com segurança pelo Mercado Pago. Nenhum
+        dado de cartão é armazenado por nós. Abaixo está o histórico por pedido.
+      </p>
+
+      {carregando && (
         <p className="mt-10 font-display text-xl italic text-coffee-faint">
-          Nenhum cartão salvo ainda.
+          Carregando pagamentos…
+        </p>
+      )}
+
+      {!carregando && erro && (
+        <p
+          role="alert"
+          className="mt-8 rounded-sm border border-[#a4533f]/30 bg-[#a4533f]/[0.06] px-4 py-3 font-body text-[0.85rem] font-medium text-[#a4533f]"
+        >
+          {erro}
+        </p>
+      )}
+
+      {!carregando && !erro && pagamentos.length === 0 && (
+        <p className="mt-10 font-display text-xl italic text-coffee-faint">
+          Nenhum pagamento registrado ainda.
         </p>
       )}
 
       <ul className="mt-8 grid gap-4 sm:grid-cols-2">
-        {cartoes?.map((cartao) => {
-          const bandeira = detectarBandeira(cartao.numeroMascarado ?? '')
-          return (
-            <li
-              key={cartao.id}
-              className="rounded-sm border border-line bg-cream-soft/60 px-6 py-5"
-            >
-              <p className="font-body text-[0.72rem] uppercase tracking-[0.18em] text-coffee-faint">
-                {bandeira.nome}
-              </p>
-              <p className="mt-2 font-display text-lg tracking-[0.12em] text-coffee">
-                {cartao.numeroMascarado ??
-                  `•••• •••• •••• ${String(cartao.numero ?? '').slice(-4)}`}
-              </p>
-              <div className="mt-4 flex items-center justify-between">
-                <p className="font-body text-[0.8rem] text-coffee-soft">
-                  Valida {cartao.mes}/{cartao.ano}
+        {pagamentos.map((pg) => (
+          <li
+            key={pg.id}
+            className="rounded-sm border border-line bg-cream-soft/60 px-6 py-5"
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="font-body text-[0.72rem] uppercase tracking-[0.18em] text-coffee-faint">
+                  Pedido #{pg.order_id}
                 </p>
-                <div className="flex items-center gap-4">
-                <button
-                  type="button"
-                  onClick={() => setParaExcluir(cartao)}
-                  className="font-body text-[0.75rem] font-medium uppercase tracking-[0.18em] text-coffee-faint transition-colors duration-300 hover:text-[#a4533f]"
-                >
-                  Excluir
-                </button>
-                <button
-                  type="button"
-                  onClick={() => abrirModal({ modo: 'editar', cartao })}
-                  className="font-body text-[0.75rem] font-medium uppercase tracking-[0.18em] text-coffee-faint transition-colors duration-300 hover:text-caramel"
-                >
-                  Editar
-                </button>
-                </div>
+                <p className="mt-2 font-display text-lg text-coffee">
+                  {formatarPreco(pg.amount)}
+                </p>
               </div>
-            </li>
-          )
-        })}
+              <span
+                className={`shrink-0 rounded-full px-2.5 py-1 font-body text-[0.68rem] font-bold uppercase tracking-wider ${
+                  ESTILO_STATUS_PAGAMENTO[pg.status] ?? 'bg-coffee/10 text-coffee-soft'
+                }`}
+              >
+                {ROTULO_STATUS_PAGAMENTO[pg.status] ?? pg.status}
+              </span>
+            </div>
+            <p className="mt-4 font-body text-[0.78rem] text-coffee-faint">
+              {pg.provider} • {pg.currency}
+            </p>
+          </li>
+        ))}
       </ul>
-
-      <ModalCartao
-        isOpen={modalAberto}
-        onClose={() => setModalAberto(false)}
-        userId={usuario?.id}
-        cartoes={cartoes ?? []}
-        onRecarregarCartoes={() => setVersao((v) => v + 1)}
-        modoInicial={modoModal}
-        cartaoParaEditar={cartaoEdicao}
-      />
-
-      <Confirmacao
-        aberto={Boolean(paraExcluir)}
-        titulo="Excluir cartão?"
-        descricao={
-          paraExcluir
-            ? `O cartão terminado em ${String(paraExcluir.numero ?? '').slice(-4) || '????'} será removido dos seus dados salvos.`
-            : ''
-        }
-        onCancelar={() => setParaExcluir(null)}
-        onConfirmar={() => {
-          cardService.excluir(usuario?.id, paraExcluir.id)
-          setParaExcluir(null)
-          setVersao((v) => v + 1)
-        }}
-      />
     </>
   )
 }

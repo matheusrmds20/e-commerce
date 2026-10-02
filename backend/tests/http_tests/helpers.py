@@ -206,6 +206,23 @@ def review_payload(**overrides):
     return payload
 
 
+def payment_payload(**overrides):
+    """Payload compatível com PaymentResponse."""
+    payload = {
+        "id": 1,
+        "order_id": 1,
+        "provider": "mercadopago",
+        "provider_payment_id": None,
+        "amount": 119.8,
+        "currency": "BRL",
+        "status": "pending",
+        "created_at": CREATED_AT,
+        "updated_at": UPDATED_AT,
+    }
+    payload.update(overrides)
+    return payload
+
+
 # ---------------------------------------------------------------------------
 # Assertions auxiliares
 # ---------------------------------------------------------------------------

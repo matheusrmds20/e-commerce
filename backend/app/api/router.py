@@ -1,17 +1,19 @@
 from fastapi import APIRouter
-from app.api.v1.categories import category_router
-from app.api.v1.users import user_router
-from app.api.v1.products import product_router
-from app.api.v1.orders import order_router
-from app.api.v1.cart import cart_router
+
 from app.api.v1.addresses import address_router
-from app.api.v1.coupons import coupon_router
-from app.api.v1.wishlist import wishlist_router
-from app.api.v1.auth import auth_router
-from app.api.v1.reviews import review_router
 from app.api.v1.admin import admin_router
-from app.api.v1.user_coupons import user_coupon_router
+from app.api.v1.auth import auth_router
+from app.api.v1.cart import cart_router
+from app.api.v1.categories import category_router
+from app.api.v1.coupons import coupon_router
 from app.api.v1.newsletter import newsletter_router
+from app.api.v1.orders import order_router
+from app.api.v1.payments import payment_router
+from app.api.v1.products import product_router
+from app.api.v1.reviews import review_router
+from app.api.v1.user_coupons import user_coupon_router
+from app.api.v1.users import user_router
+from app.api.v1.wishlist import wishlist_router
 
 router = APIRouter()
 
@@ -28,3 +30,4 @@ router.include_router(review_router, prefix="/reviews", tags=["reviews"])
 router.include_router(admin_router, prefix="/admin", tags=["admin"])
 router.include_router(user_coupon_router, prefix="/user-coupons", tags=["user-coupons"])
 router.include_router(newsletter_router, prefix="/newsletter", tags=["newsletter"])
+router.include_router(payment_router, prefix="/payments", tags=["payments"])

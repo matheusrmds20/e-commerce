@@ -17,4 +17,7 @@ class OrderRepository(BaseRepository[Order]):
         return order
 
     def get_with_items(self, id: int) -> list[OrderItem]:
-        return self.session.query(OrderItem).options(selectinload(OrderItem.order)).filter(OrderItem.order_id == id).all()
+        return self.session.query(OrderItem).options(selectinload(OrderItem.orders)).filter(OrderItem.order_id == id).all()
+
+    def get_with_items_products(self, id: int) -> list[OrderItem]:
+        return self.session.query(OrderItem).options(selectinload(OrderItem.products)).filter(OrderItem.order_id == id).all()

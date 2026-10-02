@@ -1,3 +1,4 @@
+
 from app.models.user import User, UserRole
 from app.models.wishlist import Wishlist
 from app.repositories.product_repo import ProductRepository
@@ -50,7 +51,7 @@ class WishlistService:
 
         wishlist_items = user.wishlist_items
 
-        if not wishlist_items:
+        if wishlist_items is None:
             raise ValueError(f"No wishlist items found with user_id {alvo}")
 
         return wishlist_items
@@ -76,7 +77,7 @@ class WishlistService:
                 if item.user_id == current_user.id
             ]
 
-        if not wishlist_items:
+        if wishlist_items is None:
             raise ValueError(f"No wishlist items found with product_id {product_id}")
 
         return wishlist_items

@@ -6,5 +6,14 @@ export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
+    
   ],
+
+  server: {
+    allowedHosts: [
+      'e-commerce.matheuslab.xyz',
+    ],
+
+  }
 })
+
