@@ -58,8 +58,11 @@ include = ["app*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-v --cov=app --cov-report=term-missing"
+addopts = "-v --cov=app --cov-report=term-missing -m \"not integration\""
 pythonpath = ["."]
+markers = [
+    "integration: requer um banco PostgreSQL real (bookcommerce_conc) e saindo da suíte padrão. Rode com -m integration",
+]
 
 [tool.black]
 line-length = 100
