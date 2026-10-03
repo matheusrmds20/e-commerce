@@ -52,11 +52,14 @@ import app.models.cart  # noqa: F401,E402
 import app.models.cart_item  # noqa: F401,E402
 import app.models.category  # noqa: F401,E402
 import app.models.coupon  # noqa: F401,E402
+import app.models.newsletter  # noqa: F401,E402
 import app.models.order  # noqa: F401,E402
 import app.models.order_item  # noqa: F401,E402
+import app.models.payment  # noqa: F401,E402
 import app.models.product  # noqa: F401,E402
 import app.models.review  # noqa: F401,E402
 import app.models.user  # noqa: F401,E402
+import app.models.user_coupon  # noqa: F401,E402
 import app.models.wishlist  # noqa: F401,E402
 from app.db.database import SessionLocal  # noqa: E402
 from app.models.category import Category  # noqa: E402

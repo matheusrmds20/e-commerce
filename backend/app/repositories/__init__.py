@@ -6,6 +6,7 @@ from app.repositories.category_repo import CategoryRepository as CategoryReposit
 from app.repositories.coupon_repo import CouponRepository as CouponRepository
 from app.repositories.order_item import OrderItemRepository as OrderItemRepository
 from app.repositories.order_repo import OrderRepository as OrderRepository
+from app.repositories.payment_repo import PaymentRepository as PaymentRepository
 from app.repositories.product_repo import ProductRepository as ProductRepository
 from app.repositories.review_repo import ReviewRepository as ReviewRepository
 from app.repositories.user_repo import UserRepository as UserRepository
@@ -20,6 +21,7 @@ __all__ = [
     "CouponRepository",
     "OrderItemRepository",
     "OrderRepository",
+    "PaymentRepository",
     "ProductRepository",
     "ReviewRepository",
     "UserRepository",

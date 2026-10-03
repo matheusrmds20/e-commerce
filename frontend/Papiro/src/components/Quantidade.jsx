@@ -11,6 +11,7 @@ export default function Quantidade({ valor, onChange, min = 1, max = 99 }) {
     <div className="inline-flex items-stretch overflow-hidden rounded-sm border border-line-strong bg-cream-soft">
       <button
         type="button"
+        data-testid="btn-qtd-menos"
         onClick={() => ajustar(-1)}
         disabled={valor <= min}
         aria-label="Diminuir quantidade"
@@ -28,6 +29,7 @@ export default function Quantidade({ valor, onChange, min = 1, max = 99 }) {
 
       <button
         type="button"
+        data-testid="btn-qtd-mais"
         onClick={() => ajustar(1)}
         disabled={valor >= max}
         aria-label="Aumentar quantidade"

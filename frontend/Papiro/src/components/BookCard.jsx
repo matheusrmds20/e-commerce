@@ -14,7 +14,7 @@ export default function BookCard({
   onAbrir,
 }) {
   return (
-    <article className="group flex flex-col">
+    <article className="group flex flex-col" data-testid={`book-card-${id}`}>
       <a
         href="#"
         onClick={(event) => {

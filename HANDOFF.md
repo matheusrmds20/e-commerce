@@ -4,7 +4,30 @@
 > o que o frontend consome, endpoints não usados, e as features já implementadas
 > (Cupons por usuário, Users/Minha Conta, Wishlist segura) e o estado do repositório.
 >
-> Última atualização: **Parte 10 — limpeza de endpoints órfãos + `.gitignore`** —
+> Última atualização: **Parte 17 — E2E Fase 5 concluída (documentação)**.
+> Ver `E2E_PLANO.md` — **Fases 0–5 ✅ (plano completo implementado)**.
+>
+> **Fase 5 (Parte 17):** seção "Testes E2E (Playwright) — como rodar" no
+> HANDOFF (pré-requisitos, comandos, cobertura de 11 testes, **limpeza de
+> dados** — ordem reversa de FKs, schema sem `ON DELETE CASCADE` — e notas
+> operacionais); `frontend/Papiro/README.md` reescrito (era o template do
+> Vite) com scripts e seção E2E. **Um novo dev roda o E2E seguindo só o HANDOFF.**
+>
+> **Estado final do E2E:** 11 testes verdes (3 runs ~24–26s), MP 100% mockado,
+> log do backend limpo (handshake do carrinho corrigido na Parte 15),
+> `workers: 3` no config. Arrefecer `bookcommerce-e2e` a qualquer momento com
+> o comando de limpeza documentado.
+>
+> **Próximo (sugerido, fora do E2E):** pendência 7 do backlog — dimensionar o
+> pool do SQLAlchemy no `database.py` (ver HANDOFF).
+>
+> **Fases anteriores:** 0 — DB de teste (migrations + seed, 24 produtos);
+> 1 — Playwright + `e2e_server.py` + `playwright.config.js` (webServer x2);
+> 2 — `data-testid` em 12 arquivos + lint limpo; 3 — specs core (7 testes) +
+> handshake do carrinho corrigido (404 `CART_NOT_FOUND` em vez de 500);
+> 4 — specs secundários (05–08; MP mockado em 2 camadas).
+>
+> Anterior — **Parte 10 — limpeza de endpoints órfãos + `.gitignore`** —
 > removidas **11 rotas** nunca consumidas pelo front (9 de `/coupons`, 2 de
 > `/wishlists`); criado `.gitignore` (raiz + `backend/`), removidos 178 `.pyc`,
 > 2 `.coverage` e os segredos `backend/.env`/`.env.bak` do rastreamento; nova
@@ -39,6 +62,12 @@ alembic heads
 cd "C:/Users/mathe/OneDrive/Desktop/E-commerce v1/frontend/Papiro"
 npx eslint src/
 npm run build
+
+# E2E (Playwright) — Fase 1 pronta; specs na Fase 3
+cd "C:/Users/mathe/OneDrive/Desktop/E-commerce v1/frontend/Papiro"
+npx playwright test --list       # 0 testes (config ok) — specs virão na Fase 3
+npm run e2e                       # sobe backend (porta 8000, DB bookcommerce-e2e) + Vite local
+npm run e2e:ui                    # modo interativo
 ```
 
 - **Banco:** PostgreSQL em `localhost:5433/bookcommerce-db` (ver `backend/.env`).
@@ -49,6 +78,79 @@ npm run build
 > ⚠️ **Regras de trabalho do usuário:** implementar **parte por parte**, sempre
 > apresentando o levantamento e um plano **antes** de tocar em código; e
 > **atualizar este HANDOFF.md ao final de cada task concluída**.
+
+---
+
+### Testes E2E (Playwright) — como rodar
+
+> Plano completo e progresso: **`E2E_PLANO.md`** na raiz (Fases 0–4 ✅, Fase 5 é
+> esta documentação). Resumo para quem quer rodar:
+
+**Pré-requisitos:**
+1. **Postgres (Docker) de pé** com os dois bancos: `bookcommerce-db` (dev) e
+   `bookcommerce-e2e` (teste — **isolado**, o E2E nunca suja dados de dev).
+2. **DB de teste provisionado** (idempotente — só necessário se o banco for
+   novo):
+   ```bash
+   cd "C:/Users/mathe/OneDrive/Desktop/E-commerce v1"
+   DATABASE_URL="postgresql+psycopg2://postgres:postgres@localhost:5433/bookcommerce-e2e" ./venv/Scripts/alembic.exe upgrade head
+   cd backend
+   DATABASE_URL="postgresql+psycopg2://postgres:postgres@localhost:5433/bookcommerce-e2e" ../venv/Scripts/python.exe -m scripts.seed
+   ```
+   (Critério: `SELECT count(*) FROM products;` no DB de teste = **24**.)
+3. **Playwright instalado no front:**
+   `cd frontend/Papiro && npm i -D @playwright/test && npx playwright install chromium`.
+4. **Porta 8000 livre** (o `e2e_server.py` sobe o backend E2E nela; porta
+   ocupada → o webServer falha de propósito — longe de um backend de dev).
+
+**Rodar:**
+```bash
+cd "C:/Users/mathe/OneDrive/Desktop/E-commerce v1/frontend/Papiro"
+npm run e2e       # sobe backend (porta 8000, DB bookcommerce-e2e) + Vite, roda tudo
+npm run e2e:ui    # modo interativo (browser de testes)
+npx playwright test e2e/specs/04-carrinho.spec.js --workers=1   # um arquivo
+```
+
+**O que a suíte cobre (11 testes):**
+`01-home` (dados reais da API de teste) · `02-acervo-detalhe` ·
+`03-registro-login` (reload restaura sessão) · `04-carrinho` (visitante +
+logado persistente) · `05-wishlist` · `06-review` (setup via API) ·
+`07-endereco` (ViaCEP mockado) · `08-cupom-checkout` (**MP 100% mockado** via
+`page.route`) · `09-retorno-pagamento` (sem auth).
+
+**Limpeza dos dados de teste:** cada run cria usuários únicos
+`e2e_<timestamp>_<n>@exemplo.com` (não colidem), mas eles **acumulam** no
+`bookcommerce-e2e`. Para zerar — FKs **sem** `ON DELETE CASCADE`, então ordem
+reversa:
+```bash
+docker exec -i bookcommerce-db psql -U postgres -d bookcommerce-e2e <<'SQL'
+WITH alvo AS (SELECT id FROM users WHERE email LIKE 'e2e\_%@exemplo.com')
+DELETE FROM payments     WHERE order_id IN (SELECT id FROM orders   WHERE user_id IN (SELECT id FROM alvo));
+DELETE FROM order_items  WHERE order_id IN (SELECT id FROM orders   WHERE user_id IN (SELECT id FROM alvo));
+DELETE FROM orders       WHERE user_id IN (SELECT id FROM alvo);
+DELETE FROM cart_items   WHERE cart_id  IN (SELECT id FROM carts    WHERE user_id IN (SELECT id FROM alvo));
+DELETE FROM carts        WHERE user_id IN (SELECT id FROM alvo);
+DELETE FROM addresses    WHERE user_id IN (SELECT id FROM alvo);
+DELETE FROM reviews      WHERE user_id IN (SELECT id FROM alvo);
+DELETE FROM wishlists    WHERE user_id IN (SELECT id FROM alvo);
+DELETE FROM user_coupons WHERE user_id IN (SELECT id FROM alvo);
+DELETE FROM users        WHERE id       IN (SELECT id FROM alvo);
+SQL
+```
+(Alternativa mais agressiva, quando TODAS as tabelas e2e podem ser apagadas:
+`TRUNCATE payments, order_items, orders, cart_items, carts, addresses,
+reviews, wishlists, user_coupons, users RESTART IDENTITY;` no
+`bookcommerce-e2e`.)
+
+**Notas operacionais da suíte:**
+- `workers: 3` no `playwright.config.js` — o engine usa o pool default do
+  SQLAlchemy (5+10); muito paralelismo satura (ver pendência 7 do backlog).
+- Log do backend pode exibir `Erro 404: CART_NOT_FOUND` — **fluxo normal**
+  (usuário novo sem carrinho; o front cria na sequência).
+- **MP nunca é chamado** (nem pelo backend — a rota de checkout é
+  interceptada no navegador).
+- `DetalhesLivro` remonta ao recarregar e fecha a seção retrátil; o helper do
+  spec 06 reabre via `aria-expanded`.
 
 ---
 
@@ -598,6 +700,27 @@ Ordem proposta (do mais impactante ao menor), seguindo a regra "parte por parte"
       (busca por e-mail, usa o `termoBusca` do cabeçalho; sem botão "+" nessa aba).
     - **Validação:** 594 passed (15 novos: 7 service + 8 http); ruff limpo nos
       arquivos novos; eslint limpo; build OK (chunk >500 kB é pré-existente).
+
+7. **Pool do SQLAlchemy (backend)** — ⏳ **PENDÊNCIA** (regularizou-se durante o
+    E2E; não mexer sem OK explícito). Instrumentação do `database.py`:
+    `engine = create_engine(settings.DATABASE_URL, echo=settings.DEBUG)` usa o
+    **default do SQLAlchemy** (`pool_size=5`, `max_overflow=10`, teto 15
+    conexões, fila sem timeout até 30s) — documentado na Parte 16.
+    - **Sintoma real visto:** com 11 workers do Playwright em paralelo o pool
+      saturava (Sem pool config, requests entravam na fila e o acervo ficava
+      preso em "Carregando títulos…"). Mitigação E2E aplicada:
+      `workers: 3` no `playwright.config.js`.
+    - **Recomendação para produção (1 processo uvicorn + psycopg2,
+      Postgres default `max_connections=100`):** `pool_size=10`,
+      `max_overflow=20` (teto ~30), `pool_pre_ping=True`,
+      `pool_timeout=15` (em vez de 30, falhar cedo com 503/erro claro).
+    - **Conta do budget:** também rodam o backend de dev e o E2E no mesmo
+      Postgres — 30 + 30 + admin/tools deixa fita abaixo de 100. Se um dia
+      usar `--workers N` do uvicorn, cada worker tem o próprio pool (N × 30
+      estoura 100) → reduzir números ou adotar **PgBouncer**.
+    - **Arquivos:** `backend/app/db/database.py`. Testes existentes não
+      dependem do tamanho do pool (headless/TestClient), mas validar a suíte
+      `pytest` e o E2E após a mudança.
 
 ---
 

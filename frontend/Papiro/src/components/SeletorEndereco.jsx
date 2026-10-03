@@ -40,6 +40,7 @@ export default function SeletorEndereco({
           </p>
           <button
             type="button"
+            data-testid="btn-novo-endereco"
             onClick={() => onAbrirModal({ modo: 'novo' })}
             className="mt-3 inline-flex items-center gap-1.5 rounded-sm bg-forest px-4 py-2 font-body text-xs font-semibold uppercase tracking-wider text-cream-soft hover:bg-forest-soft transition-colors shadow-sm"
           >

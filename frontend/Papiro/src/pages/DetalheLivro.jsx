@@ -89,10 +89,7 @@ export default function DetalheLivro({ productId = 1 }) {
 
   // Verifica se o usuário autenticado já comprou este livro.
   useEffect(() => {
-    if (!autenticado || !produto?.id) {
-      setComprou(false)
-      return
-    }
+    if (!autenticado || !produto?.id) return
     let ativo = true
     orderService
       .listar()

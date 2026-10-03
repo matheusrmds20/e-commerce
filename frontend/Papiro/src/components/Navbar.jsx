@@ -130,6 +130,7 @@ export default function Navbar({ onNavegar, totalItens = 0, simples = false }) {
           <div className="relative" ref={contaRef}>
             <button
               type="button"
+              data-testid="navbar-login"
               onClick={handleConta}
               aria-label={
                 autenticado
@@ -198,6 +199,7 @@ export default function Navbar({ onNavegar, totalItens = 0, simples = false }) {
 
           <button
             type="button"
+            data-testid="navbar-sacola"
             onClick={() => onNavegar?.('carrinho')}
             aria-label="Sacola"
             className="relative grid h-10 w-10 place-items-center text-coffee transition-colors duration-300 hover:text-gold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"

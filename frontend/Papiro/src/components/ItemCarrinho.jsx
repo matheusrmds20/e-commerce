@@ -14,7 +14,10 @@ export default function ItemCarrinho({
   const subtotal = item.preco * item.quantidade
 
   return (
-    <li className="group border-b border-line py-6">
+    <li
+      className="group border-b border-line py-6"
+      data-testid={`cart-item-${item.id}`}
+    >
       <div className="grid grid-cols-[80px_1fr_auto] items-center gap-4 sm:grid-cols-[96px_1fr_auto_auto] sm:gap-6">
         {/* Capa */}
         <a
@@ -53,6 +56,7 @@ export default function ItemCarrinho({
 
           <button
             type="button"
+            data-testid="btn-remover"
             onClick={() => onRemover(item.id)}
             className="mt-2.5 inline-flex items-center gap-1.5 font-body text-[0.76rem] font-semibold uppercase tracking-[0.14em] text-coffee-faint transition-colors duration-300 hover:text-caramel-dark"
           >

@@ -106,6 +106,7 @@ function FormularioAvaliacao({ enviando, onAvaliar }) {
 
       <button
         type="submit"
+        data-testid="btn-criar-review"
         disabled={enviando || texto.trim().length < 3}
         className="mt-3 rounded-sm bg-forest px-6 py-3 font-body text-xs font-semibold uppercase tracking-[0.2em] text-cream-soft transition-colors duration-300 hover:bg-forest-soft disabled:cursor-not-allowed disabled:opacity-50"
       >
@@ -188,7 +189,7 @@ function FormularioEdicaoAvaliacao({ notaInicial, textoInicial, enviando, onSalv
  * - `descricao`: string[] parágrafos do produto.
  * - `ficha`: produto normalizado (fonte dos dados técnicos).
  * - `avaliacoes`: lista já normalizada (`avaliacaoParaView`).
- * - `autenticado`, `enviando`, `feedback`: estado do fluxo de avaliação.
+ * - `enviando`, `feedback`: estado do fluxo de avaliação.
  * - `onAvaliar({rating, comment})`, `onEditarAvaliacao(reviewId, {rating, comment})`,
  *   `onExcluirAvaliacao(reviewId)`: ações.
  */
@@ -196,7 +197,6 @@ export default function DetalhesLivro({
   descricao = [],
   ficha = {},
   avaliacoes = [],
-  autenticado = false,
   comprou = false,
   enviando = false,
   feedback = null,

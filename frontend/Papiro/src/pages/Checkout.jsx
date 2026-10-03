@@ -389,6 +389,7 @@ export default function Checkout({ onIrParaLogin }) {
                   <div>
                     <button
                       type="submit"
+                      data-testid="btn-finalizar"
                       disabled={enviando || Boolean(pedido) || carrinhoCarregando || !autenticado}
                       className="w-full rounded-sm bg-forest py-4 font-body text-xs font-semibold uppercase tracking-[0.2em] text-cream-soft shadow-md transition-all duration-300 ease-[var(--ease-cozy)] hover:bg-forest-soft hover:shadow-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest disabled:cursor-not-allowed disabled:opacity-60"
                     >

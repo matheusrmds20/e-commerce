@@ -133,6 +133,7 @@ export default function Registro({ onConcluir, onVoltarLogin }) {
                 id="full_name"
                 name="full_name"
                 type="text"
+                data-testid="input-full-name"
                 autoComplete="name"
                 placeholder="Maria Almeida"
                 value={form.full_name}
@@ -147,6 +148,7 @@ export default function Registro({ onConcluir, onVoltarLogin }) {
                 id="email"
                 name="email"
                 type="email"
+                data-testid="input-email"
                 autoComplete="email"
                 placeholder="voce@exemplo.com"
                 value={form.email}
@@ -162,6 +164,7 @@ export default function Registro({ onConcluir, onVoltarLogin }) {
                   id="password"
                   name="password"
                   type={mostrarSenha ? 'text' : 'password'}
+                  data-testid="input-password"
                   autoComplete="new-password"
                   placeholder="••••••••"
                   value={form.password}
@@ -190,6 +193,7 @@ export default function Registro({ onConcluir, onVoltarLogin }) {
                 <input
                   id="confirmacao"
                   name="confirmacao"
+                  data-testid="input-confirmacao"
                   type={mostrarConfirmacao ? 'text' : 'password'}
                   autoComplete="new-password"
                   placeholder="••••••••"
@@ -218,6 +222,7 @@ export default function Registro({ onConcluir, onVoltarLogin }) {
 
             <button
               type="submit"
+              data-testid="btn-registrar"
               disabled={enviando || sucesso}
               className="mt-2 w-full rounded-sm bg-gold py-4 font-body text-xs font-semibold uppercase tracking-[0.28em] text-cream-soft shadow-md transition-all duration-300 ease-[var(--ease-cozy)] hover:bg-caramel hover:shadow-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold disabled:cursor-not-allowed disabled:opacity-60"
             >

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, ForeignKey
+from sqlalchemy import Column, Integer, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import relationship
 from app.db.base import Base
 
@@ -6,6 +6,9 @@ from app.db.base import Base
 class CartItem(Base):
 
     __tablename__ = "cart_items"
+    __table_args__ = (
+        UniqueConstraint("cart_id", "product_id", name="unique_cart_item"),
+    )
 
     id = Column(Integer, primary_key=True, autoincrement=True, index=True)
     cart_id = Column(Integer, ForeignKey("carts.id"), nullable=False)
@@ -14,3 +17,4 @@ class CartItem(Base):
 
     carts = relationship("Cart", back_populates="cart_items")
     product = relationship("Product", back_populates="cart_items")
+

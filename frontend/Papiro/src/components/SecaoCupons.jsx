@@ -27,6 +27,7 @@ export default function SecaoCupons({
         {cupomSelecionado && (
           <button
             type="button"
+            data-testid="btn-remover-cupom"
             onClick={() => onSelecionarCupom(null)}
             className="font-body text-[0.72rem] font-semibold uppercase tracking-[0.16em] text-[#a4533f] transition-colors hover:text-coffee-soft"
           >
@@ -49,7 +50,7 @@ export default function SecaoCupons({
                 : `${Number(cupom.discount_value).toFixed(0)}% de desconto`
 
             return (
-              <li key={cupom.id}>
+              <li key={cupom.id} data-testid={`cupom-item-${cupom.id}`}>
                 <button
                   type="button"
                   onClick={() => onSelecionarCupom(selecionado ? null : cupom)}

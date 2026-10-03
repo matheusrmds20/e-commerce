@@ -128,6 +128,7 @@ export default function App() {
             <button
               key={nome}
               type="button"
+              data-testid={`nav-${nome}`}
               onClick={() => setPagina(nome)}
               className={`px-4 py-2.5 font-body text-[0.62rem] uppercase tracking-[0.18em] transition-colors duration-300 ${
                 pagina === nome

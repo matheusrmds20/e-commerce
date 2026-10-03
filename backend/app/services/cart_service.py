@@ -1,9 +1,17 @@
+from sqlalchemy.exc import IntegrityError
+
 from app.models.cart import Cart
 from app.repositories.cart_item_repo import CartItemRepository
 from app.repositories.cart_repo import CartRepository
 from app.repositories.product_repo import ProductRepository
 from app.repositories.user_repo import UserRepository
-from app.schemas.cart import CartItemCreate, CartCreate
+from app.schemas.cart import CartCreate, CartItemCreate
+
+# Nº de tentativas do add_item ante o IntegrityError da constraint única
+# (cart_id, product_id). Em condições normais a primeira passa; a segunda é
+# seguro: outra request criou a linha entre a leitura e o INSERT, então a
+# releitura enxerga o item existente e o fluxo incrementa a quantidade.
+MAX_ADD_ITEM_TENTATIVAS = 2
 
 
 class CartService:
@@ -61,40 +69,52 @@ class CartService:
             return cart_created
 
     def add_item(self, cart_id: int, user_id: int, product_id: int, quantity: int) -> CartItemCreate:
-        with self.session.begin():
+        # A constraint única (cart_id, product_id) — migration 3657bf59c715 —
+        # é a defesa final contra duplicar o item do carrinho. O FOR UPDATE do
+        # produto já serializa este método para o mesmo produto, mas qualquer
+        # caminho que insira `cart_item` sem o lock (ex.: `create_with_items`,
+        # ou um refactor futuro) cairia no IntegrityError. Recuperação: o
+        # with-begin rollbacka a transação e a operação é repetida — na
+        # releitura o item já existe e o fluxo incrementa a quantidade em vez
+        # de duplicar.
+        for _ in range(MAX_ADD_ITEM_TENTATIVAS):
+            try:
+                with self.session.begin():
 
+                    cart = self.cart_repo.get_by_id(cart_id)
 
-            cart = self.cart_repo.get_by_id(cart_id)
+                    if not cart:
+                        raise ValueError(f"No cart found with id {cart_id}")
 
-            if not cart:
-                raise ValueError(f"No cart found with id {cart_id}")
+                    if cart.user_id != user_id:
+                        raise ValueError("Cart is not owned by user")
 
-            if cart.user_id != user_id:
-                raise ValueError("Cart is not owned by user")
+                    product = self.product_repo.get_by_id_for_update(product_id)
 
-            product = self.product_repo.get_by_id_for_update(product_id)
+                    if not product:
+                        raise ValueError(f"No product found with id {product_id}")
 
-            if not product:
-                raise ValueError(f"No product found with id {product_id}")
+                    cart_item = self.cart_item_repo.get_by_cart_and_product(cart_id, product_id)
 
-            cart_item = self.cart_item_repo.get_by_cart_and_product(cart_id, product_id)
+                    quantidade_atual = cart_item.quantity if cart_item else 0
+                    quantidade_total = quantidade_atual + quantity
 
+                    if product.stock_qty < quantidade_total:
+                        raise ValueError(
+                            f"Insufficient stock for product {product_id}. "
+                            f"Available: {product.stock_qty}, requested: {quantidade_total}"
+                        )
 
-            quantidade_atual = cart_item.quantity if cart_item else 0
-            quantidade_total = quantidade_atual + quantity
+                    if cart_item:
+                        return self._update_cart(cart_item, quantidade_total)
 
-            if product.stock_qty < quantidade_total:
-                raise ValueError(
-                    f"Insufficient stock for product {product_id}. "
-                    f"Available: {product.stock_qty}, requested: {quantidade_total}"
-                )
+                    cart_item_added = self.cart_item_repo.add_item(cart_id, product_id, quantity)
 
-            if cart_item:
-                return self._update_cart(cart_item, quantidade_total)
+                    return cart_item_added
+            except IntegrityError as exc:
+                ultimo_erro = exc
 
-            cart_item_added = self.cart_item_repo.add_item(cart_id, product_id, quantity)
-
-            return cart_item_added
+        raise ultimo_erro
 
 
     def update_item(self, cart_id: int, user_id: int, item_id: int, quantity: int):
@@ -147,8 +167,10 @@ class CartService:
 
             cart_item = self.cart_item_repo.get_by_id(item_id)
 
+
             if not cart_item:
                 raise ValueError(f"No cart item found with id {item_id}")
+
 
 
 

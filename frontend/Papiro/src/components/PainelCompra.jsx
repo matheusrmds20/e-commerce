@@ -69,6 +69,7 @@ export default function PainelCompra({
       {/* Ações */}
       <button
         type="button"
+        data-testid="btn-add-carrinho"
         onClick={onAdicionar}
         disabled={esgotado}
         className="mt-5 w-full rounded-sm bg-forest py-4 font-body text-xs font-semibold uppercase tracking-[0.2em] text-cream-soft shadow-md transition-all duration-300 ease-[var(--ease-cozy)] hover:bg-forest-soft hover:shadow-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest disabled:cursor-not-allowed disabled:opacity-50"
@@ -79,6 +80,7 @@ export default function PainelCompra({
       <div className="mt-4 flex items-center justify-center">
         <button
           type="button"
+          data-testid="btn-wishlist"
           onClick={onAdicionarDesejos}
           aria-pressed={nosDesejos}
           className={`inline-flex items-center gap-2 font-body text-[0.88rem] font-medium transition-colors duration-300 hover:text-gold ${
