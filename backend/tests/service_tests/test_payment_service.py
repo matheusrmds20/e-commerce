@@ -285,7 +285,7 @@ class TestProcessWebhook:
     def test_webhook_approved_completes_order(
         self, payment_service, payment_repo, order_repo, payment_gateway
     ):
-        payment_repo.get_by_provider_payment_id.return_value = None
+        payment_repo.get_by_provider_payment_id_for_update.return_value = None
         payment_repo.get_by_order_id.return_value = [make_payment()]
         order_repo.get_by_id.return_value = make_order()
         self._gateway_returns(payment_gateway, "approved")
@@ -297,11 +297,89 @@ class TestProcessWebhook:
         assert order_repo.get_by_id(1).status == OrderStatus.COMPLETED
         payment_service.session.commit.assert_called_once()
 
+    def test_webhook_approved_dispara_email_automatico(
+        self, payment_service, payment_repo, order_repo, payment_gateway
+    ):
+        """Pagamento aprovado dispara o e-mail de confirmação em background.
+
+        Verifica que a task Celery ``send_order_confirmation_email.delay`` é
+        enfileirada com o e-mail do usuário e o payload serializável do pedido.
+        """
+        from types import SimpleNamespace
+        from unittest.mock import patch
+
+        payment_repo.get_by_provider_payment_id_for_update.return_value = None
+        payment_repo.get_by_order_id.return_value = [make_payment()]
+
+        # Usamos um objeto simples (não o modelo Order instrumentado) porque a
+        # relationship `order_items` do modelo SQLAlchemy não aceita atribuição
+        # direta de objetos não-instrumentados.
+        order = SimpleNamespace(
+            id=1,
+            user_id=1,
+            total=110.0,
+            subtotal=100.0,
+            order_items=[
+                SimpleNamespace(
+                    products=SimpleNamespace(title="Livro X"),
+                    quantity=2,
+                    price=50.0,
+                )
+            ],
+            users=SimpleNamespace(email="user@example.com"),
+        )
+        order_repo.get_by_id.return_value = order
+
+        self._gateway_returns(payment_gateway, "approved", order_id=1)
+
+        with patch(
+            "app.services.payment_service.send_order_confirmation_email"
+        ) as task:
+            result = payment_service.process_webhook("MP-PAY-1")
+
+        assert result.status == "approved"
+        task.delay.assert_called_once_with(
+            order.id,
+            "user@example.com",
+            {
+                "total": 110.0,
+                "subtotal": 100.0,
+                "items": [{"name": "Livro X", "quantity": 2, "price": 50.0}],
+            },
+        )
+
+    def test_webhook_approved_sem_usuario_nao_dispara_email(
+        self, payment_service, payment_repo, order_repo, payment_gateway
+    ):
+        """Sem e-mail de usuário, o webhook segue sem enfileirar a task
+        (fluxo desgradável, não quebra o processamento do pagamento)."""
+        from types import SimpleNamespace
+        from unittest.mock import patch
+
+        payment_repo.get_by_provider_payment_id_for_update.return_value = None
+        payment_repo.get_by_order_id.return_value = [make_payment()]
+        order = SimpleNamespace(
+            id=1,
+            user_id=1,
+            users=None,
+            order_items=[],
+        )
+        order_repo.get_by_id.return_value = order
+        self._gateway_returns(payment_gateway, "approved", order_id=1)
+
+        with patch(
+            "app.services.payment_service.send_order_confirmation_email"
+        ) as task:
+            result = payment_service.process_webhook("MP-PAY-1")
+
+        assert result.status == "approved"
+        task.delay.assert_not_called()
+
     def test_webhook_merchant_order_resolves_payment(
         self, payment_service, payment_repo, order_repo, payment_gateway
     ):
         """Notificação de merchant_order: id é da order; o payment vem de dentro."""
-        payment_repo.get_by_provider_payment_id.return_value = None
+        payment_repo.get_by_provider_payment_id_for_update.return_value = None
         payment_repo.get_by_order_id.return_value = [make_payment()]
         order_repo.get_by_id.return_value = make_order()
 
@@ -326,7 +404,7 @@ class TestProcessWebhook:
     def test_webhook_pending_sets_processing(
         self, payment_service, payment_repo, order_repo, payment_gateway
     ):
-        payment_repo.get_by_provider_payment_id.return_value = None
+        payment_repo.get_by_provider_payment_id_for_update.return_value = None
         payment_repo.get_by_order_id.return_value = [make_payment()]
         order_repo.get_by_id.return_value = make_order()
         self._gateway_returns(payment_gateway, "pending")
@@ -339,7 +417,7 @@ class TestProcessWebhook:
     def test_webhook_rejected_cancels_order(
         self, payment_service, payment_repo, order_repo, payment_gateway
     ):
-        payment_repo.get_by_provider_payment_id.return_value = None
+        payment_repo.get_by_provider_payment_id_for_update.return_value = None
         payment_repo.get_by_order_id.return_value = [make_payment()]
         order_repo.get_by_id.return_value = make_order()
         self._gateway_returns(payment_gateway, "rejected")
@@ -353,7 +431,7 @@ class TestProcessWebhook:
         self, payment_service, payment_repo, order_repo, payment_gateway
     ):
         """Se o pagamento já está vinculado, não cai no fallback por order_id."""
-        payment_repo.get_by_provider_payment_id.return_value = make_payment()
+        payment_repo.get_by_provider_payment_id_for_update.return_value = make_payment()
         order_repo.get_by_id.return_value = make_order()
         self._gateway_returns(payment_gateway, "approved")
 
@@ -365,7 +443,7 @@ class TestProcessWebhook:
     def test_webhook_idempotent_when_already_approved(
         self, payment_service, payment_repo, order_repo, payment_gateway
     ):
-        payment_repo.get_by_provider_payment_id.return_value = make_payment(
+        payment_repo.get_by_provider_payment_id_for_update.return_value = make_payment(
             status="approved"
         )
         self._gateway_returns(payment_gateway, "approved")
@@ -380,7 +458,7 @@ class TestProcessWebhook:
     def test_webhook_updates_timestamp(
         self, payment_service, payment_repo, order_repo, payment_gateway
     ):
-        payment_repo.get_by_provider_payment_id.return_value = None
+        payment_repo.get_by_provider_payment_id_for_update.return_value = None
         payment = make_payment()
         before = payment.updated_at
         payment_repo.get_by_order_id.return_value = [payment]
@@ -405,7 +483,7 @@ class TestProcessWebhook:
     def test_webhook_payment_not_found(
         self, payment_service, payment_repo, payment_gateway
     ):
-        payment_repo.get_by_provider_payment_id.return_value = None
+        payment_repo.get_by_provider_payment_id_for_update.return_value = None
         payment_repo.get_by_order_id.return_value = []
         self._gateway_returns(payment_gateway, "approved")
 
@@ -417,7 +495,7 @@ class TestProcessWebhook:
     def test_webhook_order_mismatch(
         self, payment_service, payment_repo, payment_gateway
     ):
-        payment_repo.get_by_provider_payment_id.return_value = make_payment(
+        payment_repo.get_by_provider_payment_id_for_update.return_value = make_payment(
             order_id=2
         )
         self._gateway_returns(payment_gateway, "approved", order_id=1)

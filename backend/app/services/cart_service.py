@@ -7,10 +7,7 @@ from app.repositories.product_repo import ProductRepository
 from app.repositories.user_repo import UserRepository
 from app.schemas.cart import CartCreate, CartItemCreate
 
-# Nº de tentativas do add_item ante o IntegrityError da constraint única
-# (cart_id, product_id). Em condições normais a primeira passa; a segunda é
-# seguro: outra request criou a linha entre a leitura e o INSERT, então a
-# releitura enxerga o item existente e o fluxo incrementa a quantidade.
+
 MAX_ADD_ITEM_TENTATIVAS = 2
 
 
@@ -69,14 +66,7 @@ class CartService:
             return cart_created
 
     def add_item(self, cart_id: int, user_id: int, product_id: int, quantity: int) -> CartItemCreate:
-        # A constraint única (cart_id, product_id) — migration 3657bf59c715 —
-        # é a defesa final contra duplicar o item do carrinho. O FOR UPDATE do
-        # produto já serializa este método para o mesmo produto, mas qualquer
-        # caminho que insira `cart_item` sem o lock (ex.: `create_with_items`,
-        # ou um refactor futuro) cairia no IntegrityError. Recuperação: o
-        # with-begin rollbacka a transação e a operação é repetida — na
-        # releitura o item já existe e o fluxo incrementa a quantidade em vez
-        # de duplicar.
+
         for _ in range(MAX_ADD_ITEM_TENTATIVAS):
             try:
                 with self.session.begin():
@@ -134,8 +124,7 @@ class CartService:
                 raise ValueError(f"No cart item found with id {item_id}")
 
             if quantity <= 0:
-                # Consistente com o antigo `decrease_item`: zerar a quantidade
-                # remove o item do carrinho em vez de gravar 0.
+
                 self.cart_item_repo.delete(cart_item)
                 return cart_item
 

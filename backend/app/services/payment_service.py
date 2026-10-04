@@ -8,6 +8,7 @@ from app.models.payment import Payment
 from app.repositories.order_repo import OrderRepository
 from app.repositories.payment_repo import PaymentRepository
 from app.repositories.user_repo import UserRepository
+from app.utils.email import build_order_details, send_order_confirmation_email
 
 settings = get_settings()
 
@@ -148,53 +149,26 @@ class PaymentService:
 
     def process_webhook(self, payment_provider_id: str, topic: str | None = None) -> Payment:
 
-        logger.info(
-            "process_webhook start: provider_id=%s topic=%s",
-            payment_provider_id,
-            topic,
-        )
 
-        # Quando a notificação é de merchant_order, o id recebido é da
-        # merchant_order (que agrega vários payments). O payment de verdade
-        # fica em payments[i]["id"] da resposta.
         if topic == "merchant_order":
             merchant_order = self.gateway.get_merchant_order(payment_provider_id)
             payments = merchant_order.get("payments") or []
-            logger.info(
-                "merchant_order %s -> %d payment(s): %s",
-                payment_provider_id,
-                len(payments),
-                [(p.get("id"), p.get("status")) for p in payments],
-            )
             if not payments:
                 raise ValueError(
                     f"Merchant order {payment_provider_id} has no payments"
                 )
-            # Prefere um payment aprovado; senão, o de maior id. A merchant_order
-            # pode listar payments de tentativas antigas/rejeitadas, e pegar o
-            # max(id) cegamente pode escolher um que não seja o relevante.
+
             approved = [p for p in payments if p.get("status") == "approved"]
             chosen = (approved or payments)
             payment_provider_id = str(max(p["id"] for p in chosen))
-            logger.info(
-                "merchant_order %s -> usando payment %s",
-                merchant_order.get("id"),
-                payment_provider_id,
-            )
+
 
         try:
             provider_payment = self.gateway.get_payment(payment_provider_id)
         except RuntimeError as err:
-            # Alguns formatos de notificação (ex.: type=mp-connect, ou
-            # topic_merchant_order sem mapeamento de topic) trazem o id de uma
-            # merchant_order em vez de um payment. Se o get_payment der 404,
-            # tenta resolver como merchant_order antes de desistir.
             if "404" not in str(err):
                 raise
-            logger.warning(
-                "get_payment(%s) deu 404; tentando como merchant_order",
-                payment_provider_id,
-            )
+
             merchant_order = self.gateway.get_merchant_order(payment_provider_id)
             payments = merchant_order.get("payments") or []
             if not payments:
@@ -205,11 +179,7 @@ class PaymentService:
             approved = [p for p in payments if p.get("status") == "approved"]
             chosen = (approved or payments)
             payment_provider_id = str(max(p["id"] for p in chosen))
-            logger.info(
-                "fallback merchant_order %s -> payment %s",
-                merchant_order.get("id"),
-                payment_provider_id,
-            )
+
             provider_payment = self.gateway.get_payment(payment_provider_id)
 
         external_reference = provider_payment.get("external_reference")
@@ -221,41 +191,57 @@ class PaymentService:
 
         order_id = int(external_reference)
 
+        with self.session.begin():
+            
+            payment = self.repo.get_by_provider_payment_id_for_update(payment_provider_id)
 
-        payment = self.repo.get_by_provider_payment_id(payment_provider_id)
+            if not payment:
+                payments = self.repo.get_by_order_id(order_id)
+                payment = payments[0] if payments else None
 
-        if not payment:
-            payments = self.repo.get_by_order_id(order_id)
-            payment = payments[0] if payments else None
+            if not payment:
+                raise ValueError(f"Payment not found for order {order_id}")
 
-        if not payment:
-            raise ValueError(f"Payment not found for order {order_id}")
+            if payment.order_id != order_id:
+                raise ValueError(
+                    f"Payment {payment_provider_id} does not match order {order_id}"
+                )
 
-        if payment.order_id != order_id:
-            raise ValueError(
-                f"Payment {payment_provider_id} does not match order {order_id}"
-            )
-
-        if payment.status == "approved":
-            return payment
-
-        payment.status = provider_payment["status"]
-        payment.provider_payment_id = payment_provider_id
-        payment.updated_at = datetime.now()
-
-        order = self.order_repo.get_by_id(order_id)
-
-        if order:
             if payment.status == "approved":
-                order.status = OrderStatus.COMPLETED
-            elif payment.status == "pending":
-                order.status = OrderStatus.PROCESSING
-            elif payment.status == "rejected":
-                order.status = OrderStatus.CANCELLED
-            order.updated_at = datetime.now()
+                return payment
 
-        self.session.commit()
-        self.session.refresh(payment)
+            payment.status = provider_payment["status"]
+            payment.provider_payment_id = payment_provider_id
+            payment.updated_at = datetime.now()
 
-        return payment
+            order = self.order_repo.get_by_id(order_id)
+
+            if order:
+                if payment.status == "approved":
+                    order.status = OrderStatus.COMPLETED
+                    try:
+                        user_email = order.users.email if order.users else None
+                        if user_email:
+                            send_order_confirmation_email.delay(
+                                order.id,
+                                user_email,
+                                build_order_details(order),
+                            )
+                    except Exception as exc:
+                        logger.warning(
+                            "Falha ao enfileirar e-mail de confirmação "
+                            "para o pedido %s: %s",
+                            order.id,
+                            exc,
+                        )
+                elif payment.status == "pending":
+                    order.status = OrderStatus.PROCESSING
+                elif payment.status == "rejected":
+                    order.status = OrderStatus.CANCELLED
+                order.updated_at = datetime.now()
+
+            self.session.commit()
+            self.session.refresh(payment)
+
+            return payment
 

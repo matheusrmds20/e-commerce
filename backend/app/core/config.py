@@ -19,16 +19,17 @@ class Settings(BaseSettings):
     BACKEND_URL: str
     MERCADO_PAGO_ACCESS_TOKEN: str
     MERCADO_PAGO_WEBHOOK_SECRET: str
-    # Secrets adicionais (separados por vírgula) para o caso de haver mais de
-    # uma aplicação do Mercado Pago enviando webhooks para a mesma URL.
     MERCADO_PAGO_WEBHOOK_SECRETS_EXTRA: str = ""
-    # Quando False, o webhook NÃO valida a assinatura (destinado a desenvolvimento
-    # com credenciais/contas de TESTE, onde o secret de assinatura difere do
-    # exibido no painel de produção). Mantenha True em produção.
     VALIDATE_WEBHOOK_SIGNATURE: bool = True
     SECRET_KEY: str = Field(default="change-me-to-a-very-long-secret-key", min_length=32)
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    SMTP_HOST: str
+    SMTP_PORT: str
+    SMTP_USER: str
+    SMTP_PASSWORD: str
+    CELERY_BROKER_URL: str
+    CELERY_RESULT_BACKEND: str
 
     model_config=SettingsConfigDict(
         env_file=str(ENV_FILE),

@@ -9,6 +9,7 @@ from app.repositories.order_repo import OrderRepository
 from app.repositories.product_repo import ProductRepository
 from app.repositories.user_coupon_repo import UserCouponRepository
 from app.repositories.user_repo import UserRepository
+from app.utils.email import build_order_details, send_order_confirmation_email
 
 
 class OrderService:
@@ -401,3 +402,33 @@ class OrderService:
 
             self.repo.delete(order)
             return order
+
+
+    async def send_confirmation_email(self, order_id: int, user):
+        order = self.repo.get_by_id(order_id)
+
+        if not order:
+            raise ValueError(f"No order found with id {order_id}")
+        
+        if order.status != OrderStatus.COMPLETED:
+            raise ValueError(f"Order {order_id} is not completed")
+
+        if order.user_id != user.id:
+            raise ValueError(f"Order {order_id} is not owned by user {user.id}")
+
+        sended = send_order_confirmation_email.delay(
+            order_id,
+            user.email,
+            build_order_details(order),
+        )
+
+        return {"status": "success", "sended": sended.id}
+
+    async def get_task_status(self, task_id: str):
+        task = send_order_confirmation_email.AsyncResult(task_id)
+        return {
+            "task_id": task_id,
+            "status": task.status,
+            "result": task.result if task.ready() else None,
+        }
+

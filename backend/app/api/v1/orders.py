@@ -21,6 +21,7 @@ from app.schemas.order import (
 )
 from app.services.order_service import OrderService
 
+
 order_router = APIRouter()
 
 DbSession = Annotated[Session, Depends(get_db)]
@@ -127,3 +128,32 @@ def delete_order(
         return get_order_service(db).delete(order_id, user.id)
     except ValueError as exc:
         raise _traduzir_value_error(exc) from exc
+
+
+@order_router.post(
+    "/send-confirmation-email",
+    summary="Envia um email de confirmação de pedido",
+)
+async def send_order_confirmation_email(
+    order_id: int, user: UserDb, db: DbSession
+):
+
+    try:
+        return get_order_service(db).send_confirmation_email(order_id, user)
+    except ValueError as exc:
+        raise _traduzir_value_error(exc)
+
+
+@order_router.get(
+    "/send-confirmation-email/status/{task_id}",
+    summary="Consulta o status de uma tarefa de envio de email de confirmação",
+)
+async def get_task_status(
+    task_id: str,
+    db: DbSession,
+):
+
+    try:
+        return await get_order_service(db).get_task_status(task_id)
+    except ValueError as exc:
+        raise _traduzir_value_error(exc)

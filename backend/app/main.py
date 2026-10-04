@@ -1,12 +1,30 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-
+from celery import Celery
 from app.api.exceptions import register_exception_handlers
 from app.api.router import router
+from app.core.config import get_settings
+
 
 
 
 app = FastAPI()
+
+
+
+celery = Celery(
+    "ecommerce",
+    broker=get_settings().CELERY_BROKER_URL,
+    backend=get_settings().CELERY_RESULT_BACKEND,
+
+)
+
+celery.conf.imports = ("app.utils.email",)
+
+
+
+
+
 
 
 app.add_middleware(
