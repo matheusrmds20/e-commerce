@@ -9,12 +9,7 @@ settings = get_settings()
 
 
 def build_order_details(order) -> dict:
-    """Monta o payload serializável de um pedido para o Celery.
 
-    Aceita um modelo ``Order`` (SQLAlchemy) e devolve um dict de primitivos
-    (sem objetos SQLAlchemy), pronto para ser enfileirado no broker e lido
-    pelo template de e-mail.
-    """
     return {
         "total": order.total,
         "subtotal": order.subtotal,
@@ -64,10 +59,15 @@ def send_order_confirmation_email(self, order_id: int, user_email: str, order_de
         """
         msg.attach(MIMEText(html, "html"))
 
-
-        with smtplib.SMTP_SSL(smtp_host, smtp_port) as server:
-            server.login(smtp_user, smtp_password)
-            server.sendmail(smtp_user, user_email, msg.as_string())
+        if smtp_port == 465:
+            with smtplib.SMTP_SSL(smtp_host, smtp_port) as server:
+                server.login(smtp_user, smtp_password)
+                server.sendmail(smtp_user, user_email, msg.as_string())
+        else:
+            with smtplib.SMTP(smtp_host, smtp_port) as server:
+                server.starttls()
+                server.login(smtp_user, smtp_password)
+                server.sendmail(smtp_user, user_email, msg.as_string())
 
         return {"status": "success", "order_id": order_id}
 
