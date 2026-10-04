@@ -35,6 +35,7 @@ class Order(Base):
     discount_amount = Column(Float, nullable=False)
     shipping_cost = Column(Float, nullable=False)
     total = Column(Float, nullable=False)
+    receipt_path = Column(String(500), nullable=True)
     created_at = Column(DateTime, nullable=False, default=datetime.now)
     updated_at = Column(DateTime, nullable=False, default=datetime.now)
 

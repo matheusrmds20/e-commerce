@@ -30,6 +30,8 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: str
     CELERY_BROKER_URL: str
     CELERY_RESULT_BACKEND: str
+    # Diretório onde os comprovantes PDF dos pedidos são salvos.
+    COMPROVANTES_DIR: str = "comprovantes"
 
     model_config=SettingsConfigDict(
         env_file=str(ENV_FILE),

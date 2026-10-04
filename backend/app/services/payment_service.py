@@ -9,6 +9,7 @@ from app.repositories.order_repo import OrderRepository
 from app.repositories.payment_repo import PaymentRepository
 from app.repositories.user_repo import UserRepository
 from app.utils.email import build_order_details, send_order_confirmation_email
+from app.utils.receipt_tasks import generate_order_receipt
 
 settings = get_settings()
 
@@ -230,6 +231,17 @@ class PaymentService:
                     except Exception as exc:
                         logger.warning(
                             "Falha ao enfileirar e-mail de confirmação "
+                            "para o pedido %s: %s",
+                            order.id,
+                            exc,
+                        )
+
+                    # Gera o comprovante PDF em background (só quando aprovado).
+                    try:
+                        generate_order_receipt.delay(order.id)
+                    except Exception as exc:
+                        logger.warning(
+                            "Falha ao enfileirar geração do comprovante "
                             "para o pedido %s: %s",
                             order.id,
                             exc,

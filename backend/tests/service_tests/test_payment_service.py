@@ -375,6 +375,45 @@ class TestProcessWebhook:
         assert result.status == "approved"
         task.delay.assert_not_called()
 
+    def test_webhook_approved_dispara_geracao_comprovante(
+        self, payment_service, payment_repo, order_repo, payment_gateway
+    ):
+        """Pagamento aprovado enfileira a geração do comprovante PDF.
+
+        A task ``generate_order_receipt.delay`` é chamada com o id do pedido
+        quando o pagamento é aprovado, junto do disparo do e-mail.
+        """
+        from types import SimpleNamespace
+        from unittest.mock import patch
+
+        payment_repo.get_by_provider_payment_id_for_update.return_value = None
+        payment_repo.get_by_order_id.return_value = [make_payment()]
+        order = SimpleNamespace(
+            id=1,
+            user_id=1,
+            total=110.0,
+            subtotal=100.0,
+            order_items=[SimpleNamespace(
+                products=SimpleNamespace(title="Livro X"),
+                quantity=2,
+                price=50.0,
+            )],
+            users=SimpleNamespace(email="user@example.com"),
+        )
+        order_repo.get_by_id.return_value = order
+        self._gateway_returns(payment_gateway, "approved", order_id=1)
+
+        with patch(
+            "app.services.payment_service.send_order_confirmation_email"
+        ) as email_task, patch(
+            "app.services.payment_service.generate_order_receipt"
+        ) as receipt_task:
+            result = payment_service.process_webhook("MP-PAY-1")
+
+        assert result.status == "approved"
+        email_task.delay.assert_called_once()
+        receipt_task.delay.assert_called_once_with(1)
+
     def test_webhook_merchant_order_resolves_payment(
         self, payment_service, payment_repo, order_repo, payment_gateway
     ):

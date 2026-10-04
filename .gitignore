@@ -44,6 +44,9 @@ htmlcov/
 !.env.example
 backend/.env.bak
 
+# ===== Artefatos gerados em runtime =====
+backend/comprovantes/
+
 # ===== Node / Frontend =====
 node_modules/
 dist/

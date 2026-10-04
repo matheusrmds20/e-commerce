@@ -404,6 +404,27 @@ class OrderService:
             return order
 
 
+    def get_receipt_path(self, order_id: int, user_id: int) -> str:
+        """Retorna o caminho do comprovante PDF de um pedido do usuário.
+
+        Valida que o pedido existe e pertence ao usuário (anti-IDOR). Se o
+        comprovante ainda não foi gerado (task ainda não rodou ou falhou),
+        levanta ``ValueError`` que a rota traduz para 404.
+        """
+        order = self.repo.get_by_id(order_id)
+
+        if order is None:
+            raise ValueError(f"No order found with id {order_id}")
+
+        if order.user_id != user_id:
+            raise ValueError("Order is not owned by user")
+
+        if not order.receipt_path:
+            raise ValueError(f"Receipt not generated yet for order {order_id}")
+
+        return order.receipt_path
+
+
     async def send_confirmation_email(self, order_id: int, user):
         order = self.repo.get_by_id(order_id)
 

@@ -48,6 +48,7 @@ class OrderResponse(BaseModel):
     discount_amount: float
     shipping_cost: float
     total: float
+    receipt_path: str | None = None
     created_at: datetime
     updated_at: datetime
     order_items: list[OrderItemResponse]

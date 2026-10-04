@@ -69,6 +69,9 @@ def _traduzir_value_error(exc: ValueError) -> BadRequestException:
     if "No order" in msg or "No items" in msg or "No address" in msg:
         return NotFoundException(msg)
 
+    if "Receipt not generated" in msg:
+        return NotFoundException(msg)
+
     return BadRequestException(msg)
 
 
@@ -157,3 +160,27 @@ async def get_task_status(
         return await get_order_service(db).get_task_status(task_id)
     except ValueError as exc:
         raise _traduzir_value_error(exc)
+
+
+@order_router.get(
+    "/{order_id}/comprovante",
+    summary="Baixa o comprovante PDF do pedido (somente o dono)",
+    # Sem response_model: devolvemos um FileResponse (arquivo binário).
+)
+def download_receipt(
+    order_id: int,
+    user: UserDb,
+    db: DbSession,
+):
+    from fastapi.responses import FileResponse
+
+    try:
+        path = get_order_service(db).get_receipt_path(order_id, user.id)
+    except ValueError as exc:
+        raise _traduzir_value_error(exc) from exc
+
+    return FileResponse(
+        path,
+        media_type="application/pdf",
+        filename=f"comprovante_order_{order_id}.pdf",
+    )

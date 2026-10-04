@@ -42,6 +42,9 @@ dependencies = [
     "celery[redis]>=5.4.0",
     "redis>=5.0.0",
 
+    # Geração de PDF (comprovante de pedido)
+    "reportlab>=4.2.0",
+
     # Utilitários
     "python-slugify>=8.0.0",
 ]
