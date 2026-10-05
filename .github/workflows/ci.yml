@@ -29,22 +29,24 @@ jobs:
       # (é ignorado pelo git), então precisam ser definidas aqui.
       # Valores fictícios: a suíte usa sqlite em memória (tests/conftest.py)
       # e não chama nenhum serviço externo real.
-      DATABASE_URL: sqlite:///:memory:
-      FRONTEND_URL: http://localhost:5173
-      BACKEND_URL: http://localhost:8000
-      SECRET_KEY: ci-fake-secret-key-0123456789-0123456789-0123456789
-      ALGORITHM: HS256
+      # Aspas obrigatórias: em YAML, ':' dentro do valor quebra o parse
+      # (ex.: sqlite:///:memory: ou host:porta). Sempre citar URL/DSN.
+      DATABASE_URL: "sqlite:///:memory:"
+      FRONTEND_URL: "http://localhost:5173"
+      BACKEND_URL: "http://localhost:8000"
+      SECRET_KEY: "ci-fake-secret-key-0123456789-0123456789-0123456789"
+      ALGORITHM: "HS256"
       ACCESS_TOKEN_EXPIRE_MINUTES: "30"
-      MERCADO_PAGO_ACCESS_TOKEN: TEST-fake-token-for-ci
-      MERCADO_PAGO_WEBHOOK_SECRET: fake-webhook-secret-for-ci
+      MERCADO_PAGO_ACCESS_TOKEN: "TEST-fake-token-for-ci"
+      MERCADO_PAGO_WEBHOOK_SECRET: "fake-webhook-secret-for-ci"
       VALIDATE_WEBHOOK_SIGNATURE: "false"
-      SMTP_HOST: localhost
+      SMTP_HOST: "localhost"
       SMTP_PORT: "2525"
-      SMTP_USER: fake-user
-      SMTP_PASSWORD: fake-password
-      SMTP_FROM: ci@example.com
-      CELERY_BROKER_URL: redis://localhost:6379/0
-      CELERY_RESULT_BACKEND: redis://localhost:6379/1
+      SMTP_USER: "fake-user"
+      SMTP_PASSWORD: "fake-password"
+      SMTP_FROM: "ci@example.com"
+      CELERY_BROKER_URL: "redis://localhost:6379/0"
+      CELERY_RESULT_BACKEND: "redis://localhost:6379/1"
 
     steps:
       - uses: actions/checkout@v4
@@ -130,23 +132,24 @@ jobs:
       # Settings (app/core/config.py) exige estas variáveis sem default.
       # Valores fictícios: nenhum teste E2E chama serviço externo real
       # (ViaCEP e Mercado Pago são mockados via page.route).
-      FRONTEND_URL: http://localhost:5173
-      BACKEND_URL: http://localhost:8000
-      SECRET_KEY: ci-fake-secret-key-0123456789-0123456789-0123456789
-      ALGORITHM: HS256
+      # Aspas obrigatórias: valores com ':' não-citados quebram o YAML.
+      FRONTEND_URL: "http://localhost:5173"
+      BACKEND_URL: "http://localhost:8000"
+      SECRET_KEY: "ci-fake-secret-key-0123456789-0123456789-0123456789"
+      ALGORITHM: "HS256"
       ACCESS_TOKEN_EXPIRE_MINUTES: "30"
-      MERCADO_PAGO_ACCESS_TOKEN: TEST-fake-token-for-ci
-      MERCADO_PAGO_WEBHOOK_SECRET: fake-webhook-secret-for-ci
+      MERCADO_PAGO_ACCESS_TOKEN: "TEST-fake-token-for-ci"
+      MERCADO_PAGO_WEBHOOK_SECRET: "fake-webhook-secret-for-ci"
       VALIDATE_WEBHOOK_SIGNATURE: "false"
-      SMTP_HOST: localhost
+      SMTP_HOST: "localhost"
       SMTP_PORT: "2525"
-      SMTP_USER: fake-user
-      SMTP_PASSWORD: fake-password
-      SMTP_FROM: ci@example.com
-      CELERY_BROKER_URL: redis://localhost:6379/0
-      CELERY_RESULT_BACKEND: redis://localhost:6379/1
-      E2E_DATABASE_URL: postgresql+psycopg2://postgres:postgres@localhost:5432/bookcommerce_e2e
-      DATABASE_URL: postgresql+psycopg2://postgres:postgres@localhost:5432/bookcommerce_e2e
+      SMTP_USER: "fake-user"
+      SMTP_PASSWORD: "fake-password"
+      SMTP_FROM: "ci@example.com"
+      CELERY_BROKER_URL: "redis://localhost:6379/0"
+      CELERY_RESULT_BACKEND: "redis://localhost:6379/1"
+      E2E_DATABASE_URL: "postgresql+psycopg2://postgres:postgres@localhost:5432/bookcommerce_e2e"
+      DATABASE_URL: "postgresql+psycopg2://postgres:postgres@localhost:5432/bookcommerce_e2e"
 
     steps:
       - uses: actions/checkout@v4
