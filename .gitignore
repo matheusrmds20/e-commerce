@@ -44,6 +44,34 @@ htmlcov/
 !.env.example
 backend/.env.bak
 
+# Chaves, certificados e material criptografico
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.ppk
+id_rsa*
+id_ed25519*
+
+# ===== Bancos de dados locais =====
+# Nenhum banco deve ser versionado: use migrations + seed.
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+backend/_auth_test.db
+
+# ===== Backups e artefatos de reescrita de historico =====
+*.bak
+*.orig
+*.rej
+*.bundle
+.tmp/
+
 # ===== Artefatos gerados em runtime =====
 backend/comprovantes/
 
@@ -52,6 +80,7 @@ node_modules/
 dist/
 dist-ssr/
 *.local
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -63,6 +92,8 @@ pnpm-debug.log*
 !.vscode/extensions.json
 .idea/
 .DS_Store
+Thumbs.db
+desktop.ini
 *.suo
 *.ntvs*
 *.njsproj
