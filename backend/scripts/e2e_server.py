@@ -24,9 +24,15 @@ if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
 # MUST ser setado antes do primeiro import de app.*.
-os.environ["DATABASE_URL"] = (
-    "postgresql+psycopg2://postgres:postgres@localhost:5433/bookcommerce-e2e"
-)
+# Credenciais vêm do ambiente (backend/.env) — nunca hardcoded aqui.
+E2E_DATABASE_URL = os.environ.get("E2E_DATABASE_URL") or os.environ.get("DATABASE_URL")
+if not E2E_DATABASE_URL:
+    raise SystemExit(
+        "Defina E2E_DATABASE_URL (ou DATABASE_URL) apontando para o banco de teste "
+        'E2E, ex.: export E2E_DATABASE_URL="postgresql+psycopg2://<user>:<password>'
+        '@localhost:5433/bookcommerce-e2e"'
+    )
+os.environ["DATABASE_URL"] = E2E_DATABASE_URL
 
 import uvicorn  # noqa: E402
 

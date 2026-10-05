@@ -15,8 +15,8 @@
 - **Frontend:** React 19 + Vite 8 + Tailwind v4 + axios. Raiz `frontend/Papiro/`, código `frontend/Papiro/src/`.
 - **Venv Python:** `./venv/Scripts/` (na raiz do repo). Python 3.13.2.
 - **Node:** v22 (`node --version`). npm/npx disponíveis.
-- **DB de dev:** `postgresql+psycopg2://postgres:postgres@localhost:5433/bookcommerce-db`
-- **DB de teste E2E:** `postgresql+psycopg2://postgres:postgres@localhost:5433/bookcommerce-e2e`
+- **DB de dev:** `postgresql+psycopg2://<user>:<password>@localhost:5433/bookcommerce-db` (usuário/senha em `backend/.env`)
+- **DB de teste E2E:** `postgresql+psycopg2://<user>:<password>@localhost:5433/bookcommerce-e2e`
 - **API local:** `http://localhost:8000/api/v1`
 - **Frontend local:** `http://localhost:5173`
 
@@ -111,12 +111,12 @@ backend/
 - [x] Migrations aplicadas:
   ```bash
   cd "C:/Users/mathe/OneDrive/Desktop/E-commerce v1"
-  DATABASE_URL="postgresql+psycopg2://postgres:postgres@localhost:5433/bookcommerce-e2e" ./venv/Scripts/alembic.exe upgrade head
+  DATABASE_URL="postgresql+psycopg2://<user>:<password>@localhost:5433/bookcommerce-e2e" ./venv/Scripts/alembic.exe upgrade head
   ```
 - [x] Seed rodado (4 categorias, 24 produtos):
   ```bash
   cd "C:/Users/mathe/OneDrive/Desktop/E-commerce v1/backend"
-  DATABASE_URL="postgresql+psycopg2://postgres:postgres@localhost:5433/bookcommerce-e2e" ../venv/Scripts/python.exe -m scripts.seed
+  DATABASE_URL="postgresql+psycopg2://<user>:<password>@localhost:5433/bookcommerce-e2e" ../venv/Scripts/python.exe -m scripts.seed
   ```
 - [x] **Bug corrigido:** `backend/scripts/seed.py` agora importa `app.models.newsletter`, `app.models.payment` e `app.models.user_coupon`.
 
@@ -319,9 +319,9 @@ os passos do HANDOFF (todos os comandos documentados foram usados nas Fases
 # --- Provisionar/recriar DB de teste (idempotente) ---
 cd "C:/Users/mathe/OneDrive/Desktop/E-commerce v1"
 docker exec bookcommerce-db psql -U postgres -c 'CREATE DATABASE "bookcommerce-e2e";'   # só na 1ª vez
-DATABASE_URL="postgresql+psycopg2://postgres:postgres@localhost:5433/bookcommerce-e2e" ./venv/Scripts/alembic.exe upgrade head
+DATABASE_URL="postgresql+psycopg2://<user>:<password>@localhost:5433/bookcommerce-e2e" ./venv/Scripts/alembic.exe upgrade head
 cd backend
-DATABASE_URL="postgresql+psycopg2://postgres:postgres@localhost:5433/bookcommerce-e2e" ../venv/Scripts/python.exe -m scripts.seed
+DATABASE_URL="postgresql+psycopg2://<user>:<password>@localhost:5433/bookcommerce-e2e" ../venv/Scripts/python.exe -m scripts.seed
 
 # --- Rodar E2E ---
 cd "C:/Users/mathe/OneDrive/Desktop/E-commerce v1/frontend/Papiro"

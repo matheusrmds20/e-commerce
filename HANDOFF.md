@@ -97,9 +97,9 @@ npm run e2e:ui                    # modo interativo
    novo):
    ```bash
    cd "C:/Users/mathe/OneDrive/Desktop/E-commerce v1"
-   DATABASE_URL="postgresql+psycopg2://postgres:postgres@localhost:5433/bookcommerce-e2e" ./venv/Scripts/alembic.exe upgrade head
+   DATABASE_URL="postgresql+psycopg2://<user>:<password>@localhost:5433/bookcommerce-e2e" ./venv/Scripts/alembic.exe upgrade head
    cd backend
-   DATABASE_URL="postgresql+psycopg2://postgres:postgres@localhost:5433/bookcommerce-e2e" ../venv/Scripts/python.exe -m scripts.seed
+   DATABASE_URL="postgresql+psycopg2://<user>:<password>@localhost:5433/bookcommerce-e2e" ../venv/Scripts/python.exe -m scripts.seed
    ```
    (Critério: `SELECT count(*) FROM products;` no DB de teste = **24**.)
 3. **Playwright instalado no front:**

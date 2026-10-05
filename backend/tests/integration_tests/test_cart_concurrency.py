@@ -6,20 +6,22 @@ independentes — ou seja, exercitam de verdade locks de linha (``FOR UPDATE``),
 transações (``with session.begin()``) e a constraint única
 ``cart_items(cart_id, product_id)`` sob contenção.
 
-Como rodar (com o Postgres de dev de pé):
+Como rodar (com o Postgres de dev de pé). As credenciais vêm do ambiente — este
+teste **não** guarda usuário/senha no código:
 
-    DATABASE_URL="postgresql+psycopg2://postgres:postgres@localhost:5433/bookcommerce_conc" \\
+    CONC_DATABASE_URL="postgresql+psycopg2://<user>:<password>@localhost:5433/bookcommerce_conc" \\
         pytest backend/tests/integration_tests/test_cart_concurrency.py -v
 
 Pré-requisito único: o banco ```bookcommerce_conc`` criado e com a schema no head:
 
     psql -c "CREATE DATABASE bookcommerce_conc"
-    DATABASE_URL="postgresql+psycopg2://postgres:postgres@localhost:5433/bookcommerce_conc" \\
+    CONC_DATABASE_URL="postgresql+psycopg2://<user>:<password>@localhost:5433/bookcommerce_conc" \\
         alembic upgrade head
 
 O teste é marcado com ``pytest.mark.integration`` justamente para ficar fora da
 suíte padrão (que roda com sqlite/:memory: e não suporta ``FOR UPDATE`` real).
 """
+import os
 import threading
 
 import pytest
@@ -33,9 +35,14 @@ from app.models.user import User, UserRole
 from app.services.cart_service import CartService
 
 # Aponta para o banco de concorrência (deve existir e estar com schema no head).
-TEST_DATABASE_URL = (
-    "postgresql+psycopg2://postgres:postgres@localhost:5433/bookcommerce_conc"
-)
+# Sem credenciais no código: defina CONC_DATABASE_URL no ambiente.
+TEST_DATABASE_URL = os.environ.get("CONC_DATABASE_URL")
+if not TEST_DATABASE_URL:
+    pytest.skip(
+        "Defina CONC_DATABASE_URL apontando para o Postgres de concorrência "
+        "(ex.: postgresql+psycopg2://<user>:<password>@localhost:5433/bookcommerce_conc).",
+        allow_module_level=True,
+    )
 
 pytestmark = pytest.mark.integration
 
