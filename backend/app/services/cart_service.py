@@ -7,7 +7,6 @@ from app.repositories.product_repo import ProductRepository
 from app.repositories.user_repo import UserRepository
 from app.schemas.cart import CartCreate, CartItemCreate
 
-
 MAX_ADD_ITEM_TENTATIVAS = 2
 
 
@@ -17,7 +16,7 @@ class CartService:
         self.cart_item_repo = CartItemRepository(db)
         self.product_repo = ProductRepository(db)
         self.user_repo = UserRepository(db)
-        self.session = db   
+        self.session = db
 
 
     def _update_cart(self, cart_item, quantity):
@@ -31,7 +30,7 @@ class CartService:
     def _remove_item(self, cart_item):
 
         self.cart_item_repo.delete(cart_item)
-        
+
 
     def get_by_user_id(self, user_id: int) -> dict:
         user = self.user_repo.get_by_id(user_id)

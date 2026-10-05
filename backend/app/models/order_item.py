@@ -1,7 +1,9 @@
-from sqlalchemy import Column, Integer, ForeignKey, Float, DateTime
-from sqlalchemy.orm import relationship
-from app.db.base import Base
 from datetime import datetime
+
+from sqlalchemy import Column, DateTime, Float, ForeignKey, Integer
+from sqlalchemy.orm import relationship
+
+from app.db.base import Base
 
 
 class OrderItem(Base):
@@ -19,4 +21,3 @@ class OrderItem(Base):
 
     orders = relationship("Order", back_populates="order_items")
     products = relationship("Product", back_populates="order_items")
-   

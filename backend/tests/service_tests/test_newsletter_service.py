@@ -4,7 +4,6 @@ Cobre subscribe (novo e-mail, duplicado, normalização), unsubscribe
 (inexistente e existente) e list_all (restrição a administradores).
 """
 from datetime import datetime
-from unittest.mock import Mock
 
 import pytest
 

@@ -1,9 +1,10 @@
-from celery import shared_task
 import smtplib
-from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from app.core.config import get_settings
+from email.mime.text import MIMEText
 
+from celery import shared_task
+
+from app.core.config import get_settings
 
 settings = get_settings()
 
@@ -73,4 +74,4 @@ def send_order_confirmation_email(self, order_id: int, user_email: str, order_de
 
     except Exception as exc:
 
-        raise self.retry(exc=exc, countdown=60 * (self.request.retries + 1))
+        raise self.retry(exc=exc, countdown=60 * (self.request.retries + 1)) from exc

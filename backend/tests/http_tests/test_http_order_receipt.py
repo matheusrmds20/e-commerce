@@ -11,9 +11,9 @@ O ``OrderService`` é mockado na factory da rota (``get_order_service``). No tes
 de sucesso, o service retorna um caminho de um PDF real criado no disco para o
 ``FileResponse`` servir.
 """
-import pytest
-
 from unittest.mock import Mock, patch
+
+import pytest
 
 PREFIX = "/api/v1/orders"
 

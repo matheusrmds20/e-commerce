@@ -1,6 +1,5 @@
 from typing import Generic, TypeVar
 
-from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 ModelType = TypeVar("ModelType")
@@ -29,7 +28,7 @@ class BaseRepository(Generic[ModelType]):
         return self.session.query(self.model).all()
 
     def update(self, item) -> ModelType:
-        
+
         self.session.add(item)
         self.session.flush()
         self.session.refresh(item)

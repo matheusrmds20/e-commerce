@@ -3,7 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db, get_current_user
+from app.api.deps import get_current_user, get_db
 from app.api.exceptions import (
     BadRequestException,
     ConflictException,
@@ -15,7 +15,6 @@ from app.api.exceptions import (
 from app.models.user import User
 from app.schemas.cart import CartItemCreate, CartItemResponse, CartResponse
 from app.services.cart_service import CartService
-
 
 cart_router = APIRouter()
 

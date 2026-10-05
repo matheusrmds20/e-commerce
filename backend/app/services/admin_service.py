@@ -1,12 +1,12 @@
 from datetime import datetime, timedelta
+
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
-from app.models.category import Category
 from app.models.order import Order, OrderStatus
 from app.models.order_item import OrderItem
 from app.models.product import Product
-from app.models.user import User, UserRole
+from app.models.user import User
 from app.schemas.admin import (
     AdminOrderResponse,
     AdminOrderUser,
@@ -201,8 +201,8 @@ class AdminService:
 
         try:
             status_enum = OrderStatus(new_status.lower())
-        except ValueError:
-            raise ValueError(f"Status '{new_status}' inválido")
+        except ValueError as exc:
+            raise ValueError(f"Status '{new_status}' inválido") from exc
 
         order.status = status_enum
         order.updated_at = datetime.now()

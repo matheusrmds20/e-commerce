@@ -1,5 +1,7 @@
-from pydantic import BaseModel, Field, field_validator, ConfigDict
 from datetime import datetime
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
 from app.models.coupon import DiscountType
 
 

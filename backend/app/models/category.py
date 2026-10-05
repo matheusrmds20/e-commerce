@@ -1,6 +1,8 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, Boolean
+from sqlalchemy import Boolean, Column, ForeignKey, Integer, String
 from sqlalchemy.orm import relationship
+
 from app.db.base import Base
+
 
 class Category(Base):
 
@@ -13,6 +15,6 @@ class Category(Base):
     image_url = Column(String(500), nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
     parent_id = Column(Integer, ForeignKey("categories.id"), nullable=True)
-    
+
 
     products = relationship("Product", back_populates="categories")

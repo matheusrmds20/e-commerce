@@ -10,7 +10,7 @@ token e papel de administrador (``get_current_user``), mesmo padrão de
 test_http_users.py: sobrescreve a dependência e devolve um objeto com
 ``id``/``role``.
 """
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 
 import pytest
 from helpers import assert_error, assert_validation_error

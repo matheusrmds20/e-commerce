@@ -1,12 +1,10 @@
+from celery import Celery
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from celery import Celery
+
 from app.api.exceptions import register_exception_handlers
 from app.api.router import router
 from app.core.config import get_settings
-
-
-
 
 app = FastAPI()
 

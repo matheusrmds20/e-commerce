@@ -9,8 +9,7 @@ from app.api.exceptions import (
 from app.core.security import create_access_token, hash_password, verify_password
 from app.models.user import User
 from app.repositories.user_repo import UserRepository
-from app.schemas.auth import AuthResponse, LoginRequest, RegisterRequest, TokenResponse
-
+from app.schemas.auth import AuthResponse, TokenResponse
 
 
 class AuthService:
@@ -39,7 +38,7 @@ class AuthService:
 
     def login(self, data) -> TokenResponse:
         user = self.user_repo.get_by_email(data.username)
-        
+
         if user is None or not verify_password(data.password, user.password_hash):
             raise InvalidCredentialsException()
 

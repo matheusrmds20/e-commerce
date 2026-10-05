@@ -90,6 +90,13 @@ select = [
 ]
 ignore = ["E501"]  # line length handled by black
 
+[tool.ruff.lint.per-file-ignores]
+# app/schemas/__init__.py reexporta os schemas com `from .x import *` de forma
+# deliberada, para que `from app.schemas import X` funcione de qualquer módulo.
+# Os star imports são intencionais: F403 (import *) e F401 (import não usado)
+# não se aplicam a um módulo de reexport.
+"app/schemas/__init__.py" = ["F403", "F401"]
+
 [tool.mypy]
 python_version = "3.11"
 strict = true

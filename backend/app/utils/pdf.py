@@ -150,12 +150,6 @@ def generate_receipt(payload: dict, output_path: str | Path) -> Path:
     story.append(Spacer(1, 4))
 
     # Linha de total em destaque
-    total_style = ParagraphStyle(
-        "Total",
-        parent=styles["Normal"],
-        fontSize=13,
-        fontName="Helvetica-Bold",
-    )
     total_tbl = Table(
         [["TOTAL", _fmt_br(payload.get("total", 0))]],
         colWidths=[78 * mm, 90 * mm],

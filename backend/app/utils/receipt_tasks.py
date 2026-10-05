@@ -86,6 +86,6 @@ def generate_order_receipt(self, order_id: int) -> dict:
 
     except Exception as exc:
         db.rollback()
-        raise self.retry(exc=exc, countdown=60 * (self.request.retries + 1))
+        raise self.retry(exc=exc, countdown=60 * (self.request.retries + 1)) from exc
     finally:
         db.close()

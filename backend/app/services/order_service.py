@@ -1,6 +1,7 @@
 from datetime import datetime
-from app.models.order import Order, OrderStatus
+
 from app.models.coupon import DiscountType
+from app.models.order import Order, OrderStatus
 from app.repositories.address_repo import AddressRepository
 from app.repositories.cart_repo import CartRepository
 from app.repositories.coupon_repo import CouponRepository
@@ -90,7 +91,7 @@ class OrderService:
 
         return order_items
 
-        
+
 
     def _validate_coupon(self, coupon_id, items, user_id):
 
@@ -155,7 +156,7 @@ class OrderService:
 
         return subtotal, discount_amount, shipping_cost, total
 
-    
+
 
     def get_by_user_id(self, user_id: int) -> list:
         user = self.user_repo.get_by_id(user_id)
@@ -430,7 +431,7 @@ class OrderService:
 
         if not order:
             raise ValueError(f"No order found with id {order_id}")
-        
+
         if order.status != OrderStatus.COMPLETED:
             raise ValueError(f"Order {order_id} is not completed")
 

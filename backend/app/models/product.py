@@ -1,7 +1,9 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, Boolean, DateTime, Float
-from sqlalchemy.orm import relationship
-from app.db.base import Base
 from datetime import datetime
+
+from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Integer, String
+from sqlalchemy.orm import relationship
+
+from app.db.base import Base
 
 
 class Product(Base):
@@ -41,4 +43,4 @@ class Product(Base):
     reviews = relationship("Review", back_populates="products")
     order_items = relationship("OrderItem", back_populates="products")
     wishlist_items = relationship("Wishlist", back_populates="products")
-    
+

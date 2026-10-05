@@ -1,5 +1,7 @@
-from pydantic import BaseModel, Field, ConfigDict
 from datetime import datetime
+
+from pydantic import BaseModel, ConfigDict, Field
+
 from app.models.order import OrderStatus
 
 
@@ -37,7 +39,7 @@ class OrderUpdate(BaseModel):
 
 
 class OrderResponse(BaseModel):
-    
+
     id: int
     user_id: int
     address_id: int

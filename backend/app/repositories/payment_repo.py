@@ -1,6 +1,7 @@
+from sqlalchemy.orm import Session
+
 from app.models.payment import Payment
 from app.repositories.base import BaseRepository
-from sqlalchemy.orm import Session
 
 
 class PaymentRepository(BaseRepository[Payment]):
@@ -27,6 +28,6 @@ class PaymentRepository(BaseRepository[Payment]):
         )
 
 
-    
+
 
 

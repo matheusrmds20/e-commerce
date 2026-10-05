@@ -1,5 +1,6 @@
 from typing import Annotated
-from fastapi import APIRouter, Depends, Query, status
+
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
@@ -65,8 +66,8 @@ def update_order_status(
     except ValueError as exc:
         msg = str(exc)
         if "não encontrado" in msg:
-            raise NotFoundException(msg)
-        raise BadRequestException(msg)
+            raise NotFoundException(msg) from exc
+        raise BadRequestException(msg) from exc
 
 
 @admin_router.get(

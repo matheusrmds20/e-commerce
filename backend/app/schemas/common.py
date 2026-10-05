@@ -1,6 +1,6 @@
 
 
-from typing import Generic, List, TypeVar
+from typing import Generic, TypeVar
 
 from pydantic import BaseModel, Field
 
@@ -33,7 +33,7 @@ class Page(BaseModel, Generic[T]):
     ```
     """
 
-    data: List[T]
+    data: list[T]
     meta: PageMeta
 
 

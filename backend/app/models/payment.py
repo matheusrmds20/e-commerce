@@ -1,10 +1,9 @@
-from sqlalchemy import Column, Float, ForeignKey, Integer, String, DateTime, UniqueConstraint
-from sqlalchemy.orm import relationship
 from datetime import datetime
 
+from sqlalchemy import Column, DateTime, Float, ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy.orm import relationship
 
 from app.db.base import Base
-
 
 
 class Payment(Base):
@@ -12,7 +11,7 @@ class Payment(Base):
     __table_args__ = (
         UniqueConstraint("provider", "provider_payment_id", name="payments_order_provider_payment_id_key"),
     )
-        
+
 
     id = Column(Integer, primary_key=True, autoincrement=True, index=True)
     order_id = Column(Integer, ForeignKey("orders.id"), nullable=False)

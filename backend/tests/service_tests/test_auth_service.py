@@ -1,3 +1,5 @@
+from types import SimpleNamespace
+
 import pytest
 
 import app.services.auth_service as auth_module
@@ -8,8 +10,6 @@ from app.api.exceptions import (
     UserNotFoundException,
 )
 from app.models.user import User, UserRole
-from types import SimpleNamespace
-
 from app.schemas.auth import RegisterRequest
 
 

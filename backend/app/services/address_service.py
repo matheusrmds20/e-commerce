@@ -1,6 +1,6 @@
+from app.api.exceptions import AddressLinkedToOrdersException
 from app.models.address import Address
 from app.models.order import Order
-from app.api.exceptions import AddressLinkedToOrdersException
 from app.repositories.address_repo import AddressRepository
 from app.repositories.user_repo import UserRepository
 
@@ -13,7 +13,7 @@ class AddressService:
 
 
     def get_by_id(self, user_id: int, address_id: int) -> dict:
-        
+
         address = self.repo.get_by_id(address_id)
 
         if address is None:
@@ -48,8 +48,8 @@ class AddressService:
         adress = self.repo.get_actual_address_default(user_id)
 
         if adress is None:
-            raise ValueError(f"No default address found")
-        
+            raise ValueError("No default address found")
+
         return adress
 
     def set_default(self, user_id: int, address_id: int) -> dict:
@@ -57,11 +57,11 @@ class AddressService:
 
         if address is None:
             raise ValueError(f"No address found with id {address_id}")
-        
+
         return address
 
     def create(self, data, user_id: int) -> dict:
-        
+
         with self.session.begin():
             address_already_exists = self.repo.get_by_zip_code(user_id, data.zip_code)
 

@@ -193,7 +193,7 @@ class PaymentService:
         order_id = int(external_reference)
 
         with self.session.begin():
-            
+
             payment = self.repo.get_by_provider_payment_id_for_update(payment_provider_id)
 
             if not payment:

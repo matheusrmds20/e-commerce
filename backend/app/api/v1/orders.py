@@ -21,7 +21,6 @@ from app.schemas.order import (
 )
 from app.services.order_service import OrderService
 
-
 order_router = APIRouter()
 
 DbSession = Annotated[Session, Depends(get_db)]
@@ -144,7 +143,7 @@ async def send_order_confirmation_email(
     try:
         return get_order_service(db).send_confirmation_email(order_id, user)
     except ValueError as exc:
-        raise _traduzir_value_error(exc)
+        raise _traduzir_value_error(exc) from exc
 
 
 @order_router.get(
@@ -159,7 +158,7 @@ async def get_task_status(
     try:
         return await get_order_service(db).get_task_status(task_id)
     except ValueError as exc:
-        raise _traduzir_value_error(exc)
+        raise _traduzir_value_error(exc) from exc
 
 
 @order_router.get(
