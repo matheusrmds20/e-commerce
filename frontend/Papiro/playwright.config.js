@@ -2,6 +2,17 @@
 import { defineConfig, devices } from '@playwright/test'
 
 /**
+ * Intérprete Python usado para subir o backend E2E.
+ * - Windows (dev local): o venv do repo fica em `venv/Scripts/python.exe`.
+ * - Linux/macOS (CI ou outro clone): o venv não é versionado, então usamos o
+ *   `python` do ambiente (no CI o setup-python já o coloca no PATH).
+ * Sobrescrevível via PYTHON_BIN se o seu venv estiver em outro lugar.
+ */
+const isWindows = process.platform === 'win32'
+const pythonBin =
+  process.env.PYTHON_BIN || (isWindows ? '..\\venv\\Scripts\\python.exe' : 'python')
+
+/**
  * Config E2E do frontend "Papiro".
  * Ver: E2E_PLANO.md na raiz do repo.
  * - baseURL: front local (Vite em localhost:5173).
@@ -35,9 +46,11 @@ export default defineConfig({
     {
       // Backend: sempre sobe um processo novo com o DB de TESTE
       // (porta 8000 — a de dev; ver E2E_PLANO.md).
-      // (Windows/cmd nativo — caminhos com backslash + cd explícito.)
-      command:
-        'cd ..\\..\\backend && ..\\venv\\Scripts\\python.exe scripts\\e2e_server.py',
+      // Comando montado conforme o SO: `cd` com separador do Windows não
+      // existe no Linux do CI (e vice-versa).
+      command: isWindows
+        ? `cd ..\\..\\backend && ${pythonBin} scripts\\e2e_server.py`
+        : `cd ../../backend && ${pythonBin} scripts/e2e_server.py`,
       url: 'http://localhost:8000/',
       reuseExistingServer: false,
       timeout: 90_000,
