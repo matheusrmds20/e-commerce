@@ -39,6 +39,35 @@ class TokenResponse(BaseModel):
 
     access_token: str = Field(..., description="Token JWT de acesso (curta validade)")
     token_type: str = Field(default="bearer", description="Tipo de token")
+    # O refresh token também é entregue no body do login (além do cookie
+    # httpOnly papiro_refresh). Mantido para consumo fora do navegador e para
+    # o frontend atual poder transicionar sem quebrar.
+    refresh_token: str | None = Field(
+        default=None, description="Refresh token JWT (7 dias, rotativo)"
+    )
+
+
+class RefreshRequest(BaseModel):
+
+
+    # O refresh token normalmente vem no cookie httpOnly `papiro_refresh`
+    # (enviado automaticamente pelo navegador). Este campo permite passar o
+    # token no body como alternativa (p. ex. consumo fora do navegador ou
+    # clientes nativos) e serve de fallback quando o cookie não está presente.
+    refresh_token: str = Field(
+        ...,
+        description="Refresh token JWT (rotação: usado uma única vez)",
+    )
+
+
+class RefreshResponse(BaseModel):
+
+
+    # Endpoint de refresh devolve apenas um NOVO access token no body; o NOVO
+    # refresh token vai num cookie httpOnly rotacionado (não expõe o refresh
+    # pelo body do refresh).
+    access_token: str = Field(..., description="Token JWT de acesso (curta validade)")
+    token_type: str = Field(default="bearer", description="Tipo de token")
 
 
 class AuthResponse(BaseModel):

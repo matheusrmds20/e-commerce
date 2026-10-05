@@ -130,6 +130,7 @@ def auth_service(db, user_repo):
         patch("app.services.auth_service.hash_password", return_value="hashed-password"),
         patch("app.services.auth_service.verify_password", return_value=True),
         patch("app.services.auth_service.create_access_token", return_value="access-token"),
+        patch("app.services.auth_service.create_refresh_token", return_value="refresh-token"),
     ):
         from app.services.auth_service import AuthService
 
