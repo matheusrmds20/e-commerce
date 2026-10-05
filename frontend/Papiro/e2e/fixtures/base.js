@@ -20,7 +20,7 @@ export const test = base.extend({
     await use((opcoes) => loginPelaUi(page, opcoes))
   },
   // Gera um email único: `const email = emailUnico()`.
-  emailUnico: async ({}, use) => {
+  emailUnico: async (_, use) => {
     await use(emailUnico)
   },
 })
