@@ -23,6 +23,29 @@ jobs:
       run:
         working-directory: backend
 
+    env:
+      # Settings (app/core/config.py) exige estas variáveis sem default.
+      # Localmente elas vêm do backend/.env; no CI esse arquivo não existe
+      # (é ignorado pelo git), então precisam ser definidas aqui.
+      # Valores fictícios: a suíte usa sqlite em memória (tests/conftest.py)
+      # e não chama nenhum serviço externo real.
+      DATABASE_URL: sqlite:///:memory:
+      FRONTEND_URL: http://localhost:5173
+      BACKEND_URL: http://localhost:8000
+      SECRET_KEY: ci-fake-secret-key-0123456789-0123456789-0123456789
+      ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: "30"
+      MERCADO_PAGO_ACCESS_TOKEN: TEST-fake-token-for-ci
+      MERCADO_PAGO_WEBHOOK_SECRET: fake-webhook-secret-for-ci
+      VALIDATE_WEBHOOK_SIGNATURE: "false"
+      SMTP_HOST: localhost
+      SMTP_PORT: "2525"
+      SMTP_USER: fake-user
+      SMTP_PASSWORD: fake-password
+      SMTP_FROM: ci@example.com
+      CELERY_BROKER_URL: redis://localhost:6379/0
+      CELERY_RESULT_BACKEND: redis://localhost:6379/1
+
     steps:
       - uses: actions/checkout@v4
 
@@ -41,10 +64,10 @@ jobs:
         run: ruff check .
 
       - name: Testes (pytest)
-        # A suíte usa sqlite em memória e uma SECRET_KEY de teste definidas em
-        # tests/conftest.py — não precisa de Postgres, Redis nem segredos.
+        # A suíte roda com sqlite em memória e não precisa de Postgres nem Redis.
         # Os testes marcados como `integration` exigem Postgres real e são
         # deselecionados por padrão via addopts em pyproject.toml.
+        # As settings obrigatórias vêm do `env:` deste job (ver acima).
         run: pytest -q
 
   frontend:
