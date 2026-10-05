@@ -19,8 +19,9 @@ export const test = base.extend({
   loginPelaUi: async ({ page }, use) => {
     await use((opcoes) => loginPelaUi(page, opcoes))
   },
-  // Gera um email único: `const email = emailUnico()`.
-  emailUnico: async (_, use) => {
+
+  // eslint-disable-next-line no-empty-pattern
+  emailUnico: async ({}, use) => {
     await use(emailUnico)
   },
 })

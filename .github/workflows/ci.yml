@@ -7,10 +7,14 @@ on:
     branches: [main, Frontend]
   workflow_dispatch:
 
-# Cancela execuções antigas do mesmo branch quando um push novo chega.
+# Serializa execuções do mesmo branch SEM cancelar as que já estão rodando.
+# Com cancel-in-progress: true, empurrar `Frontend` e `main` em sequência (ou
+# corrigir um commit logo depois) matava o run anterior no meio — e o job E2E,
+# que depende de backend+frontend, era marcado como 'skipped' por ter os pais
+# cancelados. Agora o run novo espera na fila e nenhum resultado é perdido.
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 permissions:
   contents: read
@@ -175,7 +179,9 @@ jobs:
       - name: Aplicar migrations no banco de teste
         # alembic.ini e a pasta alembic/ ficam na RAIZ do repo (não em backend/).
         # O env.py lê DATABASE_URL via get_settings(), que vem do env do job.
-        run: alembic upgrade head
+        # `python -m alembic` em vez de `alembic`: não depende do console script
+        # estar no PATH (neste venv local ele não está).
+        run: python -m alembic upgrade head
 
       - name: Popular o banco (4 categorias, 24 produtos)
         working-directory: backend

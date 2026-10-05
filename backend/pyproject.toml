@@ -29,8 +29,15 @@ dependencies = [
     "email-validator>=2.1.0",
 
     # Segurança
+    # pwdlib[argon2] gera os hashes de senha ($argon2id$) usados em
+    # app/core/security.py via PasswordHash.recommended(). O extra [argon2]
+    # traz o argon2-cffi; sem ele, o hash quebra em runtime.
     "python-jose[cryptography]>=3.3.0",
+    "pwdlib[argon2]>=0.2.0",
     "bcrypt>=4.1.0",
+
+    # Pagamentos (SDK do Mercado Pago — app/integrations/MercadoPago/geteway.py)
+    "mercadopago>=2.2.0",
 
     # Upload / form data
     "python-multipart>=0.0.9",
