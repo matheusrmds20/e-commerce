@@ -31,8 +31,12 @@
 > removidas **11 rotas** nunca consumidas pelo front (9 de `/coupons`, 2 de
 > `/wishlists`); criado `.gitignore` (raiz + `backend/`), removidos 178 `.pyc`,
 > 2 `.coverage` e os segredos `backend/.env`/`.env.bak` do rastreamento; nova
-> `SECRET_KEY` gerada. **Pendência anotada (seção 8b):** limpar o histórico do
-> git quando o repositório for tornado público.
+> `SECRET_KEY` gerada.
+>
+> **Parte 11 — limpeza do histórico git** (ver seção 8b) — `git filter-repo`
+> removeu `backend/.env`, `backend/.env.bak` e `backend/_auth_test.db` dos
+> **24 commits**; `.gitignore` endurecido. **Falta apenas o force-push** das
+> branches `Frontend` e `main`.
 
 ---
 
@@ -856,35 +860,60 @@ a SEO/rotas públicas).
 
 ---
 
-## 8b. Checklist para tornar o repositório público
+## 8b. Limpeza do histórico git e checklist para tornar o repositório público
 
-> ⚠️ **PENDÊNCIA REGISTRADA PELO USUÁRIO:** quando o repositório for
-> tornado público, **limpar o histórico do git** para remover os segredos que
-> já foram commitados (ver abaixo). Enquanto o repo for privado, a limpeza
-> fica adiada.
+> ✅ **LIMPEZA DE HISTÓRICO CONCLUÍDA** (Parte 11). Executada com `git filter-repo
+> --invert-paths`, reescrevendo os **24 commits** de `Frontend` e `main`.
+> Falta apenas o **force-push** das duas branches (passos no fim desta seção).
 
-### Contexto: segredos no histórico
-Até o commit `9c477c6`, o repositório **rastreava** `backend/.env` e
-`backend/.env.bak`, que contêm segredos em texto puro:
-- `SECRET_KEY` (chave JWT antiga),
+### Contexto: o que estava no histórico
+Até o commit `b57eee2` (reescrito para `04abe6f`), o repositório **rastreava**
+`backend/.env` e `backend/.env.bak`, que continham segredos em texto puro:
+- `SECRET_KEY` (chave JWT antiga, 64 hex),
 - `DATABASE_URL` e `POSTGRES_PASSWORD` (banco de **teste** local — risco baixo).
 
-No commit `b57eee2` os dois arquivos foram **removidos do rastreamento**
-(`git rm --cached`) e adicionados ao `.gitignore` — mas eles **permanecem no
-histórico** dos commits anteriores.
+Também estava rastreado, desde o **primeiro commit**, o banco
+`backend/_auth_test.db` (SQLite, 110 KB) com 2 usuários de teste (e-mails +
+hash argon2id) — artefato que a suíte **não usa** (os testes rodam em
+`sqlite:///:memory:`).
 
-A `SECRET_KEY` **já foi rotacionada** (nova chave em `backend/.env`, gerada com
-`secrets.token_urlsafe(64)`), o que invalida tokens emitidos com a chave antiga.
+A `SECRET_KEY` **já havia sido rotacionada** antes desta limpeza (nova chave em
+`backend/.env`, gerada com `secrets.token_urlsafe(64)`), o que invalida tokens
+emitidos com a chave antiga.
 
-### A fazer ANTES de tornar público
-1. **Limpar o histórico** (`git filter-repo --path backend/.env --path backend/.env.bak --invert-paths`
-   ou BFG). Isso reescreve hashes e exige **force-push** coordenado.
-2. Confirmar que `backend/.env` não aparece em `git log --all -- backend/.env`.
-3. (Opcional) rotacionar novamente a `SECRET_KEY` e a senha do banco após a
-   limpeza, por precaução.
+Nunca foram commitados (verificado em todos os blobs dos 24 commits): token/chave
+do **Mercado Pago**, `MERCADO_PAGO_WEBHOOK_SECRET`, credenciais do **SMTP/Mailtrap**
+e `frontend/Papiro/.env.e2e`.
+
+### O que foi feito
+1. **Histórico reescrito** com `git filter-repo --invert-paths`, removendo
+   `backend/.env`, `backend/.env.bak` e `backend/_auth_test.db` de **todos** os commits.
+2. **Validado** que os valores vazados sumiram de todos os blobs: busca pelo
+   valor da `SECRET_KEY` antiga via `git grep` sobre `git rev-list --all` →
+   **vazio**; idem para a `DATABASE_URL` do `.env` e para o hash argon2 do banco
+   de teste. A varredura foi repetida em **todos** os objetos do `.git`
+   (`git cat-file --batch-all-objects`), inclusive inalcançáveis → limpo.
+3. **`.gitignore` endurecido**: `*.db`/`*.sqlite`/`*.sqlite3`, `*.pem`/`*.key`/
+   `*.p12`/`*.pfx`/`*.jks`, `id_rsa*`/`id_ed25519*`, `*.bak`, `*.bundle`,
+   `*.orig`/`*.rej`, `*.log`, `.tmp/`, `Thumbs.db`.
+4. Backup integral do histórico antigo em `_backup_pre_rewrite.bundle`
+   (⚠️ **contém os segredos** — apagar depois de confirmar o push; já ignorado pelo git).
+
+### A fazer (fora deste repositório local)
+1. **Force-push** das duas branches (os hashes foram reescritos):
+   ```
+   git push --force-with-lease origin Frontend
+   git push --force-with-lease origin main
+   ```
+2. Se houver forks, clones de terceiros ou PRs abertos, eles continuam apontando
+   para os commits antigos — avisar ou descartar.
+3. (Opcional) rotacionar novamente a `SECRET_KEY` e a senha do banco, por precaução.
+
+> Nota: `main` ficou parada no **primeiro commit** (`d888636`); todo o trabalho
+> está em `Frontend` (`5eff46d`).
 
 > Nota: o `.gitignore` (raiz + `backend/`) e a remoção dos 178 `.pyc`/`__pycache__`
-> e dos 2 `.coverage` **já foram feitos** no commit `b57eee2`.
+> e dos 2 `.coverage` foram feitos no commit `04abe6f` (antigo `b57eee2`).
 
 ---
 
