@@ -74,6 +74,10 @@ backend/_auth_test.db
 *.bundle
 .tmp/
 
+# ===== Documentacao Markdown (não versionar) =====
+*.md
+
+
 # ===== Artefatos gerados em runtime =====
 backend/comprovantes/
 

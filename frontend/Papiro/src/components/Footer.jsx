@@ -1,36 +1,52 @@
 import Quill from './Quill'
 import { InstagramIcon, FacebookIcon, YoutubeIcon } from './Icons'
+import { useAuth } from '../context/auth-context'
 
 const COLUMNS = [
   {
     title: 'Loja',
-    links: ['Novidades', 'Mais vendidos', 'Promoções', 'Vale-presente'],
+    links: [
+      { label: 'Mais vendidos', page: 'mais-vendidos' },
+      { label: 'O Acervo', page: 'acervo' },
+      { label: 'Início', page: 'home' },
+      { label: 'Sacola de Compras', page: 'carrinho' },
+    ],
   },
   {
-    title: 'Ajuda',
-    links: ['Entregas', 'Trocas e devoluções', 'Fale conosco', 'Perguntas frequentes'],
-  },
-  {
-    title: 'Papiro',
-    links: ['Nossa história', 'Clube Papiro', 'Eventos', 'Trabalhe conosco'],
+    title: 'Acesso',
+    links: [
+      { label: 'Sobre Nós', page: 'sobre' },
+      { label: 'Minha Conta', page: 'minhaconta' },
+      { label: 'Painel da Curadoria', page: 'admin' },
+    ],
   },
 ]
 
 /**
  * Footer — Rodapé compacto e elegante, com espaçamentos otimizados e estética editorial.
  */
-export default function Footer() {
+export default function Footer({ onNavegar }) {
+  const { usuario } = useAuth()
+  const ehAdmin = usuario?.role === 'admin'
+
   return (
     <footer className="border-t border-line bg-cream-soft">
       <div className="mx-auto max-w-[1400px] px-5 py-10 sm:px-8 sm:py-12">
-        <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-[1.3fr_repeat(3,1fr)]">
+        <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-[1.6fr_repeat(2,1fr)]">
           {/* Marca & Redes */}
           <div className="flex flex-col justify-between">
             <div>
               <div className="flex items-center gap-3">
-                <span className="font-display text-[1.7rem] leading-none text-coffee">
+                <button
+                  type="button"
+                  onClick={() => {
+                    onNavegar?.('home')
+                    window.scrollTo({ top: 0, behavior: 'smooth' })
+                  }}
+                  className="font-display text-[1.7rem] leading-none text-coffee hover:text-forest transition-colors text-left"
+                >
                   Papiro
-                </span>
+                </button>
                 <Quill className="w-[32px] text-coffee/50" />
               </div>
               <p className="mt-2.5 max-w-[22rem] font-body text-xs font-light leading-relaxed text-coffee-soft">
@@ -70,14 +86,26 @@ export default function Footer() {
             <div key={column.title}>
               <h3 className="label-caps text-[0.68rem] text-gold">{column.title}</h3>
               <ul className="mt-3.5 flex flex-col gap-2">
-                {column.links.map((link) => (
-                  <li key={link}>
-                    <a
-                      href="#"
-                      className="font-body text-xs text-coffee-soft transition-colors duration-300 hover:text-gold"
-                    >
-                      {link}
-                    </a>
+                {column.links
+                  .filter((link) => !(link.page === 'admin' && !ehAdmin))
+                  .map((link) => (
+                  <li key={link.label}>
+                    {link.page ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onNavegar?.(link.page)
+                          window.scrollTo({ top: 0, behavior: 'smooth' })
+                        }}
+                        className="font-body text-xs text-coffee-soft transition-colors duration-300 hover:text-gold text-left"
+                      >
+                        {link.label}
+                      </button>
+                    ) : (
+                      <span className="font-body text-xs text-coffee-soft/80 cursor-default">
+                        {link.label}
+                      </span>
+                    )}
                   </li>
                 ))}
               </ul>

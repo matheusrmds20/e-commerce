@@ -1,26 +1,42 @@
 import api from './client'
 
 /**
- * Endpoints de usuários (dados da conta).
+ * Endpoints de usuários e gestão de clientes.
  *
  * Contrato do backend (FastAPI):
- *   PATCH /users/update/{id}                          -> UserResponse
- *   POST  /users/change_password/{id}/change-password -> { message }
- *
- * AUTENTICAÇÃO: todas as rotas exigem Bearer token e só aceitam o próprio
- * usuário (ou admin). O `user_id` do token é usado pelo backend — o ID na
- * URL precisa ser o do usuário autenticado.
- *
- * Erros relevantes:
- *   - `atualizar`: 409 `EMAIL_ALREADY_EXISTS` (e-mail em uso), 422 (validação).
- *   - `alterarSenha`: 400 `INVALID_CURRENT_PASSWORD` (senha atual incorreta),
- *     422 (nova senha: mín. 8 caracteres, ao menos uma letra e um dígito).
+ *   GET    /admin/users                               -> AdminUserResponse[]
+ *   GET    /users/user_id/{id}                        -> UserResponse
+ *   POST   /users/create                              -> UserResponse (AdminUserCreate | CustomerUserCreate)
+ *   PATCH  /users/update/{id}                         -> UserResponse
+ *   DELETE /users/delete/{id}                         -> UserResponse (desativação / soft delete)
+ *   POST   /users/change_password/{id}/change-password -> { message }
  */
 export const userService = {
+  /** Lista todos os usuários cadastrados (via endpoint administrativo). */
+  async listar() {
+    const { data } = await api.get('/admin/users')
+    return data
+  },
+
+  /** Busca os detalhes de um usuário por ID. */
+  async obter(userId) {
+    const { data } = await api.get(`/users/user_id/${userId}`)
+    return data
+  },
+
   /**
-   * Atualiza os dados do usuário autenticado.
+   * Cria um novo usuário (cliente ou administrador).
+   * @param {{ email: string, full_name: string, password: string, role?: 'customer'|'admin' }} payload
+   */
+  async criar(payload) {
+    const { data } = await api.post('/users/create', payload)
+    return data
+  },
+
+  /**
+   * Atualiza os dados de um usuário (nome, e-mail, senha opcional).
    * @param {number} userId
-   * @param {{ full_name?: string, email?: string }} dados
+   * @param {{ full_name?: string, email?: string, password?: string, role?: 'customer'|'admin' }} dados
    * @returns {Promise<object>} UserResponse
    */
   async atualizar(userId, dados) {
@@ -29,7 +45,16 @@ export const userService = {
   },
 
   /**
-   * Altera a senha do usuário autenticado.
+   * Desativa/exclui um usuário do sistema.
+   * @param {number} userId
+   */
+  async excluir(userId) {
+    const { data } = await api.delete(`/users/delete/${userId}`)
+    return data
+  },
+
+  /**
+   * Altera a senha do usuário.
    * @param {number} userId
    * @param {{ current_password: string, new_password: string }} payload
    * @returns {Promise<{ message: string }>}

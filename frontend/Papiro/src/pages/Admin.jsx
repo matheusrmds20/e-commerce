@@ -1,10 +1,13 @@
 import { useState, useMemo, useEffect } from 'react'
+import { useAuth } from '../context/auth-context'
 import { CloseIcon, SearchIcon } from '../components/Icons'
 import ModalCupom from '../components/ModalCupom'
 import ModalCategoria from '../components/ModalCategoria'
+import ModalUsuario from '../components/ModalUsuario'
 import productService from '../api/products'
 import categoryService from '../api/categories'
 import adminService from '../api/admin'
+import userService from '../api/users'
 import couponService from '../api/coupons'
 import newsletterService from '../api/newsletter'
 
@@ -63,8 +66,10 @@ const LIVROS_FALLBACK = [
     categoria: 'Ficção Clássica',
     categoryId: 1,
     preco: 148.0,
+    desconto: 0,
     estoque: 1,
     destaque: true,
+    bestseller: true,
   },
   {
     id: 2,
@@ -73,8 +78,10 @@ const LIVROS_FALLBACK = [
     categoria: 'Ficção Internacional',
     categoryId: 1,
     preco: 165.0,
+    desconto: 0,
     estoque: 2,
     destaque: false,
+    bestseller: false,
   },
   {
     id: 3,
@@ -83,8 +90,10 @@ const LIVROS_FALLBACK = [
     categoria: 'Poesia Épica',
     categoryId: 2,
     preco: 290.0,
+    desconto: 10,
     estoque: 3,
     destaque: true,
+    bestseller: true,
   },
   {
     id: 4,
@@ -93,8 +102,10 @@ const LIVROS_FALLBACK = [
     categoria: 'Literatura Brasileira',
     categoryId: 1,
     preco: 189.9,
+    desconto: 0,
     estoque: 14,
     destaque: true,
+    bestseller: true,
   },
   {
     id: 5,
@@ -103,8 +114,10 @@ const LIVROS_FALLBACK = [
     categoria: 'Realismo Fantástico',
     categoryId: 1,
     preco: 120.0,
+    desconto: 15,
     estoque: 8,
     destaque: false,
+    bestseller: true,
   },
 ]
 
@@ -162,6 +175,9 @@ function formatarStatus(st) {
 }
 
 export default function Admin({ onVoltarParaLoja }) {
+  const { usuario } = useAuth()
+  const ehAdmin = usuario?.role === 'admin'
+
   const [abaAtiva, setAbaAtiva] = useState('visao-geral')
   const [termoBusca, setTermoBusca] = useState('')
   const [pedidos, setPedidos] = useState(PEDIDOS_FALLBACK)
@@ -184,16 +200,24 @@ export default function Admin({ onVoltarParaLoja }) {
   const [modalCategoria, setModalCategoria] = useState(false)
   const [salvandoLivro, setSalvandoLivro] = useState(false)
   const [modalCupom, setModalCupom] = useState(false)
+  // Estados de Usuários
+  const [modalUsuario, setModalUsuario] = useState(false)
+  const [usuarioEditando, setUsuarioEditando] = useState(null)
+  const [filtroRoleUsuario, setFiltroRoleUsuario] = useState('todos')
   // Form novo livro
   const [novoTitulo, setNovoTitulo] = useState('')
   const [novoAutor, setNovoAutor] = useState('')
   const [novaCategoriaId, setNovaCategoriaId] = useState(1)
   const [novoDescricao, setNovoDescricao] = useState('')
   const [novoPreco, setNovoPreco] = useState('')
+  const [novoDesconto, setNovoDesconto] = useState('')
   const [novoEstoque, setNovoEstoque] = useState('')
+  const [novoDestaque, setNovoDestaque] = useState(false)
+  const [novoBestseller, setNovoBestseller] = useState(false)
 
   // Carrega dados da API ao montar
   useEffect(() => {
+    if (!ehAdmin) return
     let ativo = true
 
     async function carregarTudo() {
@@ -214,8 +238,10 @@ export default function Admin({ onVoltarParaLoja }) {
             categoria: p.category_name || (p.category_id ? `Categoria #${p.category_id}` : 'Geral'),
             categoryId: p.category_id || 1,
             preco: Number(p.price) || 0,
+            desconto: p.discount_pct != null ? Number(p.discount_pct) : 0,
             estoque: p.stock_qty ?? 0,
             destaque: Boolean(p.is_featured),
+            bestseller: Boolean(p.is_bestseller),
           }))
           setLivros(formatados)
         }
@@ -276,6 +302,7 @@ export default function Admin({ onVoltarParaLoja }) {
   const fecharModalLivro = () => {
     setModalNovoLivro(false)
     setLivroEditando(null)
+    setNovoDesconto('')
   }
 
   // Abre o modal em modo criação (limpa o livro em edição)
@@ -286,7 +313,10 @@ export default function Admin({ onVoltarParaLoja }) {
     setNovaCategoriaId(categorias[0]?.id ?? 1)
     setNovoDescricao('')
     setNovoPreco('')
+    setNovoDesconto('')
     setNovoEstoque('')
+    setNovoDestaque(false)
+    setNovoBestseller(false)
     setModalNovoLivro(true)
   }
 
@@ -298,7 +328,14 @@ export default function Admin({ onVoltarParaLoja }) {
     setNovaCategoriaId(livro.categoryId || categorias[0]?.id || 1)
     setNovoDescricao('')
     setNovoPreco(livro.preco != null ? String(livro.preco) : '')
+    setNovoDesconto(
+      livro.desconto != null && livro.desconto > 0
+        ? String(livro.desconto)
+        : (livro.discount_pct != null && livro.discount_pct > 0 ? String(livro.discount_pct) : '')
+    )
     setNovoEstoque(livro.estoque != null ? String(livro.estoque) : '')
+    setNovoDestaque(Boolean(livro.destaque))
+    setNovoBestseller(Boolean(livro.bestseller))
     setModalNovoLivro(true)
   }
 
@@ -314,6 +351,10 @@ export default function Admin({ onVoltarParaLoja }) {
     const precoNum = parseFloat(novoPreco) || 0
     const estoqueNum = parseInt(novoEstoque, 10) || 1
     const catId = Number(novaCategoriaId) || 1
+    const descontoNum =
+      novoDesconto !== '' && novoDesconto != null
+        ? Math.min(100, Math.max(0, parseInt(novoDesconto, 10) || 0))
+        : null
 
     try {
       if (livroEditando) {
@@ -321,8 +362,11 @@ export default function Admin({ onVoltarParaLoja }) {
           title: novoTitulo.trim(),
           author: novoAutor.trim(),
           price: precoNum,
+          discount_pct: descontoNum,
           stock_qty: estoqueNum,
           category_id: catId,
+          is_featured: novoDestaque,
+          is_bestseller: novoBestseller,
         }
         if (novoDescricao.trim()) payload.description = novoDescricao.trim()
 
@@ -336,7 +380,10 @@ export default function Admin({ onVoltarParaLoja }) {
           categoria: resp?.category_name ?? categoriaNome,
           categoryId: catId,
           preco: resp?.price != null ? Number(resp.price) : precoNum,
+          desconto: resp?.discount_pct != null ? Number(resp.discount_pct) : (descontoNum ?? 0),
           estoque: resp?.stock_qty != null ? resp.stock_qty : estoqueNum,
+          destaque: resp?.is_featured != null ? Boolean(resp.is_featured) : novoDestaque,
+          bestseller: resp?.is_bestseller != null ? Boolean(resp.is_bestseller) : novoBestseller,
         }
         setLivros((prev) =>
           prev.map((l) => (l.id === livroEditando.id ? atualizado : l)),
@@ -350,11 +397,12 @@ export default function Admin({ onVoltarParaLoja }) {
           slug: slug,
           description: desc,
           price: precoNum,
+          discount_pct: descontoNum,
           author: novoAutor.trim(),
           stock_qty: estoqueNum,
           is_active: true,
-          is_featured: false,
-          is_bestseller: false,
+          is_featured: novoDestaque,
+          is_bestseller: novoBestseller,
         }
 
         const resp = await productService.criar(payload)
@@ -368,8 +416,10 @@ export default function Admin({ onVoltarParaLoja }) {
           categoria: categoriaNome,
           categoryId: catId,
           preco: precoNum,
+          desconto: resp?.discount_pct != null ? Number(resp.discount_pct) : (descontoNum ?? 0),
           estoque: estoqueNum,
-          destaque: false,
+          destaque: resp?.is_featured != null ? Boolean(resp.is_featured) : novoDestaque,
+          bestseller: resp?.is_bestseller != null ? Boolean(resp.is_bestseller) : novoBestseller,
         }
         setLivros((prev) => [novoLivroObj, ...prev])
       }
@@ -378,7 +428,10 @@ export default function Admin({ onVoltarParaLoja }) {
       setNovoAutor('')
       setNovoDescricao('')
       setNovoPreco('')
+      setNovoDesconto('')
       setNovoEstoque('')
+      setNovoDestaque(false)
+      setNovoBestseller(false)
       setLivroEditando(null)
       setModalNovoLivro(false)
     } catch {
@@ -527,6 +580,78 @@ export default function Admin({ onVoltarParaLoja }) {
     }
   }
 
+  // ===================== Usuários / Leitores =====================
+
+  // Recarrega a lista de usuários do backend
+  const recarregarUsuarios = async () => {
+    const usuariosApi = await userService.listar().catch(() => [])
+    if (Array.isArray(usuariosApi) && usuariosApi.length > 0) {
+      setClientes(usuariosApi)
+    }
+  }
+
+  // Abre o modal de usuário em modo criação
+  const handleNovoUsuario = () => {
+    setUsuarioEditando(null)
+    setModalUsuario(true)
+  }
+
+  // Abre o modal de usuário em modo edição
+  const handleEditarUsuario = (usuario) => {
+    setUsuarioEditando(usuario)
+    setModalUsuario(true)
+  }
+
+  // Cria ou atualiza um usuário
+  const handleSalvarUsuario = async (payload, usuarioId) => {
+    if (usuarioId) {
+      const resp = await userService.atualizar(usuarioId, payload).catch(() => null)
+      setClientes((prev) =>
+        prev.map((u) =>
+          u.id === usuarioId
+            ? {
+                ...u,
+                full_name: payload.full_name,
+                email: payload.email,
+                role: payload.role,
+                is_active: payload.is_active,
+                ...(resp || {}),
+              }
+            : u,
+        ),
+      )
+    } else {
+      const resp = await userService.criar(payload).catch(() => null)
+      const novoId = resp?.id || Date.now()
+      const novoObj = {
+        id: novoId,
+        full_name: payload.full_name,
+        email: payload.email,
+        role: payload.role || 'customer',
+        is_active: payload.is_active !== false,
+        orders_count: 0,
+        created_at: new Date().toISOString(),
+      }
+      setClientes((prev) => [novoObj, ...prev])
+    }
+    await recarregarUsuarios().catch(() => null)
+  }
+
+  // Desativa / exclui um usuário
+  const handleExcluirUsuario = async (usuario) => {
+    const acao = usuario.is_active === false ? 'remover' : 'desativar'
+    if (!window.confirm(`Deseja realmente ${acao} o usuário "${usuario.full_name}"?`)) return
+    try {
+      await userService.excluir(usuario.id).catch(() => null)
+      setClientes((prev) =>
+        prev.map((u) => (u.id === usuario.id ? { ...u, is_active: false } : u)),
+      )
+      await recarregarUsuarios().catch(() => null)
+    } catch (err) {
+      setErroAviso(err.message || 'Erro ao desativar o usuário.')
+    }
+  }
+
   // Atualizar status do pedido
   const handleAtualizarStatusPedido = async (rawId, idFormatted, novoStatus) => {
     try {
@@ -569,14 +694,20 @@ export default function Admin({ onVoltarParaLoja }) {
   }, [pedidos, termoBusca])
 
   const clientesFiltrados = useMemo(() => {
-    if (!termoBusca.trim()) return clientes
+    let lista = [...clientes]
+    if (filtroRoleUsuario !== 'todos') {
+      lista = lista.filter((c) => c.role === filtroRoleUsuario)
+    }
+    if (!termoBusca.trim()) return lista
     const busca = termoBusca.toLowerCase()
-    return clientes.filter(
+    return lista.filter(
       (c) =>
+        String(c.id).includes(busca) ||
         c.full_name?.toLowerCase().includes(busca) ||
-        c.email?.toLowerCase().includes(busca)
+        c.email?.toLowerCase().includes(busca) ||
+        c.role?.toLowerCase().includes(busca)
     )
-  }, [clientes, termoBusca])
+  }, [clientes, termoBusca, filtroRoleUsuario])
 
   const cuponsFiltrados = useMemo(() => {
     if (!termoBusca.trim()) return cupons
@@ -612,6 +743,30 @@ export default function Admin({ onVoltarParaLoja }) {
     pedidos.filter((p) => p.status === 'pending' || p.status === 'processing' || p.status === 'separacao' || p.status === 'aguardando').length
   const totalObrasCount = statsApi?.total_products ?? livros.length
   const ticketMedio = statsApi?.average_ticket ?? (totalPedidosCount > 0 ? faturamento / totalPedidosCount : 0)
+
+  // Defesa extra: só administradores veem o painel. (App.jsx já bloqueia a rota;
+  // aqui garantimos que, mesmo montado por engano, nada de dados admin é exibido.)
+  if (!ehAdmin) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-cream-deep px-4 text-center">
+        <div>
+          <p className="font-display text-xl font-medium text-coffee">
+            Acesso restrito a administradores
+          </p>
+          <p className="mt-2 font-body text-sm text-coffee-faint">
+            Você não tem permissão para visualizar o painel administrativo.
+          </p>
+          <button
+            type="button"
+            onClick={onVoltarParaLoja}
+            className="mt-5 px-4 py-2 font-body text-sm text-cream bg-forest hover:bg-forest-soft"
+          >
+            Voltar para a loja
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="flex min-h-screen bg-cream-deep text-coffee">
@@ -829,18 +984,23 @@ export default function Admin({ onVoltarParaLoja }) {
 
               <button
                 type="button"
-                onClick={() =>
-                  abaAtiva === 'descontos'
-                    ? handleNovoCupom()
-                    : abaAtiva === 'categorias'
-                      ? handleNovaCategoria()
-                      : handleNovoLivro()
-                }
-                hidden={abaAtiva === 'newsletter'}
+                onClick={() => {
+                  if (abaAtiva === 'descontos') handleNovoCupom()
+                  else if (abaAtiva === 'categorias') handleNovaCategoria()
+                  else if (abaAtiva === 'clientes') handleNovoUsuario()
+                  else handleNovoLivro()
+                }}
+                hidden={abaAtiva === 'newsletter' || abaAtiva === 'pedidos'}
                 className="px-4 py-2 bg-forest hover:bg-forest-soft text-cream text-xs uppercase tracking-wider font-semibold rounded-sm transition-colors flex items-center gap-2 shadow-sm"
               >
                 <span className="text-gold font-bold text-base leading-none">+</span>
-                {abaAtiva === 'descontos' ? 'Novo Cupom' : abaAtiva === 'categorias' ? 'Nova Categoria' : 'Novo Livro'}
+                {abaAtiva === 'descontos'
+                  ? 'Novo Cupom'
+                  : abaAtiva === 'categorias'
+                    ? 'Nova Categoria'
+                    : abaAtiva === 'clientes'
+                      ? 'Novo Usuário'
+                      : 'Novo Livro'}
               </button>
             </div>
           )}
@@ -1099,6 +1259,7 @@ export default function Admin({ onVoltarParaLoja }) {
                       <th className="py-3.5 px-6 font-semibold">Autor</th>
                       <th className="py-3.5 px-6 font-semibold">Categoria</th>
                       <th className="py-3.5 px-6 font-semibold">Preço</th>
+                      <th className="py-3.5 px-6 font-semibold">Desconto</th>
                       <th className="py-3.5 px-6 font-semibold">Estoque</th>
                       <th className="py-3.5 px-6 font-semibold text-right">Ações</th>
                     </tr>
@@ -1113,6 +1274,11 @@ export default function Admin({ onVoltarParaLoja }) {
                               Destaque
                             </span>
                           )}
+                          {livro.bestseller && (
+                            <span className="ml-1.5 text-[0.65rem] uppercase tracking-wider px-2 py-0.5 bg-forest-tint text-forest rounded font-body font-semibold">
+                              Mais Vendido
+                            </span>
+                          )}
                         </td>
                         <td className="py-4 px-6 text-xs text-coffee-soft">{livro.autor}</td>
                         <td className="py-4 px-6 text-xs">
@@ -1122,6 +1288,15 @@ export default function Admin({ onVoltarParaLoja }) {
                         </td>
                         <td className="py-4 px-6 font-display font-bold text-coffee">
                           R$ {Number(livro.preco).toFixed(2).replace('.', ',')}
+                        </td>
+                        <td className="py-4 px-6">
+                          {livro.desconto > 0 ? (
+                            <span className="text-xs font-semibold px-2 py-0.5 rounded bg-caramel/20 text-caramel-dark">
+                              {livro.desconto}% OFF
+                            </span>
+                          ) : (
+                            <span className="text-xs text-coffee-faint">—</span>
+                          )}
                         </td>
                         <td className="py-4 px-6">
                           <span
@@ -1238,17 +1413,65 @@ export default function Admin({ onVoltarParaLoja }) {
             </section>
           )}
 
-          {/* ===================== ABA: CLIENTES ===================== */}
+          {/* ===================== ABA: GESTÃO DE USUÁRIOS (CRUD) ===================== */}
           {abaAtiva === 'clientes' && (
             <section className="bg-cream-soft rounded-sm border border-line shadow-sm overflow-hidden">
-              <div className="p-6 border-b border-line flex justify-between items-center">
+              <div className="p-6 border-b border-line flex flex-wrap justify-between items-center gap-4">
                 <div>
                   <h3 className="font-display text-xl font-bold text-coffee">
-                    Leitores & Clientes Cadastrados
+                    Gestão de Leitores & Usuários
                   </h3>
                   <p className="font-body text-xs text-coffee-faint">
-                    {clientesFiltrados.length} leitores registrados no sistema
+                    {clientesFiltrados.length} usuário(s) encontrado(s) no sistema
                   </p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-3">
+                  {/* Filtro por perfil */}
+                  <div className="flex items-center gap-1 bg-cream-deep p-1 rounded border border-line-strong">
+                    <button
+                      type="button"
+                      onClick={() => setFiltroRoleUsuario('todos')}
+                      className={`px-3 py-1 text-xs font-semibold uppercase tracking-wider rounded transition-colors ${
+                        filtroRoleUsuario === 'todos'
+                          ? 'bg-forest text-cream shadow-xs'
+                          : 'text-coffee-faint hover:text-coffee'
+                      }`}
+                    >
+                      Todos ({clientes.length})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFiltroRoleUsuario('customer')}
+                      className={`px-3 py-1 text-xs font-semibold uppercase tracking-wider rounded transition-colors ${
+                        filtroRoleUsuario === 'customer'
+                          ? 'bg-forest text-cream shadow-xs'
+                          : 'text-coffee-faint hover:text-coffee'
+                      }`}
+                    >
+                      Leitores ({clientes.filter((c) => c.role === 'customer').length})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFiltroRoleUsuario('admin')}
+                      className={`px-3 py-1 text-xs font-semibold uppercase tracking-wider rounded transition-colors ${
+                        filtroRoleUsuario === 'admin'
+                          ? 'bg-forest text-cream shadow-xs'
+                          : 'text-coffee-faint hover:text-coffee'
+                      }`}
+                    >
+                      Curadores/Admin ({clientes.filter((c) => c.role === 'admin').length})
+                    </button>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleNovoUsuario}
+                    className="px-4 py-2 bg-forest text-cream text-xs uppercase tracking-wider font-semibold rounded-sm hover:bg-forest-soft transition-colors flex items-center gap-1.5 shadow-sm"
+                  >
+                    <span className="text-gold font-bold text-base leading-none">+</span>
+                    Novo Usuário
+                  </button>
                 </div>
               </div>
 
@@ -1256,42 +1479,106 @@ export default function Admin({ onVoltarParaLoja }) {
                 <table className="w-full text-left font-body text-sm">
                   <thead className="bg-cream-tint/60 text-[0.72rem] uppercase tracking-[0.16em] text-coffee-faint border-b border-line">
                     <tr>
-                      <th className="py-3.5 px-6 font-semibold">ID</th>
-                      <th className="py-3.5 px-6 font-semibold">Nome Completo</th>
+                      <th className="py-3.5 px-6 font-semibold">Leitor / Usuário</th>
                       <th className="py-3.5 px-6 font-semibold">E-mail</th>
                       <th className="py-3.5 px-6 font-semibold">Perfil</th>
+                      <th className="py-3.5 px-6 font-semibold">Status</th>
                       <th className="py-3.5 px-6 font-semibold">Pedidos</th>
-                      <th className="py-3.5 px-6 font-semibold text-right">Cadastro</th>
+                      <th className="py-3.5 px-6 font-semibold">Cadastro</th>
+                      <th className="py-3.5 px-6 font-semibold text-right">Ações</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-line text-coffee-soft">
-                    {clientesFiltrados.map((cli) => (
-                      <tr key={cli.id} className="hover:bg-cream-deep/40 transition-colors">
-                        <td className="py-4 px-6 font-mono text-xs text-coffee">#{cli.id}</td>
-                        <td className="py-4 px-6 font-medium text-coffee">{cli.full_name}</td>
-                        <td className="py-4 px-6 text-xs text-coffee-faint">{cli.email}</td>
-                        <td className="py-4 px-6">
-                          <span
-                            className={`text-xs uppercase tracking-wider font-semibold px-2 py-0.5 rounded ${
-                              cli.role === 'admin'
-                                ? 'bg-forest text-cream'
-                                : 'bg-cream-deep text-coffee-soft'
-                            }`}
-                          >
-                            {cli.role}
-                          </span>
-                        </td>
-                        <td className="py-4 px-6 text-xs font-semibold text-coffee">
-                          {cli.orders_count || 0} pedido(s)
-                        </td>
-                        <td className="py-4 px-6 text-right text-xs text-coffee-faint">
-                          {cli.created_at ? new Date(cli.created_at).toLocaleDateString('pt-BR') : '-'}
-                        </td>
-                      </tr>
-                    ))}
+                    {clientesFiltrados.map((cli) => {
+                      const iniciais = (cli.full_name || 'U')
+                        .split(' ')
+                        .filter(Boolean)
+                        .map((n) => n[0])
+                        .slice(0, 2)
+                        .join('')
+                        .toUpperCase()
+
+                      return (
+                        <tr key={cli.id} className="hover:bg-cream-deep/40 transition-colors">
+                          <td className="py-4 px-6">
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-full bg-forest text-gold flex items-center justify-center font-bold text-xs shrink-0 shadow-xs">
+                                {iniciais}
+                              </div>
+                              <div>
+                                <p className="font-display font-bold text-coffee text-base leading-tight">
+                                  {cli.full_name}
+                                </p>
+                                <p className="font-mono text-[0.7rem] text-coffee-faint">
+                                  ID #{cli.id}
+                                </p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="py-4 px-6 text-xs text-coffee-soft">{cli.email}</td>
+                          <td className="py-4 px-6">
+                            <span
+                              className={`text-[0.68rem] uppercase tracking-wider font-semibold px-2 py-0.5 rounded ${
+                                cli.role === 'admin'
+                                  ? 'bg-forest text-cream'
+                                  : 'bg-gold/20 text-gold-dark'
+                              }`}
+                            >
+                              {cli.role === 'admin' ? 'Curador (Admin)' : 'Leitor (Cliente)'}
+                            </span>
+                          </td>
+                          <td className="py-4 px-6">
+                            <span
+                              className={`text-[0.68rem] uppercase tracking-wider font-semibold px-2 py-0.5 rounded ${
+                                cli.is_active !== false
+                                  ? 'bg-forest-tint text-forest'
+                                  : 'bg-red-100 text-red-700'
+                              }`}
+                            >
+                              {cli.is_active !== false ? 'Ativo' : 'Inativo'}
+                            </span>
+                          </td>
+                          <td className="py-4 px-6 text-xs font-semibold text-coffee">
+                            {cli.orders_count || 0} pedido(s)
+                          </td>
+                          <td className="py-4 px-6 text-xs text-coffee-faint">
+                            {cli.created_at ? new Date(cli.created_at).toLocaleDateString('pt-BR') : '-'}
+                          </td>
+                          <td className="py-4 px-6 text-right">
+                            <div className="flex justify-end gap-3">
+                              <button
+                                type="button"
+                                onClick={() => handleEditarUsuario(cli)}
+                                className="text-xs text-forest hover:text-forest-soft font-medium transition-colors"
+                              >
+                                Editar
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleExcluirUsuario(cli)}
+                                className="text-xs text-red-700 hover:text-red-900 font-medium transition-colors"
+                              >
+                                {cli.is_active === false ? 'Excluir' : 'Desativar'}
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>
+
+              {clientesFiltrados.length === 0 && (
+                <div className="p-12 text-center">
+                  <p className="font-display text-lg text-coffee">
+                    Nenhum usuário encontrado
+                  </p>
+                  <p className="mt-1 font-body text-xs text-coffee-faint">
+                    Tente ajustar o termo da busca ou o filtro de perfil.
+                  </p>
+                </div>
+              )}
             </section>
           )}
 
@@ -1606,7 +1893,7 @@ export default function Admin({ onVoltarParaLoja }) {
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs uppercase tracking-wider font-semibold text-coffee-soft mb-1">
                     Categoria
@@ -1651,6 +1938,21 @@ export default function Admin({ onVoltarParaLoja }) {
 
                 <div>
                   <label className="block text-xs uppercase tracking-wider font-semibold text-coffee-soft mb-1">
+                    Desconto (%)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    placeholder="0"
+                    value={novoDesconto}
+                    onChange={(e) => setNovoDesconto(e.target.value)}
+                    className="w-full campo py-2"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs uppercase tracking-wider font-semibold text-coffee-soft mb-1">
                     Estoque *
                   </label>
                   <input
@@ -1663,6 +1965,28 @@ export default function Admin({ onVoltarParaLoja }) {
                     className="w-full campo py-2"
                   />
                 </div>
+              </div>
+
+              {/* Flags de Curadoria */}
+              <div className="flex flex-wrap gap-6 pt-4 border-t border-line/60">
+                <label className="flex items-center gap-2.5 cursor-pointer text-xs uppercase tracking-wider font-semibold text-coffee-soft hover:text-coffee">
+                  <input
+                    type="checkbox"
+                    checked={novoDestaque}
+                    onChange={(e) => setNovoDestaque(e.target.checked)}
+                    className="h-4 w-4 rounded border-line-strong text-forest focus:ring-forest"
+                  />
+                  <span>Marcar como Destaque</span>
+                </label>
+                <label className="flex items-center gap-2.5 cursor-pointer text-xs uppercase tracking-wider font-semibold text-coffee-soft hover:text-coffee">
+                  <input
+                    type="checkbox"
+                    checked={novoBestseller}
+                    onChange={(e) => setNovoBestseller(e.target.checked)}
+                    className="h-4 w-4 rounded border-line-strong text-forest focus:ring-forest"
+                  />
+                  <span>Marcar como Mais Vendido (Best-Seller)</span>
+                </label>
               </div>
 
               <div className="flex justify-end gap-3 pt-4 border-t border-line mt-6">
@@ -1708,6 +2032,15 @@ export default function Admin({ onVoltarParaLoja }) {
           onClose={() => setModalCategoria(false)}
           onSalvar={handleSalvarCategoria}
           categoriaParaEditar={categoriaEditando}
+        />
+      )}
+
+      {/* Modal: Novo/Editar Usuário */}
+      {modalUsuario && (
+        <ModalUsuario
+          onClose={() => setModalUsuario(false)}
+          onSalvar={handleSalvarUsuario}
+          usuarioParaEditar={usuarioEditando}
         />
       )}
     </div>

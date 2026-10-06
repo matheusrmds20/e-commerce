@@ -8,15 +8,20 @@ import DetalheLivro from './pages/DetalheLivro'
 import Carrinho from './pages/Carrinho'
 import Checkout from './pages/Checkout'
 import Acervo from './pages/Acervo'
+import MaisVendidos from './pages/MaisVendidos'
+import SobreNos from './pages/SobreNos'
 import Admin from './pages/Admin'
 import MinhaConta from './pages/MinhaConta'
 import PaginaRetornoPagamento from './components/PaginaRetornoPagamento'
 
+import { useAuth } from './context/auth-context'
 import { useCart } from './context/cart-context'
 
 const PAGINAS = [
   'home',
   'acervo',
+  'mais-vendidos',
+  'sobre',
   'detalhe',
   'carrinho',
   'checkout',
@@ -45,8 +50,12 @@ function detectarRetornoPagamento() {
 }
 
 export default function App() {
+  const { usuario } = useAuth()
+  const ehAdmin = usuario?.role === 'admin'
+
   const [pagina, setPagina] = useState('home')
   const [produtoId, setProdutoId] = useState(null)
+  const [termoBuscaGlobal, setTermoBuscaGlobal] = useState('')
   // Congela o resultado do retorno na montagem: o polling não deve ser
   // reiniciado a cada re-render (e a URL pode ter a query limpa depois).
   const [retornoPagamento] = useState(detectarRetornoPagamento)
@@ -73,6 +82,13 @@ export default function App() {
     setPagina('detalhe')
   }
 
+  /** Dispara uma busca da Navbar e redireciona para o Acervo com o termo */
+  const handleBuscar = (termo) => {
+    setTermoBuscaGlobal(termo)
+    setPagina('acervo')
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
   const renderizar = () => {
     if (retornoPagamento)
       return (
@@ -81,7 +97,11 @@ export default function App() {
           onVoltarParaLoja={voltarParaLoja}
         />
       )
-    if (pagina === 'admin') return <Admin onVoltarParaLoja={() => setPagina('home')} />
+    if (pagina === 'admin') {
+      // Só administradores podem abrir o painel; qualquer outro cai na loja.
+      if (!ehAdmin) return <Home onAbrirLivro={abrirLivro} onExplorarAcervo={() => setPagina('acervo')} />
+      return <Admin onVoltarParaLoja={() => setPagina('home')} />
+    }
     if (pagina === 'login') return <Login onEntrar={() => setPagina('home')} onRegistrar={() => setPagina('registro')} />
     if (pagina === 'registro')
       return (
@@ -92,7 +112,29 @@ export default function App() {
       )
     if (pagina === 'minhaconta')
       return <MinhaConta onIrParaLogin={() => setPagina('login')} />
-    if (pagina === 'acervo') return <Acervo onAbrirLivro={abrirLivro} />
+    if (pagina === 'acervo')
+      return (
+        <Acervo
+          onAbrirLivro={abrirLivro}
+          termoInicial={termoBuscaGlobal}
+          onLimparBuscaInicial={() => setTermoBuscaGlobal('')}
+        />
+      )
+    if (pagina === 'mais-vendidos')
+      return (
+        <MaisVendidos
+          onAbrirLivro={abrirLivro}
+          onExplorarAcervo={() => setPagina('acervo')}
+          onVoltarHome={() => setPagina('home')}
+        />
+      )
+    if (pagina === 'sobre')
+      return (
+        <SobreNos
+          onExplorarAcervo={() => setPagina('acervo')}
+          onVoltarHome={() => setPagina('home')}
+        />
+      )
     if (pagina === 'detalhe')
       return <DetalheLivro productId={produtoId ?? 1} />
     if (pagina === 'carrinho')
@@ -111,7 +153,11 @@ export default function App() {
     <div className="flex min-h-svh flex-col">
       {pagina !== 'admin' && !retornoPagamento && (
         <Navbar
-          onNavegar={setPagina}
+          onNavegar={(p) => {
+            if (p !== 'acervo') setTermoBuscaGlobal('')
+            setPagina(p)
+          }}
+          onBuscar={handleBuscar}
           totalItens={totalItens}
           simples={pagina === 'login' || pagina === 'registro'}
         />
@@ -119,12 +165,12 @@ export default function App() {
 
       <div className="flex-1">{renderizar()}</div>
 
-      {pagina !== 'admin' && !retornoPagamento && <Footer />}
+      {pagina !== 'admin' && !retornoPagamento && <Footer onNavegar={setPagina} />}
 
       {/* Alternador temporário — remover ao adicionar o roteador */}
       {!retornoPagamento && (
         <nav className="fixed bottom-5 right-5 z-40 flex gap-1 bg-forest p-1 shadow-lg">
-          {PAGINAS.map((nome) => (
+          {PAGINAS.filter((nome) => !(nome === 'admin' && !ehAdmin)).map((nome) => (
             <button
               key={nome}
               type="button"

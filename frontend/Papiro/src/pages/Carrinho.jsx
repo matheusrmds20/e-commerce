@@ -29,10 +29,7 @@ export default function Carrinho({ onCheckout, onIrParaLogin }) {
   const [acaoErro, setAcaoErro] = useState(null)
 
   // Totais derivados dos itens atuais (frete grátis a partir de R$ 150).
-  const { subtotal, frete, total } = useMemo(
-    () => calcularTotais(itens),
-    [itens],
-  )
+  const { subtotal, total } = useMemo(() => calcularTotais(itens), [itens])
 
   // Busca recomendações no catálogo real.
   useEffect(() => {
@@ -144,7 +141,6 @@ export default function Carrinho({ onCheckout, onIrParaLogin }) {
             {/* Resumo */}
             <ResumoCarrinho
               subtotal={subtotal}
-              frete={frete}
               total={total}
               formatarPreco={formatarPreco}
               onCheckout={onCheckout}
