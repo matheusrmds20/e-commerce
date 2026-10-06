@@ -5,32 +5,42 @@ import {
   useState,
 } from 'react'
 import authService from '../api/auth'
-import { getToken, toApiError } from '../api/client'
+import { toApiError } from '../api/client'
 import AuthContext from './auth-context'
 
 /**
  * AuthProvider — guarda o usuário logado e expõe as ações de autenticação.
  *
- * Ao montar, se houver token salvo, tenta restaurar a sessão via GET /auth/me.
- * Enquanto isso, `carregando` fica true para evitar telas piscando.
+ * Ao montar, tenta restaurar a sessão: como o access token vive só em memória
+ * (se perde num F5), fazemos refresh silencioso (POST /auth/refresh via cookie
+ * httpOnly) e depois GET /auth/me. Enquanto isso, `carregando` fica true para
+ * evitar telas piscando.
  */
 export function AuthProvider({ children }) {
   const [usuario, setUsuario] = useState(null)
-  const [carregando, setCarregando] = useState(() => Boolean(getToken()))
+  // Começa true para permitir o refresh silencioso no load (mesmo sem access).
+  const [carregando, setCarregando] = useState(true)
 
   useEffect(() => {
     let ativo = true
 
     async function restaurarSessao() {
-      if (!getToken()) {
-        setCarregando(false)
-        return
-      }
       try {
+        // 1) Garante access válido (renova via cookie se estiver fora de
+        //    memória). Se não houver sessão, interrompe sem erro.
+        const renovou = await authService.restaurarSessaoViaRefresh()
+        if (!renovou) {
+          if (ativo) {
+            setUsuario(null)
+            setCarregando(false)
+          }
+          return
+        }
+        // 2) Busca o perfil do usuário com o access renovado.
         const dados = await authService.me()
         if (ativo) setUsuario(dados)
       } catch {
-        // Token inválido/expirado — o interceptor já limpou o token.
+        // Sessão inválida/expirada — interceptor já limpou a memória.
         if (ativo) setUsuario(null)
       } finally {
         if (ativo) setCarregando(false)
@@ -51,8 +61,8 @@ export function AuthProvider({ children }) {
     return dados
   }, [])
 
-  const logout = useCallback(() => {
-    authService.logout()
+  const logout = useCallback(async () => {
+    await authService.logout()
     setUsuario(null)
   }, [])
 

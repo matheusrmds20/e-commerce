@@ -1,12 +1,15 @@
-import api, { clearToken, setToken } from './client'
+import api, { clearToken, ensureAccessToken, setToken } from './client'
 
 /**
  * Endpoints de autenticação.
  *
  * Backend (FastAPI):
- *   POST /auth/login    -> { access_token, token_type }
+ *   POST /auth/login    -> { access_token, refresh_token } (o refresh também vai
+ *                          num cookie httpOnly `papiro_refresh`)
  *   POST /auth/register -> { id, email, full_name, role, is_active, created_at }
- *   GET  /auth/me       -> mesmo shape do register (exige Bearer token)
+ *   POST /auth/refresh  -> { access_token } (renova via cookie httpOnly)
+ *   POST /auth/logout   -> { message } (apaga o cookie de refresh)
+ *   GET  /auth/me       -> mesmo shape do register (exige Bearer access token)
  *
  * OBS: `/auth/login` usa `OAuth2PasswordRequestForm`, ou seja, espera
  * `application/x-www-form-urlencoded` com os campos `username` (o e-mail) e
@@ -14,7 +17,8 @@ import api, { clearToken, setToken } from './client'
  */
 export const authService = {
   /**
-   * Autentica e persiste o token.
+   * Autentica e guarda o access token EM MEMÓRIA.
+   * O refresh token fica no cookie httpOnly setado pelo backend.
    * @param {{ email: string, password: string }} credenciais
    * @returns {Promise<{ access_token: string, token_type: string }>}
    */
@@ -48,8 +52,26 @@ export const authService = {
     return data
   },
 
-  /** Encerra a sessão local (não há endpoint de logout no backend). */
-  logout() {
+  /**
+   * Renova a sessão usando o refresh token do cookie httpOnly.
+   * Chamado ao carregar a app (refresh silencioso) — permite que o usuário
+   * continue logado mesmo após um F5 (o access em memória se perdeu).
+   * @returns {Promise<boolean>} true se renovou com sucesso, false se não.
+   */
+  async restaurarSessaoViaRefresh() {
+    return ensureAccessToken()
+  },
+
+  /**
+   * Encerra a sessão: chama POST /auth/logout (apaga o cookie httpOnly) e
+   * limpa o access token da memória.
+   */
+  async logout() {
+    try {
+      await api.post('/auth/logout')
+    } catch {
+      // Mesmo se o servidor falhar, limpa a sessão local.
+    }
     clearToken()
   },
 }

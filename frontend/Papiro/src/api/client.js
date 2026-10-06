@@ -3,44 +3,48 @@ import axios from 'axios'
 /**
  * Instância única do axios usada por toda a aplicação.
  *
- * - baseURL vem de VITE_API_URL (veja .env.example)
- * - o interceptor de request anexa o token JWT salvo
- * - o interceptor de response normaliza os erros da API
+ * Segurança de tokens (PLANO 7.3):
+ * - O access token (curta validade) vive APENAS em memória (variável módulo),
+ *   NUNCA em localStorage — um XSS não consegue exfiltrá-lo.
+ * - O refresh token (7 dias, rotativo) fica num cookie httpOnly, por isso o
+ *   axios usa `withCredentials: true` (envia o cookie junto).
+ * - Quando uma request devolve 401, o interceptor renova o access via
+ *   POST /auth/refresh (cujo cookie vai sozinho) e REPETE a request.
+ *
+ * Legado/back-compat: mantemos as chaves getToken/setToken/clearToken com os
+ * MESMOS nomes (AuthContext e auth.js as usam), mas agora operam em memória.
  */
-const TOKEN_KEY = 'papiro.token'
+
+// --- Access token em memória (não persiste entre reloads; normal) ---
+let accessToken = null
 
 export function getToken() {
-  try {
-    return localStorage.getItem(TOKEN_KEY)
-  } catch {
-    return null
-  }
+  return accessToken
 }
 
 export function setToken(token) {
-  try {
-    if (token) localStorage.setItem(TOKEN_KEY, token)
-    else localStorage.removeItem(TOKEN_KEY)
-  } catch {
-    /* localStorage indisponível (modo privado, SSR) — segue sem persistir */
-  }
+  if (token) accessToken = token
+  else accessToken = null
 }
 
 export function clearToken() {
-  setToken(null)
+  accessToken = null
 }
 
+// --- Configuração do axios ---
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL ?? 'https://api-e-commerce.matheuslab.xyz/api/v1',
   headers: { 'Content-Type': 'application/json' },
   timeout: 15000,
+  // Envia o cookie httpOnly (refresh token) nas requisições — necessário para
+  // /auth/refresh e /auth/logout receberem o cookie.
+  withCredentials: true,
 })
 
-// Request — injeta o Bearer token quando existir
+// Request — injeta o Bearer access token quando existir em memória.
 api.interceptors.request.use((config) => {
-  const token = getToken()
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`
+  if (accessToken) {
+    config.headers.Authorization = `Bearer ${accessToken}`
   }
   return config
 })
@@ -90,14 +94,115 @@ export function toApiError(error) {
   })
 }
 
-// Response — sessão expirada limpa o token; demais erros viram ApiError
+// ---------------------------------------------------------------------------
+// Refresh silencioso (rotação de token em segundo plano)
+// ---------------------------------------------------------------------------
+
+// Lock: evita disparar N refreshes quando N requests falham 401 em paralelo.
+let isRefreshing = false
+/** Fila de requests que aguardam o novo access token (promise resolvers). */
+let waitingQueue = []
+
+function flushWaiting(newToken) {
+  waitingQueue.forEach((resolve) => resolve(newToken))
+  waitingQueue = []
+}
+
+function failWaiting(error) {
+  waitingQueue.forEach((reject) => reject(error))
+  waitingQueue = []
+}
+
+/**
+ * Troca o access token via POST /auth/refresh usando o cookie httpOnly.
+ * Usa `axios` CRU (fora do interceptor) para não entrar em recursão.
+ *
+ * @returns {Promise<boolean>} true se renovou, false se o refresh falhou.
+ */
+async function tryRefreshToken() {
+  try {
+    // `request.withCredentials` não é garantido aqui; setamos explicitamente.
+    const { data } = await axios.post(
+      `${api.defaults.baseURL}/auth/refresh`,
+      null,
+      { withCredentials: true, timeout: 15000 },
+    )
+    if (data?.access_token) {
+      accessToken = data.access_token
+      return true
+    }
+    return false
+  } catch {
+    // Refresh inválido/expirado — sessão realmente encerrada.
+    accessToken = null
+    return false
+  }
+}
+
+/**
+ * Garante um access token válido. Se não houver (primeiro uso / após F5),
+ * tenta renovar silenciosamente pelo cookie.
+ */
+export async function ensureAccessToken() {
+  if (accessToken) return true
+  if (isRefreshing) {
+    // Já existe uma renovação em andamento — aguarda o resultado dela.
+    return new Promise((resolve) => {
+      waitingQueue.push((token) => resolve(Boolean(token)))
+    })
+  }
+
+  isRefreshing = true
+  try {
+    const ok = await tryRefreshToken()
+    flushWaiting(accessToken)
+    return ok
+  } catch (err) {
+    failWaiting(err)
+    return false
+  } finally {
+    isRefreshing = false
+  }
+}
+
+// Response — 401: renova o access e repete a request original.
+// Demais erros viram ApiError.
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (error?.response?.status === 401) {
-      clearToken()
+  async (error) => {
+    const { config, response } = error
+
+    // Falha de rede/timeout ou status != 401 não dispara refresh.
+    if (!response || response.status !== 401) {
+      return Promise.reject(toApiError(error))
     }
-    return Promise.reject(toApiError(error))
+
+    // /auth/login e /auth/refresh não devem entrar no retry (credenciais
+    // inválidas já retornam 401; refresh inválido = sessão morta).
+    const url = config?.url ?? ''
+    if (url.includes('/auth/login') || url.includes('/auth/refresh')) {
+      clearToken()
+      return Promise.reject(toApiError(error))
+    }
+
+    // Já tentamos renovar uma vez nesta request — evita loop infinito.
+    if (config?._retried) {
+      clearToken()
+      return Promise.reject(toApiError(error))
+    }
+
+    const renewed = await ensureAccessToken()
+    if (!renewed) {
+      // Sessão expirou de verdade.
+      clearToken()
+      return Promise.reject(toApiError(error))
+    }
+
+    // Repete a request original (apenas uma vez) com o novo token.
+    config._retried = true
+    config.headers = config.headers ?? {}
+    config.headers.Authorization = `Bearer ${accessToken}`
+    return api(config)
   },
 )
 
