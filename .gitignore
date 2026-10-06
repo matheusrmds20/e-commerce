@@ -30,6 +30,8 @@ ENV/
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/
+# Diretório temporário criado pelo pytest (plugin tmp_path).
+pytest-of-*/
 .coverage
 .coverage.*
 coverage.xml

@@ -1,8 +1,8 @@
 import { test, expect } from '../fixtures/base'
 import {
-  tokenDaPagina,
   criarEnderecoViaApi,
   criarPedidoViaApi,
+  fazerLoginViaApi,
   primeiroProdutoViaApi,
 } from '../helpers/setup'
 
@@ -21,10 +21,14 @@ test.describe('Review', () => {
     emailUnico,
   }) => {
     await page.goto('/')
-    await registrarPelaUi({ email: emailUnico('review') })
+    const dados = await registrarPelaUi({ email: emailUnico('review') })
 
     // Setup via API: libera o form de review (usuário "comprou" o livro).
-    const token = await tokenDaPagina(page)
+    // O token agora vem de um login via API (a memória do front não é legível).
+    const token = await fazerLoginViaApi(request, {
+      email: dados.email,
+      password: dados.password,
+    })
     const endereco = await criarEnderecoViaApi(request, token)
     const productId = await primeiroProdutoViaApi(request)
     await criarPedidoViaApi(request, token, {

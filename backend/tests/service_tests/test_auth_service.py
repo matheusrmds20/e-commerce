@@ -1,4 +1,5 @@
 from types import SimpleNamespace
+from unittest.mock import patch
 
 import pytest
 
@@ -7,6 +8,7 @@ from app.api.exceptions import (
     EmailAlreadyExistsException,
     InactiveUserException,
     InvalidCredentialsException,
+    InvalidTokenException,
     UserNotFoundException,
 )
 from app.models.user import User, UserRole
@@ -68,6 +70,7 @@ class TestLogin:
 
         assert result.access_token == "access-token"
         assert result.token_type == "bearer"
+        assert result.refresh_token == "refresh-token"
         user_repo.get_by_email.assert_called_once_with("user@example.com")
 
     def test_login_wrong_password(self, auth_service, user_repo):
@@ -99,3 +102,34 @@ class TestMe:
     def test_me_none_user(self, auth_service):
         with pytest.raises(UserNotFoundException):
             auth_service.me(None)
+
+
+class TestRefresh:
+    def test_refresh_success_rotates(self, auth_service, user_repo):
+        """Refresh válido emite um par NOVO (novo access e novo refresh)."""
+        with patch("app.services.auth_service.decode_token", return_value={"sub": "1", "type": "refresh"}):
+            user_repo.get_by_id.return_value = make_user()
+            result = auth_service.refresh("old-refresh-token")
+
+        assert result.access_token == "access-token"
+        assert result.refresh_token == "refresh-token"
+        user_repo.get_by_id.assert_called_once_with(1)
+
+    def test_refresh_rejects_access_token(self, auth_service, user_repo):
+        with patch("app.services.auth_service.decode_token", return_value={"sub": "1", "type": "access"}):
+            with pytest.raises(InvalidTokenException):
+                auth_service.refresh("an-access-token")
+
+        user_repo.get_by_id.assert_not_called()
+
+    def test_refresh_invalid_user(self, auth_service, user_repo):
+        with patch("app.services.auth_service.decode_token", return_value={"sub": "999", "type": "refresh"}):
+            user_repo.get_by_id.return_value = None
+            with pytest.raises(InvalidTokenException):
+                auth_service.refresh("old-refresh-token")
+
+
+class TestLogout:
+    def test_logout_returns_none(self, auth_service):
+        # Sem blacklist ainda, logout apenas sinaliza (cookie é apagado na rota).
+        assert auth_service.logout() is None

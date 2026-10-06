@@ -12,8 +12,10 @@ from app.api.exceptions import (
     EmailAlreadyExistsException,
     InactiveUserException,
     InvalidCredentialsException,
+    InvalidTokenException,
     UserNotFoundException,
 )
+from app.schemas.auth import TokenResponse
 
 PREFIX = "/api/v1/auth"
 
@@ -94,7 +96,10 @@ class TestLogin:
 
     def test_login_success(self, client):
         svc = Mock(name="auth_service")
-        svc.login.return_value = {"access_token": "jwt-token", "token_type": "bearer"}
+        svc.login.return_value = TokenResponse(
+            access_token="jwt-token",
+            refresh_token="refresh-token",
+        )
 
         response = self._enviar(client, svc)
 
@@ -102,6 +107,9 @@ class TestLogin:
         body = response.json()
         assert body["access_token"] == "jwt-token"
         assert body["token_type"] == "bearer"
+        assert body["refresh_token"] == "refresh-token"
+        # O refresh token também vai num cookie httpOnly papiro_refresh.
+        assert response.cookies["papiro_refresh"] == "refresh-token"
 
     def test_login_invalid_credentials(self, client):
         svc = Mock(name="auth_service")
@@ -172,3 +180,67 @@ class TestMe:
             response = client.get(f"{PREFIX}/me")
 
         assert_error(response, 404, "USER_NOT_FOUND")
+
+
+class TestRefresh:
+    """POST /auth/refresh — rotação do refresh token (cookie ou body)."""
+
+    @staticmethod
+    def _fresh_response():
+        return TokenResponse(access_token="new-access", refresh_token="new-refresh")
+
+    def test_refresh_success_via_cookie(self, client):
+        svc = Mock(name="auth_service")
+        svc.refresh.return_value = self._fresh_response()
+
+        client.cookies.set("papiro_refresh", "old-refresh-token")
+
+        with patch("app.api.v1.auth.get_auth_service", return_value=svc):
+            response = client.post(f"{PREFIX}/refresh")
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["access_token"] == "new-access"
+        # NFC: o body do refresh não devolve refresh_token (trocado no cookie).
+        assert "refresh_token" not in body
+        svc.refresh.assert_called_once_with("old-refresh-token")
+        assert response.cookies["papiro_refresh"] == "new-refresh"
+
+    def test_refresh_success_via_body(self, client):
+        svc = Mock(name="auth_service")
+        svc.refresh.return_value = self._fresh_response()
+
+        with patch("app.api.v1.auth.get_auth_service", return_value=svc):
+            response = client.post(
+                f"{PREFIX}/refresh", json={"refresh_token": "body-refresh"}
+            )
+
+        assert response.status_code == 200
+        svc.refresh.assert_called_once_with("body-refresh")
+
+    def test_refresh_rejects_invalid_token(self, client):
+        svc = Mock(name="auth_service")
+        svc.refresh.side_effect = InvalidTokenException()
+
+        client.cookies.set("papiro_refresh", "bad-refresh")
+
+        with patch("app.api.v1.auth.get_auth_service", return_value=svc):
+            response = client.post(f"{PREFIX}/refresh")
+
+        assert_error(response, 401, "INVALID_TOKEN")
+
+
+class TestLogout:
+    """POST /auth/logout — apaga o cookie de refresh e encerra a sessão."""
+
+    def test_logout_clears_cookie(self, client):
+        svc = Mock(name="auth_service")
+        client.cookies.set("papiro_refresh", "refresh-to-remove")
+
+        with patch("app.api.v1.auth.get_auth_service", return_value=svc):
+            response = client.post(f"{PREFIX}/logout")
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["message"] == "Sessão encerrada."
+        svc.logout.assert_called_once()

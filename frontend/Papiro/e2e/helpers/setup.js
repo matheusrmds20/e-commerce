@@ -10,9 +10,36 @@ import { expect } from '@playwright/test'
  */
 export const API_URL = 'http://localhost:8000/api/v1'
 
-/** Token JWT persistido pelo AuthProvider no localStorage ('papiro.token'). */
-export function tokenDaPagina(page) {
-  return page.evaluate(() => localStorage.getItem('papiro.token'))
+/**
+ * Faz login via API e retorna o access token para as chamadas de setup.
+ *
+ * Com a migração segura (PLANO 7.3) o access token vive SÓ em memória do
+ * front (não há mais `papiro.token` no localStorage), então o setup não pode
+ * lê-lo da página. Chamamos `POST /auth/login` (form-urlencoded) direto na
+ * API e usamos o access token retornado nos headers das chamadas de setup.
+ *
+ * @returns {Promise<string>} access_token JWT (válido 15 min).
+ */
+export async function fazerLoginViaApi(request, { email, password }) {
+  const resp = await request.post(`${API_URL}/auth/login`, {
+    form: { username: email, password },
+  })
+  expect(
+    resp.ok(),
+    `login via API (setup) falhou: ${resp.status()} ${(await resp.text()).slice(0, 200)}`,
+  ).toBeTruthy()
+  const body = await resp.json()
+  expect(body.access_token, 'login via API sem access_token').toBeTruthy()
+  return body.access_token
+}
+
+/** Registra um usuário novo via API e retorna {id, email, ...}. */
+export async function registrarViaApi(request, payload) {
+  const resp = await request.post(`${API_URL}/auth/register`, {
+    data: payload,
+  })
+  expect(resp.ok(), `register via API (setup) falhou: ${resp.status()}`).toBeTruthy()
+  return resp.json()
 }
 
 /**

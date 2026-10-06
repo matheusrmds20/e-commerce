@@ -23,7 +23,12 @@ class Settings(BaseSettings):
     VALIDATE_WEBHOOK_SIGNATURE: bool = True
     SECRET_KEY: str = Field(default="change-me-to-a-very-long-secret-key", min_length=32)
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    # TTL do access token (JWT curta validade, enviado via header Bearer).
+    # 15 min em produção (7.3 do plano). Ajuste sobrescreve via env/CI.
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
+    # TTL do refresh token (em dias) — usado para "lembrar-me" e renovar a
+    # sessão ativa. Rotativo: a cada refresh, um novo refresh token é emitido.
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     SMTP_HOST: str
     SMTP_PORT: str
     SMTP_USER: str

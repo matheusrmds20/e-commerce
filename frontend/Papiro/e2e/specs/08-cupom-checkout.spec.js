@@ -1,5 +1,5 @@
 import { test, expect } from '../fixtures/base'
-import { tokenDaPagina, criarEnderecoViaApi } from '../helpers/setup'
+import { criarEnderecoViaApi, fazerLoginViaApi } from '../helpers/setup'
 
 /**
  * 08 — Cupom / Checkout com Mercado Pago MOCKADO.
@@ -42,10 +42,14 @@ test.describe('Cupom / Checkout (MP mockado)', () => {
     )
 
     await page.goto('/')
-    await registrarPelaUi({ email: emailUnico('checkout') })
+    const dados = await registrarPelaUi({ email: emailUnico('checkout') })
 
     // Endereço via API (o cadastro pelo modal é coberto no 07).
-    const token = await tokenDaPagina(page)
+    // O token vem de um login via API (memória do front não é legível).
+    const token = await fazerLoginViaApi(request, {
+      email: dados.email,
+      password: dados.password,
+    })
     await criarEnderecoViaApi(request, token)
 
     // Item na sacola pela UI.

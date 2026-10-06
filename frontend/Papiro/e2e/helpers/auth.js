@@ -58,7 +58,8 @@ export async function loginPelaUi(page, { email, password }) {
   )
 }
 
-/** Lê o token JWT salvo no localStorage (chave 'papiro.token'). */
-export function tokenNoLocalStorage(page) {
-  return page.evaluate(() => localStorage.getItem('papiro.token'))
+/** Lê o cookie httpOnly do refresh (prova de sessão ativa no browser). */
+export async function refreshCookiePresente(context) {
+  const cookies = await context.cookies()
+  return cookies.some((c) => c.name === 'papiro_refresh')
 }

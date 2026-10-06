@@ -1,5 +1,5 @@
 import { test, expect } from '../fixtures/base'
-import { tokenNoLocalStorage } from '../helpers/auth'
+import { refreshCookiePresente } from '../helpers/auth'
 
 /**
  * 03 — Registro + login automático + restauração de sessão no reload.
@@ -8,6 +8,7 @@ import { tokenNoLocalStorage } from '../helpers/auth'
 test.describe('Registro / Login', () => {
   test('registra, entra sozinho e restaura a sessão após reload', async ({
     page,
+    context,
     registrarPelaUi,
     emailUnico,
   }) => {
@@ -18,12 +19,11 @@ test.describe('Registro / Login', () => {
       email: emailUnico('registro'),
     })
 
-    // 1) Login automático após o cadastro: token JWT salvo.
-    const token = await tokenNoLocalStorage(page)
-    expect(token).toBeTruthy()
-    expect(token).not.toHaveLength(0)
+    // 1) Login automático após o cadastro: refresh token em cookie httpOnly.
+    const temCookie = await refreshCookiePresente(context)
+    expect(temCookie, 'cookie httpOnly papiro_refresh após login').toBeTruthy()
 
-    // 2) Reload → sessão restaurada via GET /auth/me (token no localStorage).
+    // 2) Reload → sessão restaurada via refresh silencioso + GET /auth/me.
     await page.reload()
     await expect(page.getByTestId('navbar-login')).toHaveAttribute(
       'aria-label',
