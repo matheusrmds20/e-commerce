@@ -6,6 +6,7 @@ from app.api.v1.auth import auth_router
 from app.api.v1.cart import cart_router
 from app.api.v1.categories import category_router
 from app.api.v1.coupons import coupon_router
+from app.api.v1.health import health_router
 from app.api.v1.newsletter import newsletter_router
 from app.api.v1.orders import order_router
 from app.api.v1.payments import payment_router
@@ -17,6 +18,7 @@ from app.api.v1.wishlist import wishlist_router
 
 router = APIRouter()
 
+router.include_router(health_router, prefix="/health", tags=["health"])
 router.include_router(category_router, prefix="/categories", tags=["categories"])
 router.include_router(user_router, prefix="/users", tags=["users"])
 router.include_router(product_router, prefix="/products", tags=["products"])
