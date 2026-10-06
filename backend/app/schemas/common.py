@@ -45,9 +45,29 @@ class PaginationParams(BaseModel):
 
 
 
+class DependencyHealth(BaseModel):
+    """Status de uma dependência checada pelo health check."""
+
+    name: str = Field(..., description="Nome da dependência (ex.: database")
+    status: str = Field(..., description="Status da dependência (ok | error")
+    detail: str | None = Field(
+        None, description="Mensagem de erro/contexto quando não estiver ok"
+    )
+
+
 class HealthResponse(BaseModel):
-    """Resposta do endpoint de health check."""
+    """Resposta do endpoint de health check.
+
+    - ``status``: "ok" se a API e todas as dependências responderem; "error"
+      caso contrário.
+    - ``app``/``version``: identidade da aplicação.
+    - ``dependencies``: resultado individual de cada dependência (ex.: banco).
+    """
 
     status: str
     app: str
     version: str
+    dependencies: list[DependencyHealth] = Field(
+        default_factory=list,
+        description="Resultado de cada dependência checada",
+    )

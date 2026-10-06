@@ -1,5 +1,14 @@
 import pytest
 
+from app.api.exceptions import (
+    CartAlreadyExistsException,
+    CartItemNotFoundException,
+    CartNotFoundException,
+    ForbiddenException,
+    InsufficientStockException,
+    ProductNotFoundException,
+    UserNotFoundException,
+)
 from app.models.cart import Cart
 from app.models.cart_item import CartItem
 from app.models.product import Product
@@ -59,20 +68,16 @@ class TestGetByUserID:
     def test_user_not_found(self, cart_service, user_repo):
         user_repo.get_by_id.return_value = None
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(UserNotFoundException):
             cart_service.get_by_user_id(1)
-
-        assert str(exc.value) == "No user found with id 1"
 
     def test_no_cart(self, cart_service, user_repo):
         user = make_user()
         user.cart = None
         user_repo.get_by_id.return_value = user
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(CartNotFoundException):
             cart_service.get_by_user_id(1)
-
-        assert str(exc.value) == "No cart found with user_id 1"
 
 
 class TestCreate:
@@ -92,20 +97,16 @@ class TestCreate:
     def test_user_not_found(self, cart_service, user_repo):
         user_repo.get_by_id.return_value = None
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(UserNotFoundException):
             cart_service.create(1)
-
-        assert str(exc.value) == "No user found with id 1"
 
     def test_user_already_has_cart(self, cart_service, user_repo):
         user = make_user()
         user.cart = make_cart()
         user_repo.get_by_id.return_value = user
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(CartAlreadyExistsException):
             cart_service.create(1)
-
-        assert str(exc.value) == "User 1 already has a cart"
 
 
 class TestAddItem:
@@ -135,38 +136,33 @@ class TestAddItem:
     def test_cart_not_found(self, cart_service, cart_repo):
         cart_repo.get_by_id.return_value = None
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(CartNotFoundException):
             cart_service.add_item(1, 1, 1, 2)
-
-        assert str(exc.value) == "No cart found with id 1"
 
     def test_cart_not_owned(self, cart_service, cart_repo):
         cart_repo.get_by_id.return_value = make_cart(user_id=2)
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(ForbiddenException):
             cart_service.add_item(1, 1, 1, 2)
-
-        assert str(exc.value) == "Cart is not owned by user"
 
     def test_product_not_found(self, cart_service, cart_repo, product_repo):
         cart_repo.get_by_id.return_value = make_cart()
         product_repo.get_by_id.return_value = None
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(ProductNotFoundException):
             cart_service.add_item(1, 1, 99, 2)
-
-        assert str(exc.value) == "No product found with id 99"
 
     def test_insufficient_stock(self, cart_service, cart_repo, product_repo, cart_item_repo):
         cart_repo.get_by_id.return_value = make_cart()
-        product_repo.get_by_id.return_value = make_product(stock_qty=1)
+        prod = make_product(stock_qty=1, title="Livro")
+        product_repo.get_by_id.return_value = prod
         # Nada ainda na sacola — a validação compara o total pedido com o estoque.
         cart_item_repo.get_by_cart_and_product.return_value = None
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(InsufficientStockException) as exc:
             cart_service.add_item(1, 1, 1, 5)
 
-        assert "Insufficient stock for product 1" in str(exc.value)
+        assert str(exc.value) == "Estoque insuficiente para 'Livro'. Disponível: 1."
 
     def test_insufficient_stock_considera_o_que_ja_esta_na_sacola(
         self, cart_service, cart_repo, product_repo, cart_item_repo
@@ -182,10 +178,10 @@ class TestAddItem:
             quantity=2
         )
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(InsufficientStockException) as exc:
             cart_service.add_item(1, 1, 1, 2)
 
-        assert "requested: 4" in str(exc.value)
+        assert str(exc.value) == "Estoque insuficiente para 'Livro'. Disponível: 3."
 
 
 class TestUpdateItem:
@@ -218,10 +214,8 @@ class TestUpdateItem:
         cart_repo.get_by_id.return_value = make_cart()
         cart_item_repo.get_by_id.return_value = None
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(CartItemNotFoundException):
             cart_service.update_item(1, 1, 99, 5)
-
-        assert str(exc.value) == "No cart item found with id 99"
 
 
 class TestRemoveItem:
@@ -239,10 +233,8 @@ class TestRemoveItem:
         cart_repo.get_by_id.return_value = make_cart()
         cart_item_repo.get_by_id.return_value = None
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(CartItemNotFoundException):
             cart_service.remove_item(1, 1, 99)
-
-        assert str(exc.value) == "No cart item found with id 99"
 
 
 class TestClear:
@@ -259,10 +251,8 @@ class TestClear:
     def test_not_found(self, cart_service, cart_repo):
         cart_repo.get_by_id.return_value = None
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(CartNotFoundException):
             cart_service.clear(1, 1)
-
-        assert str(exc.value) == "No cart found with id 1"
 
 
 class TestLockDeEstoque:
@@ -312,12 +302,10 @@ class TestLockDeEstoque:
     def test_update_item_sem_estoque_suficiente(self, cart_service, cart_repo, cart_item_repo, product_repo):
         cart_repo.get_by_id.return_value = make_cart()
         cart_item_repo.get_by_id.return_value = make_cart_item(quantity=1)
-        product_repo.get_by_id.return_value = make_product(stock_qty=3)
+        product_repo.get_by_id.return_value = make_product(stock_qty=3, title="Livro")
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(InsufficientStockException):
             cart_service.update_item(1, 1, 1, 10)
-
-        assert "Insufficient stock" in str(exc.value)
 
 
 class TestProductRepositoryLock:

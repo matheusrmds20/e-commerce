@@ -1,5 +1,10 @@
 import pytest
 
+from app.api.exceptions import (
+    CategoryNotFoundException,
+    ConflictException,
+    InsufficientPermissionException,
+)
 from app.models.category import Category
 from app.models.user import User, UserRole
 from app.schemas.category import CategoryCreate, CategoryUpdate
@@ -40,10 +45,8 @@ class TestGet:
     def test_get_by_id_not_found(self, category_service, category_repo):
         category_repo.get_by_id.return_value = None
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(CategoryNotFoundException):
             category_service.get_by_id(99)
-
-        assert str(exc.value) == "No category found with id 99"
 
     def test_get_by_name_success(self, category_service, category_repo):
         category = make_category()
@@ -54,10 +57,8 @@ class TestGet:
     def test_get_by_name_not_found(self, category_service, category_repo):
         category_repo.get_by_name.return_value = None
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(CategoryNotFoundException):
             category_service.get_by_name("Inexistente")
-
-        assert str(exc.value) == "No category found with name Inexistente"
 
     def test_get_by_slug_success(self, category_service, category_repo):
         category = make_category()
@@ -68,10 +69,8 @@ class TestGet:
     def test_get_by_slug_not_found(self, category_service, category_repo):
         category_repo.get_by_slug.return_value = None
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(CategoryNotFoundException):
             category_service.get_by_slug("sem-slug")
-
-        assert str(exc.value) == "No category found with slug sem-slug"
 
     def test_get_all_success(self, category_service, category_repo):
         categories = [make_category()]
@@ -102,19 +101,15 @@ class TestCreate:
     def test_create_name_already_exists(self, category_service, category_repo):
         category_repo.get_by_name.return_value = make_category()
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(ConflictException):
             category_service.create(create_payload(), make_user())
-
-        assert "already exists" in str(exc.value)
 
     def test_create_slug_already_exists(self, category_service, category_repo):
         category_repo.get_by_name.return_value = None
         category_repo.get_by_slug.return_value = make_category()
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(ConflictException):
             category_service.create(create_payload(), make_user())
-
-        assert "already exists" in str(exc.value)
 
 
 class TestUpdate:
@@ -134,10 +129,8 @@ class TestUpdate:
     def test_update_not_found(self, category_service, category_repo):
         category_repo.get_by_id.return_value = None
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(CategoryNotFoundException):
             category_service.update(1, CategoryUpdate(name="Terror"), make_user())
-
-        assert str(exc.value) == "No category found with id 1"
 
     def test_update_name_conflict(self, category_service, category_repo):
         category = make_category()
@@ -145,10 +138,8 @@ class TestUpdate:
         category_repo.get_by_id.return_value = category
         category_repo.get_by_name.return_value = other
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(ConflictException):
             category_service.update(1, CategoryUpdate(name="Terror"), make_user())
-
-        assert "already exists" in str(exc.value)
 
     def test_update_slug_conflict(self, category_service, category_repo):
         category = make_category()
@@ -157,34 +148,29 @@ class TestUpdate:
         category_repo.get_by_name.return_value = None
         category_repo.get_by_slug.return_value = other
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(ConflictException):
             category_service.update(1, CategoryUpdate(slug="terror"), make_user())
-
-        assert "already exists" in str(exc.value)
 
 
 class TestAdminPermission:
     def test_create_customer_forbidden(self, category_service, category_repo):
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(InsufficientPermissionException):
             category_service.create(create_payload(), make_user(role=UserRole.CUSTOMER))
 
-        assert "Admin permission required" in str(exc.value)
         category_repo.create.assert_not_called()
 
     def test_update_customer_forbidden(self, category_service, category_repo):
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(InsufficientPermissionException):
             category_service.update(
                 1, CategoryUpdate(name="Terror"), make_user(role=UserRole.CUSTOMER)
             )
 
-        assert "Admin permission required" in str(exc.value)
         category_repo.update.assert_not_called()
 
     def test_delete_customer_forbidden(self, category_service, category_repo):
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(InsufficientPermissionException):
             category_service.delete(1, make_user(role=UserRole.CUSTOMER))
 
-        assert "Admin permission required" in str(exc.value)
         category_repo.delete.assert_not_called()
 
 
@@ -201,7 +187,5 @@ class TestDelete:
     def test_delete_not_found(self, category_service, category_repo):
         category_repo.get_by_id.return_value = None
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(CategoryNotFoundException):
             category_service.delete(1, make_user())
-
-        assert str(exc.value) == "No category found with id 1"

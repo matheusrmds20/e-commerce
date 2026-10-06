@@ -15,6 +15,11 @@ from unittest.mock import Mock
 import pytest
 from helpers import assert_error, assert_validation_error
 
+from app.api.exceptions import (
+    ConflictException,
+    ForbiddenException,
+    NewsletterSubscriberNotFoundException,
+)
 from app.models.user import UserRole
 
 PREFIX = "/api/v1/newsletter"
@@ -62,7 +67,10 @@ class TestSubscribe:
 
     def test_subscribe_duplicate(self, client, patch_service):
         svc = Mock(name="newsletter_service")
-        svc.subscribe.side_effect = ValueError("Email x@y.com is already subscribed")
+        svc.subscribe.side_effect = ConflictException(
+            "Email x@y.com is already subscribed",
+            code="NEWSLETTER_ALREADY_SUBSCRIBED",
+        )
 
         with patch_service("newsletter", "get_newsletter_service", svc):
             resp = client.post(f"{PREFIX}/subscribe", json=SUBSCRIBE_OK)
@@ -92,7 +100,7 @@ class TestUnsubscribe:
 
     def test_unsubscribe_not_found(self, client, patch_service):
         svc = Mock(name="newsletter_service")
-        svc.unsubscribe.side_effect = ValueError("No subscriber found with email x@y.com")
+        svc.unsubscribe.side_effect = NewsletterSubscriberNotFoundException()
 
         with patch_service("newsletter", "get_newsletter_service", svc):
             resp = client.post(f"{PREFIX}/unsubscribe", json=SUBSCRIBE_OK)
@@ -115,7 +123,9 @@ class TestListSubscribers:
     def test_list_forbidden_customer(self, client, patch_service, auth_user):
         auth_user(1)
         svc = Mock(name="newsletter_service")
-        svc.list_all.side_effect = ValueError("Admin permission required to list subscribers")
+        svc.list_all.side_effect = ForbiddenException(
+            "Admin permission required to list subscribers"
+        )
 
         with patch_service("newsletter", "get_newsletter_service", svc):
             resp = client.get(f"{PREFIX}/list")

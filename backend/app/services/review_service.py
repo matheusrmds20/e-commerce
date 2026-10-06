@@ -1,3 +1,10 @@
+from app.api.exceptions import (
+    DuplicateReviewException,
+    NotFoundException,
+    ProductNotFoundException,
+    ReviewForbiddenException,
+    UserNotFoundException,
+)
 from app.models.review import Review
 from app.models.user import User, UserRole
 from app.repositories.product_repo import ProductRepository
@@ -31,7 +38,7 @@ class ReviewService:
         if self._is_admin(current_user):
             return
         if current_user.id != user_id:
-            raise ValueError("Review is not owned by user")
+            raise ReviewForbiddenException()
 
     def get_by_user_id(
         self, current_user: User, user_id: int | None = None
@@ -47,20 +54,18 @@ class ReviewService:
         user = self.user_repo.get_by_id(alvo)
 
         if user is None:
-            raise ValueError(f"No user found with id {alvo}")
+            raise UserNotFoundException(user_id=alvo)
 
         reviews = user.reviews
 
-        if not reviews:
-            raise ValueError(f"No reviews found with user_id {alvo}")
-
+        # Sem avaliações é estado normal (lista vazia), não erro.
         return reviews
 
     def get_by_product_id(self, product_id: int) -> list:
         product = self.product_repo.get_by_id(product_id)
 
         if product is None:
-            raise ValueError(f"No product found with id {product_id}")
+            raise ProductNotFoundException()
 
         # Produto válido sem avaliações é um estado normal (lista vazia), não um
         # erro. Retornar [] mantém o endpoint de listagem idempotente para a UI.
@@ -71,21 +76,19 @@ class ReviewService:
             user = self.user_repo.get_by_id(current_user.id)
 
             if user is None:
-                raise ValueError(f"No user found with id {current_user.id}")
+                raise UserNotFoundException(user_id=current_user.id)
 
             product = self.product_repo.get_by_id(data.product_id)
 
             if product is None:
-                raise ValueError(f"No product found with id {data.product_id}")
+                raise ProductNotFoundException()
 
             existing_review = self.repo.get_by_user_id_and_product_id(
                 current_user.id, data.product_id
             )
 
             if existing_review is not None:
-                raise ValueError(
-                    f"User {current_user.id} already reviewed product {data.product_id}"
-                )
+                raise DuplicateReviewException()
 
             review = self.repo.create(
                 Review(
@@ -103,7 +106,9 @@ class ReviewService:
             review = self.repo.get_by_id(review_id)
 
             if review is None:
-                raise ValueError(f"No review found with id {review_id}")
+                raise NotFoundException(
+                    "Avaliação não encontrada.", code="REVIEW_NOT_FOUND"
+                )
 
             self._ensure_owner_or_admin(current_user, review.user_id)
 
@@ -120,7 +125,9 @@ class ReviewService:
             review = self.repo.get_by_id(review_id)
 
             if review is None:
-                raise ValueError(f"No review found with id {review_id}")
+                raise NotFoundException(
+                    "Avaliação não encontrada.", code="REVIEW_NOT_FOUND"
+                )
 
             self._ensure_owner_or_admin(current_user, review.user_id)
 

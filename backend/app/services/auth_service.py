@@ -1,4 +1,4 @@
-from jose import JWTError
+from jose import ExpiredSignatureError, JWTError
 from sqlalchemy.orm import Session
 
 from app.api.exceptions import (
@@ -6,6 +6,7 @@ from app.api.exceptions import (
     InactiveUserException,
     InvalidCredentialsException,
     InvalidTokenException,
+    TokenExpiredException,
     UserNotFoundException,
 )
 from app.core.security import (
@@ -77,6 +78,10 @@ class AuthService:
 
         try:
             payload = decode_token(refresh_token)
+        except ExpiredSignatureError as err:
+            # Preservar o sentido do expirado permite ao frontend distinguir
+            # "sessão expirou" (re-login) de token malformado.
+            raise TokenExpiredException() from err
         except JWTError as err:
             raise InvalidTokenException() from err
 

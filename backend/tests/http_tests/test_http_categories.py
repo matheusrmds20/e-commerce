@@ -8,15 +8,19 @@ SEGURANÇA: create/update/delete exigem Bearer token de **administrador**
 (401 sem token, 403 sem permissão). Leitura (list/get/name/slug) continua
 pública — o catálogo precisa das categorias sem login.
 
-NOTA: o ``_traduzir_value_error`` da rota converte os ``ValueError`` do service
-em 403 (não-admin) / 409 (duplicado) / 404 (não encontrado).
+NOTA: o service lança ``BookCommerceException`` diretamente (403/409/404); os
+handlers globais geram a resposta. Sem ``_traduzir_value_error`` na rota.
 """
 from unittest.mock import Mock, patch
 
 import pytest
 from helpers import assert_error, assert_validation_error, category_payload
 
-from app.api.exceptions import CategoryNotFoundException, ConflictException
+from app.api.exceptions import (
+    CategoryNotFoundException,
+    ConflictException,
+    InsufficientPermissionException,
+)
 from app.models.user import UserRole
 
 PREFIX = "/api/v1/categories"
@@ -78,9 +82,7 @@ class TestCreateCategory:
     def test_create_customer_forbidden(self, client, auth_user):
         auth_user(1, role="customer")
         svc = Mock(name="category_service")
-        svc.create.side_effect = ValueError(
-            "Admin permission required to manage categories"
-        )
+        svc.create.side_effect = InsufficientPermissionException()
 
         with patch("app.api.v1.categories.get_category_service", return_value=svc):
             response = client.post(f"{PREFIX}/create", json=CREATE_OK)
@@ -182,9 +184,7 @@ class TestUpdateCategory:
     def test_update_customer_forbidden(self, client, auth_user):
         auth_user(1, role="customer")
         svc = Mock(name="category_service")
-        svc.update.side_effect = ValueError(
-            "Admin permission required to manage categories"
-        )
+        svc.update.side_effect = InsufficientPermissionException()
 
         with patch("app.api.v1.categories.get_category_service", return_value=svc):
             response = client.patch(f"{PREFIX}/update/1", json={"name": "Nova"})
@@ -226,9 +226,7 @@ class TestDeleteCategory:
     def test_delete_customer_forbidden(self, client, auth_user):
         auth_user(1, role="customer")
         svc = Mock(name="category_service")
-        svc.delete.side_effect = ValueError(
-            "Admin permission required to manage categories"
-        )
+        svc.delete.side_effect = InsufficientPermissionException()
 
         with patch("app.api.v1.categories.get_category_service", return_value=svc):
             response = client.delete(f"{PREFIX}/delete/1")

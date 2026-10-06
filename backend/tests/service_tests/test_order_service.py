@@ -2,6 +2,19 @@ from datetime import datetime, timedelta
 
 import pytest
 
+from app.api.exceptions import (
+    AddressForbiddenException,
+    AddressNotFoundException,
+    BadRequestException,
+    CouponNotAssignedException,
+    CouponNotFoundException,
+    ForbiddenException,
+    InsufficientStockException,
+    InvalidCouponException,
+    OrderNotFoundException,
+    ProductNotFoundException,
+    UserNotFoundException,
+)
 from app.models.address import Address
 from app.models.cart import Cart
 from app.models.coupon import Coupon, DiscountType
@@ -123,10 +136,8 @@ class TestGetByUserID:
     def test_user_not_found(self, order_service, user_repo):
         user_repo.get_by_id.return_value = None
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(UserNotFoundException):
             order_service.get_by_user_id(1)
-
-        assert str(exc.value) == "No user found with id 1"
 
 
 class TestCreate:
@@ -221,53 +232,41 @@ class TestCreate:
     def test_address_not_found(self, order_service, address_repo):
         address_repo.get_by_id.return_value = None
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(AddressNotFoundException):
             order_service.create(1, order_create_payload(address_id=99))
-
-        assert str(exc.value) == "No address found with id 99"
 
     def test_address_not_owned(self, order_service, address_repo):
         address_repo.get_by_id.return_value = make_address(user_id=2)
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(AddressForbiddenException):
             order_service.create(1, order_create_payload())
-
-        assert str(exc.value) == "Address is not owned by user"
 
     def test_empty_items(self, order_service, address_repo):
         address_repo.get_by_id.return_value = make_address()
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(BadRequestException):
             order_service.create(1, order_create_payload(items=[]))
-
-        assert str(exc.value) == "Order must have at least one item"
 
     def test_product_not_found(self, order_service, address_repo, product_repo):
         address_repo.get_by_id.return_value = make_address()
         product_repo.get_by_id.return_value = None
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(ProductNotFoundException):
             order_service.create(1, order_create_payload())
-
-        assert str(exc.value) == "No product found with id 1"
 
     def test_product_inactive(self, order_service, address_repo, product_repo):
         address_repo.get_by_id.return_value = make_address()
         product_repo.get_by_id.return_value = make_product(is_active=False)
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(BadRequestException):
             order_service.create(1, order_create_payload())
-
-        assert str(exc.value) == "Product 'Livro' is not active"
 
     def test_insufficient_stock(self, order_service, address_repo, product_repo):
         address_repo.get_by_id.return_value = make_address()
         product_repo.get_by_id.return_value = make_product(stock_qty=1)
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(InsufficientStockException):
             order_service.create(1, order_create_payload())
-
-        assert "Insufficient stock" in str(exc.value)
 
     def test_coupon_not_found(self, order_service, address_repo, product_repo, order_item_repo, coupon_repo):
         address_repo.get_by_id.return_value = make_address()
@@ -275,10 +274,8 @@ class TestCreate:
         order_item_repo.create_order_item.return_value = make_order_item()
         coupon_repo.get_by_id.return_value = None
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(CouponNotFoundException):
             order_service.create(1, order_create_payload(coupon_id=99))
-
-        assert str(exc.value) == "No coupon found with id 99"
 
     def test_coupon_inactive(self, order_service, address_repo, product_repo, order_item_repo, coupon_repo):
         address_repo.get_by_id.return_value = make_address()
@@ -286,10 +283,8 @@ class TestCreate:
         order_item_repo.create_order_item.return_value = make_order_item()
         coupon_repo.get_by_id.return_value = make_coupon(is_active=False)
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(InvalidCouponException):
             order_service.create(1, order_create_payload(coupon_id=1))
-
-        assert "is not active" in str(exc.value)
 
     def test_coupon_expired(self, order_service, address_repo, product_repo, order_item_repo, coupon_repo):
         address_repo.get_by_id.return_value = make_address()
@@ -299,10 +294,8 @@ class TestCreate:
             valid_until=datetime.now() - timedelta(days=1)
         )
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(InvalidCouponException):
             order_service.create(1, order_create_payload(coupon_id=1))
-
-        assert "has expired" in str(exc.value)
 
     def test_coupon_not_applicable(self, order_service, address_repo, product_repo, order_item_repo, coupon_repo):
         address_repo.get_by_id.return_value = make_address()
@@ -310,10 +303,8 @@ class TestCreate:
         order_item_repo.create_order_item.return_value = make_order_item()
         coupon_repo.get_by_id.return_value = make_coupon(product_id=99)
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(InvalidCouponException):
             order_service.create(1, order_create_payload(coupon_id=1))
-
-        assert "not applicable" in str(exc.value)
 
     def test_coupon_not_assigned_to_user(
         self,
@@ -331,10 +322,8 @@ class TestCreate:
         # Sobrescreve o default do autouse: o vínculo não existe.
         user_coupon_repo.get_by_user_and_coupon.return_value = None
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(CouponNotAssignedException):
             order_service.create(1, order_create_payload(coupon_id=1))
-
-        assert "is not assigned to user" in str(exc.value)
 
     def test_coupon_min_purchase_not_met(
         self,
@@ -348,10 +337,8 @@ class TestCreate:
         self._setup(address_repo, product_repo, order_item_repo, order_repo)
         coupon_repo.get_by_id.return_value = make_coupon(min_purchase=200.0)
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(InvalidCouponException):
             order_service.create(1, order_create_payload(coupon_id=1))
-
-        assert "minimum purchase" in str(exc.value)
 
 
 class TestUpdate:
@@ -385,35 +372,27 @@ class TestUpdate:
     def test_cancelled_order(self, order_service, order_repo):
         order_repo.get_by_id.return_value = make_order(status=OrderStatus.CANCELLED)
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(BadRequestException):
             order_service.update(1, 1, OrderUpdate(status=OrderStatus.PROCESSING))
-
-        assert str(exc.value) == "Cannot update a cancelled order"
 
     def test_not_found(self, order_service, order_repo):
         order_repo.get_by_id.return_value = None
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(OrderNotFoundException):
             order_service.update(1, 1, OrderUpdate(notes="x"))
-
-        assert str(exc.value) == "No order found with id 1"
 
     def test_not_owned(self, order_service, order_repo):
         order_repo.get_by_id.return_value = make_order(user_id=2)
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(ForbiddenException):
             order_service.update(1, 1, OrderUpdate(notes="x"))
-
-        assert str(exc.value) == "Order is not owned by user"
 
     def test_address_not_owned(self, order_service, order_repo, address_repo):
         order_repo.get_by_id.return_value = make_order()
         address_repo.get_by_id.return_value = make_address(user_id=2)
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(AddressForbiddenException):
             order_service.update(1, 1, OrderUpdate(address_id=1))
-
-        assert str(exc.value) == "Address is not owned by user"
 
 
 class TestDelete:
@@ -429,18 +408,14 @@ class TestDelete:
     def test_not_found(self, order_service, order_repo):
         order_repo.get_by_id.return_value = None
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(OrderNotFoundException):
             order_service.delete(1, 1)
-
-        assert str(exc.value) == "No order found with id 1"
 
     def test_not_owned(self, order_service, order_repo):
         order_repo.get_by_id.return_value = make_order(user_id=2)
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(ForbiddenException):
             order_service.delete(1, 1)
-
-        assert str(exc.value) == "Order is not owned by user"
 
 
 class TestBaixaDeEstoque:
@@ -481,7 +456,7 @@ class TestBaixaDeEstoque:
             address_repo, product_repo, order_item_repo, order_repo, produto
         )
 
-        with pytest.raises(ValueError):
+        with pytest.raises(InsufficientStockException):
             order_service.create(1, order_create_payload())
 
         assert produto.stock_qty == 1
@@ -507,10 +482,9 @@ class TestBaixaDeEstoque:
             ]
         )
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(InsufficientStockException):
             order_service.create(1, payload)
 
-        assert "requested: 4" in str(exc.value)
         assert produto.stock_qty == 3
         product_repo.decrement_stock.assert_not_called()
 
@@ -543,7 +517,7 @@ class TestBaixaDeEstoque:
         product_repo.get_by_id.return_value = produto
 
         # Transição cancelado → processing é bloqueada antes de tocar estoque.
-        with pytest.raises(ValueError):
+        with pytest.raises(BadRequestException):
             order_service.update(1, 1, OrderUpdate(status=OrderStatus.PROCESSING))
 
         assert produto.stock_qty == 8
@@ -676,7 +650,7 @@ class TestLimpezaDoCarrinho:
         )
         product_repo.get_by_id.return_value = make_product(stock_qty=1)
 
-        with pytest.raises(ValueError):
+        with pytest.raises(InsufficientStockException):
             order_service.create(1, order_create_payload())
 
         cart_repo.clear.assert_not_called()

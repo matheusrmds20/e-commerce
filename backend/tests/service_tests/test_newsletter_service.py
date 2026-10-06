@@ -7,6 +7,11 @@ from datetime import datetime
 
 import pytest
 
+from app.api.exceptions import (
+    ConflictException,
+    ForbiddenException,
+    NewsletterSubscriberNotFoundException,
+)
 from app.models.newsletter import NewsletterSubscriber
 from app.models.user import User, UserRole
 from app.schemas.newsletter import NewsletterSubscribe, NewsletterUnsubscribe
@@ -51,10 +56,9 @@ class TestSubscribe:
     def test_subscribe_duplicate(self, newsletter_service, newsletter_repo):
         newsletter_repo.get_by_email.return_value = make_subscriber()
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(ConflictException):
             newsletter_service.subscribe(NewsletterSubscribe(email="reader@example.com"))
 
-        assert "already subscribed" in str(exc.value)
         newsletter_repo.create.assert_not_called()
 
 
@@ -73,12 +77,11 @@ class TestUnsubscribe:
     def test_unsubscribe_not_found(self, newsletter_service, newsletter_repo):
         newsletter_repo.get_by_email.return_value = None
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(NewsletterSubscriberNotFoundException):
             newsletter_service.unsubscribe(
                 NewsletterUnsubscribe(email="ghost@example.com")
             )
 
-        assert "No subscriber found" in str(exc.value)
         newsletter_repo.delete.assert_not_called()
 
 
@@ -90,16 +93,13 @@ class TestListAll:
         assert newsletter_service.list_all(make_admin()) == subscribers
 
     def test_list_all_customer_forbidden(self, newsletter_service, newsletter_repo):
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(ForbiddenException):
             newsletter_service.list_all(make_user())
 
-        assert "Admin permission required" in str(exc.value)
         newsletter_repo.get_all.assert_not_called()
 
     def test_list_all_empty(self, newsletter_service, newsletter_repo):
+        """Lista vazia é resposta válida ([]), em vez de erro."""
         newsletter_repo.get_all.return_value = []
 
-        with pytest.raises(ValueError) as exc:
-            newsletter_service.list_all(make_admin())
-
-        assert "No newsletter subscribers found" in str(exc.value)
+        assert newsletter_service.list_all(make_admin()) == []

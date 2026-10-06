@@ -1,5 +1,12 @@
 import pytest
 
+from app.api.exceptions import (
+    BadRequestException,
+    ConflictException,
+    ForbiddenException,
+    OrderNotFoundException,
+    PaymentNotFoundException,
+)
 from app.models.order import Order, OrderStatus
 from app.models.payment import Payment
 from app.schemas.payment import PaymentCreate
@@ -84,10 +91,9 @@ class TestCreate:
     def test_create_order_not_found(self, payment_service, order_repo, payment_repo):
         order_repo.get_by_id.return_value = None
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(OrderNotFoundException):
             payment_service.create(create_payload(order_id=99))
 
-        assert str(exc.value) == "Order not found with id 99"
         payment_service.session.add.assert_not_called()
 
 
@@ -101,10 +107,8 @@ class TestGetById:
     def test_get_by_id_not_found(self, payment_service, payment_repo):
         payment_repo.get_by_id.return_value = None
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(PaymentNotFoundException):
             payment_service.get_by_id(99)
-
-        assert str(exc.value) == "No payment found with id 99"
 
 
 class TestGetByOrderId:
@@ -115,12 +119,10 @@ class TestGetByOrderId:
         assert payment_service.get_by_order_id(1) == payments
 
     def test_get_by_order_id_empty(self, payment_service, payment_repo):
+        """Pedido sem pagamentos devolve [] (estado normal), não erro."""
         payment_repo.get_by_order_id.return_value = []
 
-        with pytest.raises(ValueError) as exc:
-            payment_service.get_by_order_id(1)
-
-        assert str(exc.value) == "No payments found with order_id 1"
+        assert payment_service.get_by_order_id(1) == []
 
 
 class TestCreateCheckout:
@@ -232,10 +234,9 @@ class TestCreateCheckout:
     ):
         order_repo.get_by_id.return_value = None
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(OrderNotFoundException):
             payment_service.create_checkout(99, 1)
 
-        assert str(exc.value) == "Order not found with id 99"
         payment_gateway.create_preference.assert_not_called()
 
     def test_create_checkout_not_owned(
@@ -243,10 +244,9 @@ class TestCreateCheckout:
     ):
         order_repo.get_by_id.return_value = make_order(user_id=2)
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(ForbiddenException):
             payment_service.create_checkout(1, 1)
 
-        assert str(exc.value) == "Order 1 does not belong to user 1"
         payment_gateway.create_preference.assert_not_called()
 
     def test_create_checkout_without_items(
@@ -255,10 +255,9 @@ class TestCreateCheckout:
         order_repo.get_by_id.return_value = make_order()
         order_repo.get_with_items_products.return_value = []
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(OrderNotFoundException):
             payment_service.create_checkout(1, 1)
 
-        assert str(exc.value) == "Order not found with id 1"
         payment_gateway.create_preference.assert_not_called()
 
     def test_create_checkout_already_exists(
@@ -268,10 +267,9 @@ class TestCreateCheckout:
         order_repo.get_with_items_products.return_value = [make_order_item()]
         payment_repo.get_by_order_id.return_value = [make_payment()]
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(ConflictException):
             payment_service.create_checkout(1, 1)
 
-        assert str(exc.value) == "Payment already exists for order 1"
         payment_gateway.create_preference.assert_not_called()
 
 
@@ -514,10 +512,8 @@ class TestProcessWebhook:
     ):
         payment_gateway.get_payment.return_value = {"status": "approved"}
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(BadRequestException):
             payment_service.process_webhook("MP-PAY-1")
-
-        assert str(exc.value) == "Payment MP-PAY-1 has no external_reference"
 
     def test_webhook_payment_not_found(
         self, payment_service, payment_repo, payment_gateway
@@ -526,10 +522,8 @@ class TestProcessWebhook:
         payment_repo.get_by_order_id.return_value = []
         self._gateway_returns(payment_gateway, "approved")
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(PaymentNotFoundException):
             payment_service.process_webhook("MP-PAY-1")
-
-        assert str(exc.value) == "Payment not found for order 1"
 
     def test_webhook_order_mismatch(
         self, payment_service, payment_repo, payment_gateway
@@ -539,7 +533,5 @@ class TestProcessWebhook:
         )
         self._gateway_returns(payment_gateway, "approved", order_id=1)
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(ConflictException):
             payment_service.process_webhook("MP-PAY-1")
-
-        assert str(exc.value) == "Payment MP-PAY-1 does not match order 1"

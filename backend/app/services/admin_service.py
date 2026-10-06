@@ -3,6 +3,10 @@ from datetime import datetime, timedelta
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
+from app.api.exceptions import (
+    InvalidStateTransitionException,
+    OrderNotFoundException,
+)
 from app.models.order import Order, OrderStatus
 from app.models.order_item import OrderItem
 from app.models.product import Product
@@ -197,12 +201,15 @@ class AdminService:
             .first()
         )
         if not order:
-            raise ValueError(f"Pedido #{order_id} não encontrado")
+            raise OrderNotFoundException()
 
         try:
             status_enum = OrderStatus(new_status.lower())
         except ValueError as exc:
-            raise ValueError(f"Status '{new_status}' inválido") from exc
+            raise InvalidStateTransitionException(
+                current=order.status.value if hasattr(order.status, "value") else str(order.status),
+                target=new_status,
+            ) from exc
 
         order.status = status_enum
         order.updated_at = datetime.now()

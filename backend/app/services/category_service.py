@@ -1,3 +1,8 @@
+from app.api.exceptions import (
+    CategoryNotFoundException,
+    ConflictException,
+    InsufficientPermissionException,
+)
 from app.models.category import Category
 from app.models.user import User, UserRole
 from app.repositories.category_repo import CategoryRepository
@@ -19,13 +24,13 @@ class CategoryService:
     @staticmethod
     def _ensure_admin(current_user: User) -> None:
         if current_user.role != UserRole.ADMIN:
-            raise ValueError("Admin permission required to manage categories")
+            raise InsufficientPermissionException()
 
     def get_by_id(self, category_id: int) -> Category:
         category = self.repo.get_by_id(category_id)
 
         if category is None:
-            raise ValueError(f"No category found with id {category_id}")
+            raise CategoryNotFoundException()
 
         return category
 
@@ -33,7 +38,7 @@ class CategoryService:
         category = self.repo.get_by_name(name)
 
         if category is None:
-            raise ValueError(f"No category found with name {name}")
+            raise CategoryNotFoundException()
 
         return category
 
@@ -41,17 +46,12 @@ class CategoryService:
         category = self.repo.get_by_slug(slug)
 
         if category is None:
-            raise ValueError(f"No category found with slug {slug}")
+            raise CategoryNotFoundException()
 
         return category
 
     def get_all(self) -> list:
-        categories = self.repo.get_all()
-
-        if categories is None:
-            raise ValueError("No categories found")
-
-        return categories
+        return self.repo.get_all()
 
     def create(self, data, current_user: User) -> Category:
         with self.session.begin():
@@ -59,11 +59,17 @@ class CategoryService:
 
             existing_name = self.repo.get_by_name(data.name)
             if existing_name is not None:
-                raise ValueError(f"Category with name '{data.name}' already exists")
+                raise ConflictException(
+                    f"Já existe uma categoria com o nome '{data.name}'.",
+                    code="DUPLICATE_CATEGORY",
+                )
 
             existing_slug = self.repo.get_by_slug(data.slug)
             if existing_slug is not None:
-                raise ValueError(f"Category with slug '{data.slug}' already exists")
+                raise ConflictException(
+                    f"Já existe uma categoria com o slug '{data.slug}'.",
+                    code="DUPLICATE_CATEGORY",
+                )
 
             category = self.repo.create(
                 Category(
@@ -85,17 +91,23 @@ class CategoryService:
             category = self.repo.get_by_id(category_id)
 
             if category is None:
-                raise ValueError(f"No category found with id {category_id}")
+                raise CategoryNotFoundException()
 
             if data.name is not None:
                 existing_name = self.repo.get_by_name(data.name)
                 if existing_name is not None and existing_name.id != category_id:
-                    raise ValueError(f"Category with name '{data.name}' already exists")
+                    raise ConflictException(
+                        f"Já existe uma categoria com o nome '{data.name}'.",
+                        code="DUPLICATE_CATEGORY",
+                    )
 
             if data.slug is not None:
                 existing_slug = self.repo.get_by_slug(data.slug)
                 if existing_slug is not None and existing_slug.id != category_id:
-                    raise ValueError(f"Category with slug '{data.slug}' already exists")
+                    raise ConflictException(
+                        f"Já existe uma categoria com o slug '{data.slug}'.",
+                        code="DUPLICATE_CATEGORY",
+                    )
 
             for field, value in data.model_dump(exclude_unset=True).items():
                 setattr(category, field, value)
@@ -111,7 +123,7 @@ class CategoryService:
             category = self.repo.get_by_id(category_id)
 
             if category is None:
-                raise ValueError(f"No category found with id {category_id}")
+                raise CategoryNotFoundException()
 
             self.repo.delete(category)
             return category

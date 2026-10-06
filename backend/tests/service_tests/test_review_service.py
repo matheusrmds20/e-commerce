@@ -1,5 +1,12 @@
 import pytest
 
+from app.api.exceptions import (
+    DuplicateReviewException,
+    NotFoundException,
+    ProductNotFoundException,
+    ReviewForbiddenException,
+    UserNotFoundException,
+)
 from app.models.product import Product
 from app.models.review import Review
 from app.models.user import User, UserRole
@@ -59,10 +66,8 @@ class TestGetByUserId:
         user.reviews = [make_review()]
         user_repo.get_by_id.return_value = user
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(ReviewForbiddenException):
             review_service.get_by_user_id(make_user(id=2), 1)
-
-        assert str(exc.value) == "Review is not owned by user"
 
     def test_admin_can_target_any_user(self, review_service, user_repo):
         user = make_user()
@@ -75,20 +80,16 @@ class TestGetByUserId:
     def test_user_not_found(self, review_service, user_repo):
         user_repo.get_by_id.return_value = None
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(UserNotFoundException):
             review_service.get_by_user_id(make_user())
 
-        assert str(exc.value) == "No user found with id 1"
-
     def test_no_reviews(self, review_service, user_repo):
+        """Sem avaliações devolve [] (estado normal), não erro."""
         user = make_user()
         user.reviews = []
         user_repo.get_by_id.return_value = user
 
-        with pytest.raises(ValueError) as exc:
-            review_service.get_by_user_id(make_user())
-
-        assert str(exc.value) == "No reviews found with user_id 1"
+        assert review_service.get_by_user_id(make_user()) == []
 
 
 class TestGetByProductId:
@@ -102,10 +103,8 @@ class TestGetByProductId:
     def test_product_not_found(self, review_service, product_repo):
         product_repo.get_by_id.return_value = None
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(ProductNotFoundException):
             review_service.get_by_product_id(99)
-
-        assert str(exc.value) == "No product found with id 99"
 
     def test_no_reviews_returns_empty(self, review_service, product_repo, review_repo):
         product_repo.get_by_id.return_value = make_product()
@@ -136,35 +135,29 @@ class TestCreate:
     def test_user_not_found(self, review_service, user_repo):
         user_repo.get_by_id.return_value = None
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(UserNotFoundException):
             review_service.create(
                 make_user(), ReviewCreate(product_id=1, rating=5)
             )
-
-        assert str(exc.value) == "No user found with id 1"
 
     def test_product_not_found(self, review_service, user_repo, product_repo):
         user_repo.get_by_id.return_value = make_user()
         product_repo.get_by_id.return_value = None
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(ProductNotFoundException):
             review_service.create(
                 make_user(), ReviewCreate(product_id=99, rating=5)
             )
-
-        assert str(exc.value) == "No product found with id 99"
 
     def test_duplicate_review(self, review_service, user_repo, product_repo, review_repo):
         user_repo.get_by_id.return_value = make_user()
         product_repo.get_by_id.return_value = make_product()
         review_repo.get_by_user_id_and_product_id.return_value = make_review()
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(DuplicateReviewException):
             review_service.create(
                 make_user(), ReviewCreate(product_id=1, rating=5)
             )
-
-        assert "already reviewed" in str(exc.value)
 
 
 class TestUpdate:
@@ -182,18 +175,14 @@ class TestUpdate:
     def test_not_found(self, review_service, review_repo):
         review_repo.get_by_id.return_value = None
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(NotFoundException):
             review_service.update(99, ReviewUpdate(rating=4), make_user())
-
-        assert str(exc.value) == "No review found with id 99"
 
     def test_not_owned(self, review_service, review_repo):
         review_repo.get_by_id.return_value = make_review(user_id=2)
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(ReviewForbiddenException):
             review_service.update(1, ReviewUpdate(rating=4), make_user())
-
-        assert str(exc.value) == "Review is not owned by user"
 
     def test_admin_can_update_any_review(self, review_service, review_repo):
         review = make_review(user_id=2)
@@ -219,18 +208,14 @@ class TestDelete:
     def test_not_found(self, review_service, review_repo):
         review_repo.get_by_id.return_value = None
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(NotFoundException):
             review_service.delete(99, make_user())
-
-        assert str(exc.value) == "No review found with id 99"
 
     def test_not_owned(self, review_service, review_repo):
         review_repo.get_by_id.return_value = make_review(user_id=2)
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(ReviewForbiddenException):
             review_service.delete(1, make_user())
-
-        assert str(exc.value) == "Review is not owned by user"
 
     def test_admin_can_delete_any_review(self, review_service, review_repo):
         review = make_review(user_id=2)

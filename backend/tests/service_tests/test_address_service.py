@@ -1,6 +1,11 @@
 import pytest
 
-from app.api.exceptions import AddressLinkedToOrdersException
+from app.api.exceptions import (
+    AddressForbiddenException,
+    AddressLinkedToOrdersException,
+    AddressNotFoundException,
+    ConflictException,
+)
 from app.models.address import Address
 from app.schemas.address import AddressCreate, AddressUpdate
 
@@ -44,18 +49,14 @@ class TestGet:
     def test_get_by_id_not_found(self, address_service, address_repo):
         address_repo.get_by_id.return_value = None
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(AddressNotFoundException):
             address_service.get_by_id(1, 99)
-
-        assert str(exc.value) == "No address found with id 99"
 
     def test_get_by_id_not_owned(self, address_service, address_repo):
         address_repo.get_by_id.return_value = make_address(user_id=2)
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(AddressForbiddenException):
             address_service.get_by_id(1, 1)
-
-        assert str(exc.value) == "Address is not owned by user"
 
     def test_get_by_user_id_success(self, address_service, address_repo):
         addresses = [make_address()]
@@ -72,10 +73,8 @@ class TestGet:
     def test_get_by_zip_code_empty(self, address_service, address_repo):
         address_repo.get_by_zip_code.return_value = []
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(AddressNotFoundException):
             address_service.get_by_zip_code(1, "99999999")
-
-        assert str(exc.value) == "No address found with zip_code 99999999"
 
     def test_get_default_success(self, address_service, address_repo):
         address = make_address(is_default=True)
@@ -86,10 +85,8 @@ class TestGet:
     def test_get_default_none(self, address_service, address_repo):
         address_repo.get_actual_address_default.return_value = None
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(AddressNotFoundException):
             address_service.get_actual_address_default(1)
-
-        assert str(exc.value) == "No default address found"
 
 
 class TestSetDefault:
@@ -105,10 +102,8 @@ class TestSetDefault:
     def test_not_found(self, address_service, address_repo):
         address_repo.set_default.return_value = None
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(AddressNotFoundException):
             address_service.set_default(1, 99)
-
-        assert str(exc.value) == "No address found with id 99"
 
 
 class TestCreate:
@@ -141,10 +136,8 @@ class TestCreate:
     def test_zip_code_already_exists(self, address_service, address_repo):
         address_repo.get_by_zip_code.return_value = make_address()
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(ConflictException):
             address_service.create(create_payload(), 1)
-
-        assert "already exists" in str(exc.value)
 
 
 class TestUpdate:
@@ -162,18 +155,14 @@ class TestUpdate:
     def test_not_found(self, address_service, address_repo):
         address_repo.get_by_id.return_value = None
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(AddressNotFoundException):
             address_service.update(99, AddressUpdate(street="Rua B"), 1)
-
-        assert str(exc.value) == "No address found with id 99"
 
     def test_not_owned(self, address_service, address_repo):
         address_repo.get_by_id.return_value = make_address(user_id=2)
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(AddressForbiddenException):
             address_service.update(1, AddressUpdate(street="Rua B"), 1)
-
-        assert str(exc.value) == "Address is not owned by user"
 
 
 class TestDelete:
@@ -201,15 +190,11 @@ class TestDelete:
     def test_not_found(self, address_service, address_repo):
         address_repo.get_by_id.return_value = None
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(AddressNotFoundException):
             address_service.delete(99, 1)
-
-        assert str(exc.value) == "No address found with id 99"
 
     def test_not_owned(self, address_service, address_repo):
         address_repo.get_by_id.return_value = make_address(user_id=2)
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(AddressForbiddenException):
             address_service.delete(1, 1)
-
-        assert str(exc.value) == "Address is not owned by user"

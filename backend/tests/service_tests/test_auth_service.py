@@ -9,6 +9,7 @@ from app.api.exceptions import (
     InactiveUserException,
     InvalidCredentialsException,
     InvalidTokenException,
+    TokenExpiredException,
     UserNotFoundException,
 )
 from app.models.user import User, UserRole
@@ -127,6 +128,19 @@ class TestRefresh:
             user_repo.get_by_id.return_value = None
             with pytest.raises(InvalidTokenException):
                 auth_service.refresh("old-refresh-token")
+
+    def test_refresh_expired_token(self, auth_service, user_repo):
+        """Refresh expirado → TokenExpiredException (distinto de token inválido)."""
+        from jose import ExpiredSignatureError
+
+        with patch(
+            "app.services.auth_service.decode_token",
+            side_effect=ExpiredSignatureError("expired"),
+        ):
+            with pytest.raises(TokenExpiredException):
+                auth_service.refresh("expired-refresh-token")
+
+        user_repo.get_by_id.assert_not_called()
 
 
 class TestLogout:

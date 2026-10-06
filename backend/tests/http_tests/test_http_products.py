@@ -24,6 +24,7 @@ from helpers import assert_error, assert_validation_error, product_payload
 from app.api.exceptions import (
     CategoryNotFoundException,
     ConflictException,
+    InsufficientPermissionException,
     ProductNotFoundException,
 )
 from app.models.user import UserRole
@@ -86,9 +87,7 @@ class TestCreateProduct:
     def test_create_customer_forbidden(self, client, auth_user):
         auth_user(1, role="customer")
         svc = Mock(name="product_service")
-        svc.create.side_effect = ValueError(
-            "Admin permission required to manage products"
-        )
+        svc.create.side_effect = InsufficientPermissionException()
 
         with patch("app.api.v1.products.get_product_service", return_value=svc):
             response = client.post(f"{PREFIX}/create", json=CREATE_OK)
@@ -156,16 +155,16 @@ class TestListProducts:
         assert isinstance(body, list)
         assert len(body) == 2
 
-    def test_list_service_error(self, client):
-        """Lista vazia: o serviço real lança ValueError; no contrato, documenta-se o 500."""
+    def test_list_empty(self, client):
+        """Lista vazia: devolve 200 com [] (estado normal de catálogo)."""
         svc = Mock(name="product_service")
-        svc.get_all.side_effect = ValueError("No products found")
+        svc.get_all.return_value = []
 
         with patch("app.api.v1.products.get_product_service", return_value=svc):
             response = client.get(f"{PREFIX}/list")
 
-        assert response.status_code == 500
-        assert response.json()["error"]["code"] == "INTERNAL_SERVER_ERROR"
+        assert response.status_code == 200
+        assert response.json() == []
 
 
 class TestGetProduct:
@@ -244,9 +243,7 @@ class TestUpdateProduct:
     def test_update_customer_forbidden(self, client, auth_user):
         auth_user(1, role="customer")
         svc = Mock(name="product_service")
-        svc.update.side_effect = ValueError(
-            "Admin permission required to manage products"
-        )
+        svc.update.side_effect = InsufficientPermissionException()
 
         with patch("app.api.v1.products.get_product_service", return_value=svc):
             response = client.patch(f"{PREFIX}/update/1", json={"price": 49.9})
@@ -305,9 +302,7 @@ class TestDeleteProduct:
     def test_delete_customer_forbidden(self, client, auth_user):
         auth_user(1, role="customer")
         svc = Mock(name="product_service")
-        svc.delete.side_effect = ValueError(
-            "Admin permission required to manage products"
-        )
+        svc.delete.side_effect = InsufficientPermissionException()
 
         with patch("app.api.v1.products.get_product_service", return_value=svc):
             response = client.delete(f"{PREFIX}/delete/1")
@@ -494,7 +489,7 @@ class TestPaginatedProducts:
     def test_paginated_category_not_found(self, client):
         """Categoria inexistente é 404 (erro do cliente), não lista vazia."""
         svc = Mock(name="product_service")
-        svc.get_paginated.side_effect = ValueError("No category found with id 999")
+        svc.get_paginated.side_effect = CategoryNotFoundException()
 
         with patch("app.api.v1.products.get_product_service", return_value=svc):
             response = client.get(f"{PREFIX}/paginated?category_id=999")

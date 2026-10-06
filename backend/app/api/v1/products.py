@@ -4,13 +4,6 @@ from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db
-from app.api.exceptions import (
-    BadRequestException,
-    CategoryNotFoundException,
-    ConflictException,
-    InsufficientPermissionException,
-    ProductNotFoundException,
-)
 from app.models.user import User
 from app.schemas.common import Page
 from app.schemas.product import ProductCreate, ProductResponse, ProductUpdate
@@ -21,8 +14,8 @@ product_router = APIRouter()
 DbSession = Annotated[Session, Depends(get_db)]
 
 # Escritas no catálogo exigem Bearer token de administrador. A checagem do
-# papel acontece no service (`_ensure_admin`), que levanta ValueError traduzido
-# pelo `_traduzir_value_error` em 403.
+# papel acontece no service (`_ensure_admin`), que levanta
+# `InsufficientPermissionException` (403) diretamente — sem tradução na rota.
 AuthUser = Annotated[User, Depends(get_current_user)]
 
 # Limite máximo de itens numa vitrine. Evita que um cliente peça a tabela
@@ -58,30 +51,6 @@ def get_product_service(db: DbSession) -> ProductService:
     return ProductService(db)
 
 
-def _traduzir_value_error(exc: ValueError):
-    """Converte os ``ValueError`` do service no erro HTTP correspondente.
-
-    Sem esta tradução o handler global devolveria 500 para casos que o cliente
-    precisa distinguir (403 sem permissão, 409 duplicado, 404 inexistente).
-    Mesmo padrão já usado em `addresses.py`, `orders.py` e `categories.py`.
-    """
-    msg = str(exc)
-
-    if "Admin permission required" in msg:
-        return InsufficientPermissionException()
-
-    if "No category found" in msg:
-        return CategoryNotFoundException()
-
-    if "No product found" in msg:
-        return ProductNotFoundException()
-
-    if "already exists" in msg:
-        return ConflictException(msg, code="DUPLICATE_PRODUCT")
-
-    return BadRequestException(msg)
-
-
 @product_router.post(
     "/create",
     response_model=ProductResponse,
@@ -92,10 +61,7 @@ def create_product(
     data: ProductCreate, current_user: AuthUser, db: DbSession
 ) -> ProductResponse:
     """Cria um produto. Exige admin — sem token 401, sem papel 403."""
-    try:
-        return get_product_service(db).create(data, current_user)
-    except ValueError as exc:
-        raise _traduzir_value_error(exc) from exc
+    return get_product_service(db).create(data, current_user)
 
 
 @product_router.get(
@@ -137,12 +103,9 @@ def list_products_paginated(
 
     Categoria inexistente responde 404 (erro do cliente), não lista vazia.
     """
-    try:
-        return get_product_service(db).get_paginated(
-            page, per_page, category_id, search=search
-        )
-    except ValueError as exc:
-        raise _traduzir_value_error(exc) from exc
+    return get_product_service(db).get_paginated(
+        page, per_page, category_id, search=search
+    )
 
 
 @product_router.get(
@@ -248,10 +211,7 @@ def update_product(
     db: DbSession,
 ) -> ProductResponse:
     """Atualiza um produto. Exige admin — sem token 401, sem papel 403."""
-    try:
-        return get_product_service(db).update(product_id, data, current_user)
-    except ValueError as exc:
-        raise _traduzir_value_error(exc) from exc
+    return get_product_service(db).update(product_id, data, current_user)
 
 
 @product_router.delete(
@@ -263,7 +223,4 @@ def delete_product(
     product_id: int, current_user: AuthUser, db: DbSession
 ) -> ProductResponse:
     """Exclui um produto. Exige admin — sem token 401, sem papel 403."""
-    try:
-        return get_product_service(db).delete(product_id, current_user)
-    except ValueError as exc:
-        raise _traduzir_value_error(exc) from exc
+    return get_product_service(db).delete(product_id, current_user)

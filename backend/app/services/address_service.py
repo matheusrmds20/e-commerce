@@ -1,4 +1,9 @@
-from app.api.exceptions import AddressLinkedToOrdersException
+from app.api.exceptions import (
+    AddressForbiddenException,
+    AddressLinkedToOrdersException,
+    AddressNotFoundException,
+    ConflictException,
+)
 from app.models.address import Address
 from app.models.order import Order
 from app.repositories.address_repo import AddressRepository
@@ -17,28 +22,23 @@ class AddressService:
         address = self.repo.get_by_id(address_id)
 
         if address is None:
-            raise ValueError(f"No address found with id {address_id}")
+            raise AddressNotFoundException()
 
         if address.user_id != user_id:
-            raise ValueError("Address is not owned by user")
+            raise AddressForbiddenException()
 
 
         return address
 
     def get_by_user_id(self, user_id: int) -> list:
-        addresses = self.repo.get_by_user_id(user_id)
-
-        if addresses is None:
-            raise ValueError(f"No addresses found with user_id {user_id}")
-
-
-        return addresses
+        # Usuário sem endereços é estado normal: devolve lista vazia (200).
+        return self.repo.get_by_user_id(user_id)
 
     def get_by_zip_code(self, user_id: int, zip_code: str) -> dict:
         adress = self.repo.get_by_zip_code(user_id, zip_code)
 
         if not adress:
-            raise ValueError(f"No address found with zip_code {zip_code}")
+            raise AddressNotFoundException()
 
         return adress
 
@@ -48,7 +48,7 @@ class AddressService:
         adress = self.repo.get_actual_address_default(user_id)
 
         if adress is None:
-            raise ValueError("No default address found")
+            raise AddressNotFoundException()
 
         return adress
 
@@ -56,7 +56,7 @@ class AddressService:
         address = self.repo.set_default(user_id, address_id)
 
         if address is None:
-            raise ValueError(f"No address found with id {address_id}")
+            raise AddressNotFoundException()
 
         return address
 
@@ -66,7 +66,10 @@ class AddressService:
             address_already_exists = self.repo.get_by_zip_code(user_id, data.zip_code)
 
             if address_already_exists:
-                raise ValueError(f"Address with zip_code {data.zip_code} already exists")
+                raise ConflictException(
+                    "Já existe um endereço com este CEP.",
+                    code="ADDRESS_ALREADY_EXISTS",
+                )
 
             new_address = self.repo.create(
                 Address(
@@ -92,10 +95,10 @@ class AddressService:
             address = self.repo.get_by_id(adress_id)
 
             if address is None:
-                raise ValueError(f"No address found with id {adress_id}")
+                raise AddressNotFoundException()
 
             if address.user_id != user_id:
-                raise ValueError("Address is not owned by user")
+                raise AddressForbiddenException()
 
 
             for field, value in data.model_dump(exclude_unset=True).items():
@@ -112,10 +115,10 @@ class AddressService:
 
             address = self.repo.get_by_id(adress_id)
             if address is None:
-                raise ValueError(f"No address found with id {adress_id}")
+                raise AddressNotFoundException()
 
             if address.user_id != user_id:
-                raise ValueError("Address is not owned by user")
+                raise AddressForbiddenException()
 
             # Endereços usados em pedidos não podem ser excluídos: o pedido
             # guarda referência NOT NULL ao endereço de entrega e removê-lo

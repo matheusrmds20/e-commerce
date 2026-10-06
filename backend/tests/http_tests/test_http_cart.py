@@ -12,9 +12,9 @@ de autorização (IDOR) em que qualquer cliente podia ler/mutar o carrinho de
 outro usuário. Os testes abaixo injetam o usuário via
 ``app.dependency_overrides[get_current_user]``.
 
-NOTA: o CartService real lança ``ValueError``; as rotas traduzem via
-``_traduzir_value_error`` (404/403/409/400) — ver `cart.py`. Testes que mockam
-``ValueError`` validam essa tradução.
+NOTA: o CartService real lança exceções de domínio (subclasses de
+``BookCommerceException``) e os handlers globais geram o JSON de erro
+(404/403/409/400). Testes que mockam essas exceções validam o contrato HTTP.
 """
 from unittest.mock import Mock, patch
 
@@ -22,6 +22,7 @@ import pytest
 from helpers import assert_error, assert_validation_error, cart_item_payload, cart_payload
 
 from app.api.exceptions import (
+    CartNotFoundException,
     ConflictException,
     InsufficientStockException,
     NotFoundException,
@@ -150,23 +151,23 @@ class TestGetCart:
 
         assert_error(response, 404, "CART_NOT_FOUND")
 
-    def test_get_by_user_id_valorerror_vira_404_handshake(self, client, auth_user):
+    def test_get_by_user_id_cart_nao_encontrada_vira_404(self, client, auth_user):
         """Handshake do front: usuário novo navega e o app chama GET /cart/me.
 
-        O service real lança ``ValueError("No cart found...")``; a rota deve
-        traduzir para 404 padronizado (CART_NOT_FOUND). Regressão: antes a
-        tradução não existia e o erro caía no handler genérico (500 + traceback
-        no log) a cada carrinho de usuário recém-criado.
+        O service real lança ``CartNotFoundException`` (404 CART_NOT_FOUND).
+        Regressão: antes a tradução de ``ValueError`` não existia e o erro
+        caía no handler genérico (500 + traceback no log) a cada carrinho de
+        usuário recém-criado.
         """
         auth_user(1)
         svc = Mock(name="cart_service")
-        svc.get_by_user_id.side_effect = ValueError("No cart found with user_id 1")
+        svc.get_by_user_id.side_effect = CartNotFoundException()
 
         with patch("app.api.v1.cart.get_cart_service", return_value=svc):
             response = client.get(f"{PREFIX}/cart/me")
 
         assert_error(response, 404, "CART_NOT_FOUND")
-        assert response.json()["error"]["message"] == "No cart found with user_id 1"
+        assert response.json()["error"]["message"] == "Carrinho não encontrado."
 
 
 class TestAddItem:

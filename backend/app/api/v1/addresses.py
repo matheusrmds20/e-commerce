@@ -4,12 +4,6 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db
-from app.api.exceptions import (
-    BadRequestException,
-    ConflictException,
-    ForbiddenException,
-    NotFoundException,
-)
 from app.models.user import User
 from app.schemas.address import AddressCreate, AddressResponse, AddressUpdate
 from app.services.address_service import AddressService
@@ -24,22 +18,6 @@ def get_address_service(db: DbSession) -> AddressService:
     return AddressService(db)
 
 
-def _traduzir_value_error(exc: ValueError) -> BadRequestException:
-    """Traduz os ``ValueError`` do service em erros HTTP (senão viram 500)."""
-    msg = str(exc)
-
-    if "not owned by user" in msg:
-        return ForbiddenException(msg)
-
-    if "already exists" in msg:
-        return ConflictException(msg, code="ADDRESS_ALREADY_EXISTS")
-
-    if "No address" in msg:
-        return NotFoundException(msg, code="ADDRESS_NOT_FOUND")
-
-    return BadRequestException(msg)
-
-
 @address_router.post(
     "/create",
     response_model=AddressResponse,
@@ -49,10 +27,7 @@ def _traduzir_value_error(exc: ValueError) -> BadRequestException:
 def create_address(
     data: AddressCreate, user: UserDb, db: DbSession
 ) -> AddressResponse:
-    try:
-        return get_address_service(db).create(data, user.id)
-    except ValueError as exc:
-        raise _traduzir_value_error(exc) from exc
+    return get_address_service(db).create(data, user.id)
 
 
 @address_router.get(
@@ -61,10 +36,7 @@ def create_address(
     summary="Lista os endereços do usuário autenticado",
 )
 def list_addresses(user: UserDb, db: DbSession) -> list:
-    try:
-        return get_address_service(db).get_by_user_id(user.id)
-    except ValueError as exc:
-        raise _traduzir_value_error(exc) from exc
+    return get_address_service(db).get_by_user_id(user.id)
 
 
 @address_router.get(
@@ -75,10 +47,7 @@ def list_addresses(user: UserDb, db: DbSession) -> list:
 def get_address(
     address_id: int, user: UserDb, db: DbSession
 ) -> AddressResponse:
-    try:
-        return get_address_service(db).get_by_id(user.id, address_id)
-    except ValueError as exc:
-        raise _traduzir_value_error(exc) from exc
+    return get_address_service(db).get_by_id(user.id, address_id)
 
 
 @address_router.get(
@@ -87,10 +56,7 @@ def get_address(
     summary="Busca o endereço padrão do usuário",
 )
 def get_default_address(user: UserDb, db: DbSession) -> AddressResponse:
-    try:
-        return get_address_service(db).get_actual_address_default(user.id)
-    except ValueError as exc:
-        raise _traduzir_value_error(exc) from exc
+    return get_address_service(db).get_actual_address_default(user.id)
 
 
 @address_router.get(
@@ -101,10 +67,7 @@ def get_default_address(user: UserDb, db: DbSession) -> AddressResponse:
 def get_address_by_zip_code(
     zip_code: str, user: UserDb, db: DbSession
 ) -> AddressResponse:
-    try:
-        return get_address_service(db).get_by_zip_code(user.id, zip_code)
-    except ValueError as exc:
-        raise _traduzir_value_error(exc) from exc
+    return get_address_service(db).get_by_zip_code(user.id, zip_code)
 
 
 @address_router.patch(
@@ -115,10 +78,7 @@ def get_address_by_zip_code(
 def set_default_address(
     address_id: int, user: UserDb, db: DbSession
 ) -> AddressResponse:
-    try:
-        return get_address_service(db).set_default(user.id, address_id)
-    except ValueError as exc:
-        raise _traduzir_value_error(exc) from exc
+    return get_address_service(db).set_default(user.id, address_id)
 
 
 @address_router.patch(
@@ -129,10 +89,7 @@ def set_default_address(
 def update_address(
     address_id: int, data: AddressUpdate, user: UserDb, db: DbSession
 ) -> AddressResponse:
-    try:
-        return get_address_service(db).update(address_id, data, user.id)
-    except ValueError as exc:
-        raise _traduzir_value_error(exc) from exc
+    return get_address_service(db).update(address_id, data, user.id)
 
 
 @address_router.delete(
@@ -143,7 +100,4 @@ def update_address(
 def delete_address(
     address_id: int, user: UserDb, db: DbSession
 ) -> AddressResponse:
-    try:
-        return get_address_service(db).delete(address_id, user.id)
-    except ValueError as exc:
-        raise _traduzir_value_error(exc) from exc
+    return get_address_service(db).delete(address_id, user.id)

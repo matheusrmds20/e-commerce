@@ -1,5 +1,14 @@
 from sqlalchemy.exc import IntegrityError
 
+from app.api.exceptions import (
+    CartAlreadyExistsException,
+    CartItemNotFoundException,
+    CartNotFoundException,
+    ForbiddenException,
+    InsufficientStockException,
+    ProductNotFoundException,
+    UserNotFoundException,
+)
 from app.models.cart import Cart
 from app.repositories.cart_item_repo import CartItemRepository
 from app.repositories.cart_repo import CartRepository
@@ -36,12 +45,12 @@ class CartService:
         user = self.user_repo.get_by_id(user_id)
 
         if not user:
-            raise ValueError(f"No user found with id {user_id}")
+            raise UserNotFoundException(user_id=user_id)
 
         cart = user.cart
 
         if cart is None:
-            raise ValueError(f"No cart found with user_id {user_id}")
+            raise CartNotFoundException()
 
         return cart
 
@@ -51,12 +60,12 @@ class CartService:
             user = self.user_repo.get_by_id(user_id)
 
             if not user:
-                raise ValueError(f"No user found with id {user_id}")
+                raise UserNotFoundException(user_id=user_id)
 
             existing_cart = user.cart
 
             if existing_cart:
-                raise ValueError(f"User {user_id} already has a cart")
+                raise CartAlreadyExistsException()
 
             cart = Cart(user_id=user_id)
 
@@ -73,15 +82,18 @@ class CartService:
                     cart = self.cart_repo.get_by_id(cart_id)
 
                     if not cart:
-                        raise ValueError(f"No cart found with id {cart_id}")
+                        raise CartNotFoundException()
 
                     if cart.user_id != user_id:
-                        raise ValueError("Cart is not owned by user")
+                        raise ForbiddenException(
+                            "Este carrinho pertence a outro usuário.",
+                            code="CART_FORBIDDEN",
+                        )
 
                     product = self.product_repo.get_by_id_for_update(product_id)
 
                     if not product:
-                        raise ValueError(f"No product found with id {product_id}")
+                        raise ProductNotFoundException()
 
                     cart_item = self.cart_item_repo.get_by_cart_and_product(cart_id, product_id)
 
@@ -89,9 +101,8 @@ class CartService:
                     quantidade_total = quantidade_atual + quantity
 
                     if product.stock_qty < quantidade_total:
-                        raise ValueError(
-                            f"Insufficient stock for product {product_id}. "
-                            f"Available: {product.stock_qty}, requested: {quantidade_total}"
+                        raise InsufficientStockException(
+                            product.title, product.stock_qty
                         )
 
                     if cart_item:
@@ -112,15 +123,18 @@ class CartService:
             cart = self.cart_repo.get_by_id(cart_id)
 
             if not cart:
-                raise ValueError(f"No cart found with id {cart_id}")
+                raise CartNotFoundException()
 
             if cart.user_id != user_id:
-                raise ValueError("Cart is not owned by user")
+                raise ForbiddenException(
+                    "Este carrinho pertence a outro usuário.",
+                    code="CART_FORBIDDEN",
+                )
 
             cart_item = self.cart_item_repo.get_by_id(item_id)
 
             if not cart_item:
-                raise ValueError(f"No cart item found with id {item_id}")
+                raise CartItemNotFoundException()
 
             if quantity <= 0:
 
@@ -131,9 +145,8 @@ class CartService:
                 product = self.product_repo.get_by_id_for_update(cart_item.product_id)
 
                 if product and product.stock_qty < quantity:
-                    raise ValueError(
-                        f"Insufficient stock for product {cart_item.product_id}. "
-                        f"Available: {product.stock_qty}, requested: {quantity}"
+                    raise InsufficientStockException(
+                        product.title, product.stock_qty
                     )
 
             self.cart_item_repo.update_quantity(cart_item, quantity)
@@ -148,16 +161,19 @@ class CartService:
             cart = self.cart_repo.get_by_id(cart_id)
 
             if not cart:
-                raise ValueError(f"No cart found with id {cart_id}")
+                raise CartNotFoundException()
 
             if cart.user_id != user_id:
-                raise ValueError("Cart is not owned by user")
+                raise ForbiddenException(
+                    "Este carrinho pertence a outro usuário.",
+                    code="CART_FORBIDDEN",
+                )
 
             cart_item = self.cart_item_repo.get_by_id(item_id)
 
 
             if not cart_item:
-                raise ValueError(f"No cart item found with id {item_id}")
+                raise CartItemNotFoundException()
 
 
 
@@ -171,10 +187,13 @@ class CartService:
             cart = self.cart_repo.get_by_id(cart_id)
 
             if not cart:
-                raise ValueError(f"No cart found with id {cart_id}")
+                raise CartNotFoundException()
 
             if cart.user_id != user_id:
-                raise ValueError("Cart is not owned by user")
+                raise ForbiddenException(
+                    "Este carrinho pertence a outro usuário.",
+                    code="CART_FORBIDDEN",
+                )
 
             items = self.cart_repo.get_with_items(cart_id)
 
@@ -182,5 +201,3 @@ class CartService:
                 self._remove_item(item)
 
             return cart
-
-
