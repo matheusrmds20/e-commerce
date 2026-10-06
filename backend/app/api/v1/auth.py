@@ -30,7 +30,10 @@ def get_auth_service(db: DbSession) -> AuthService:
 def _set_refresh_cookie(response: Response, request: Request, token: str) -> None:
     """Grava o refresh token em cookie httpOnly.
 
-    - `Path=/auth` limita o envio às rotas de autenticação (refresca/logout).
+    - `Path=/api/v1/auth` limita o envio às rotas de autenticação — deve bater
+      com o prefixo REAL das rotas (app.include_router(router, prefix="/api/v1")
+      + router.include_router(auth_router, prefix="/auth")), ou o navegador
+      jamais enviaria o cookie.
     - `Secure` aplicado só quando a request chega por HTTPS — em dev local
       (http://localhost) fica desligado para o cookie funcionar no navegador.
     - `SameSite=Lax` protege contra CSRF cross-site mantendo a sessão ao
@@ -42,7 +45,7 @@ def _set_refresh_cookie(response: Response, request: Request, token: str) -> Non
         httponly=True,
         secure=request.url.scheme == "https",
         samesite="lax",
-        path="/auth",
+        path="/api/v1/auth",
         max_age=get_settings().REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
     )
 
@@ -52,7 +55,7 @@ def _expire_refresh_cookie(response: Response, request: Request) -> None:
         httponly=True,
         secure=request.url.scheme == "https",
         samesite="lax",
-        path="/auth",
+        path="/api/v1/auth",
     )
 
 
