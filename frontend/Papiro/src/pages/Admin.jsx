@@ -296,6 +296,9 @@ export default function Admin({ onVoltarParaLoja }) {
     return () => {
       ativo = false
     }
+    // `ehAdmin` é derivado de `usuario.role`; só muda no login/logout, e a
+    // busca dos dados de admin deve rodar somente na montagem (uma vez).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Fecha o modal de livro (limpa o modo edição)

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import BookCard from '../components/BookCard'
 import Migalhas from '../components/Migalhas'
 import Paginacao from '../components/Paginacao'
@@ -70,6 +70,7 @@ export default function MaisVendidos({ onAbrirLivro, onExplorarAcervo, onVoltarH
   }, [])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     carregarMaisVendidos()
   }, [carregarMaisVendidos])
 

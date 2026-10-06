@@ -123,6 +123,7 @@ export default function Acervo({ onAbrirLivro, termoInicial = '', onLimparBuscaI
   // Sincroniza se o termo inicial mudar externamente (ex: busca na Navbar)
   useEffect(() => {
     if (termoInicial !== undefined) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setTermoBusca(termoInicial)
       const limpo = termoInicial ? termoInicial.trim() : ''
       const novo = limpo ? limpo : null
