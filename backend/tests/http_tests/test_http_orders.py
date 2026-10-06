@@ -21,6 +21,7 @@ from helpers import assert_error, assert_validation_error, order_payload
 
 from app.api.exceptions import (
     BadRequestException,
+    CouponNotAssignedException,
     ForbiddenException,
     InsufficientStockException,
     InvalidCouponException,
@@ -175,9 +176,7 @@ class TestCreateOrder:
         """Cupom válido, mas não vinculado ao usuário: 403 com código dedicado."""
         auth_user(1)
         svc = Mock(name="order_service")
-        svc.create.side_effect = ValueError(
-            "Coupon 'PAPIRO10' is not assigned to user 1"
-        )
+        svc.create.side_effect = CouponNotAssignedException()
 
         with patch("app.api.v1.orders.get_order_service", return_value=svc):
             response = client.post(

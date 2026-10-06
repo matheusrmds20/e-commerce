@@ -1,4 +1,11 @@
 
+from app.api.exceptions import (
+    DuplicateWishlistException,
+    NotFoundException,
+    ProductNotFoundException,
+    UserNotFoundException,
+    WishlistForbiddenException,
+)
 from app.models.user import User, UserRole
 from app.models.wishlist import Wishlist
 from app.repositories.product_repo import ProductRepository
@@ -31,7 +38,7 @@ class WishlistService:
         if self._is_admin(current_user):
             return
         if current_user.id != user_id:
-            raise ValueError("Wishlist item is not owned by user")
+            raise WishlistForbiddenException()
 
     def get_by_user_id(
         self, current_user: User, user_id: int | None = None
@@ -47,14 +54,10 @@ class WishlistService:
         user = self.user_repo.get_by_id(alvo)
 
         if user is None:
-            raise ValueError(f"No user found with id {alvo}")
+            raise UserNotFoundException(user_id=alvo)
 
-        wishlist_items = user.wishlist_items
-
-        if wishlist_items is None:
-            raise ValueError(f"No wishlist items found with user_id {alvo}")
-
-        return wishlist_items
+        # Wishlist vazia é estado normal (lista vazia), não erro.
+        return user.wishlist_items or []
 
     def get_by_product_id(self, product_id: int, current_user: User) -> list:
         """Itens de wishlist de um produto.
@@ -66,7 +69,7 @@ class WishlistService:
         product = self.product_repo.get_by_id(product_id)
 
         if product is None:
-            raise ValueError(f"No product found with id {product_id}")
+            raise ProductNotFoundException()
 
         wishlist_items = self.repo.get_by_product_id(product_id)
 
@@ -78,20 +81,20 @@ class WishlistService:
             ]
 
         if wishlist_items is None:
-            raise ValueError(f"No wishlist items found with product_id {product_id}")
+            raise NotFoundException(
+                f"Nenhum item na lista de desejos do produto {product_id}.",
+                code="WISHLIST_NOT_FOUND",
+            )
 
         return wishlist_items
 
     def get_all(self, current_user: User) -> list:
         if not self._is_admin(current_user):
-            raise ValueError("Admin permission required to list all wishlists")
+            raise WishlistForbiddenException(
+                "Apenas administradores podem listar todas as listas de desejos."
+            )
 
-        wishlist_items = self.repo.get_all()
-
-        if not wishlist_items:
-            raise ValueError("No wishlist items found")
-
-        return wishlist_items
+        return self.repo.get_all()
 
     def create(self, data, current_user: User) -> dict:
         with self.session.begin():
@@ -101,21 +104,18 @@ class WishlistService:
             user = self.user_repo.get_by_id(user_id)
 
             if user is None:
-                raise ValueError(f"No user found with id {user_id}")
+                raise UserNotFoundException(user_id=user_id)
 
             product = self.product_repo.get_by_id(data.product_id)
 
             if product is None:
-                raise ValueError(f"No product found with id {data.product_id}")
+                raise ProductNotFoundException()
 
             existing_items = self.repo.get_by_user_id(user_id)
 
             for existing_item in existing_items:
                 if existing_item.product_id == data.product_id:
-                    raise ValueError(
-                        f"User {user_id} already has product {data.product_id} "
-                        f"in wishlist"
-                    )
+                    raise DuplicateWishlistException()
 
             wishlist_item = self.repo.create(
                 Wishlist(
@@ -132,7 +132,10 @@ class WishlistService:
             wishlist_item = self.repo.get_by_id(wishlist_id)
 
             if wishlist_item is None:
-                raise ValueError(f"No wishlist item found with id {wishlist_id}")
+                raise NotFoundException(
+                    "Item da lista de desejos não encontrado.",
+                    code="WISHLIST_NOT_FOUND",
+                )
 
             self._ensure_owner_or_admin(current_user, wishlist_item.user_id)
 

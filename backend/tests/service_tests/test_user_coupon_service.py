@@ -1,5 +1,12 @@
 import pytest
 
+from app.api.exceptions import (
+    ConflictException,
+    CouponNotAssignedException,
+    CouponNotFoundException,
+    NotFoundException,
+    UserNotFoundException,
+)
 from app.models.coupon import Coupon, DiscountType
 from app.models.user import User, UserRole
 from app.models.user_coupon import UserCoupon
@@ -50,18 +57,14 @@ class TestGet:
     def test_get_by_id_not_found(self, user_coupon_service, user_coupon_repo):
         user_coupon_repo.get_by_id.return_value = None
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(NotFoundException):
             user_coupon_service.get_by_id(99, 1)
-
-        assert str(exc.value) == "No user coupon found with id 99"
 
     def test_get_by_id_not_owned(self, user_coupon_service, user_coupon_repo):
         user_coupon_repo.get_by_id.return_value = make_user_coupon(user_id=2)
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(CouponNotAssignedException):
             user_coupon_service.get_by_id(1, 1)
-
-        assert str(exc.value) == "User coupon is not owned by user"
 
     def test_get_by_user_id_success(self, user_coupon_service, user_repo, user_coupon_repo):
         user_repo.get_by_id.return_value = make_user()
@@ -73,10 +76,8 @@ class TestGet:
     def test_get_by_user_id_user_not_found(self, user_coupon_service, user_repo):
         user_repo.get_by_id.return_value = None
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(UserNotFoundException):
             user_coupon_service.get_by_user_id(1)
-
-        assert str(exc.value) == "No user found with id 1"
 
     def test_get_by_coupon_id_success(self, user_coupon_service, coupon_repo, user_coupon_repo):
         coupon_repo.get_by_id.return_value = make_coupon()
@@ -88,10 +89,8 @@ class TestGet:
     def test_get_by_coupon_id_not_found(self, user_coupon_service, coupon_repo):
         coupon_repo.get_by_id.return_value = None
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(CouponNotFoundException):
             user_coupon_service.get_by_coupon_id(99)
-
-        assert str(exc.value) == "No coupon found with id 99"
 
     def test_get_all(self, user_coupon_service, user_coupon_repo):
         links = [make_user_coupon()]
@@ -111,10 +110,8 @@ class TestGet:
     def test_list_coupons_by_user_not_found(self, user_coupon_service, user_repo):
         user_repo.get_by_id.return_value = None
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(UserNotFoundException):
             user_coupon_service.list_coupons_by_user(1)
-
-        assert str(exc.value) == "No user found with id 1"
 
 
 class TestCreate:
@@ -137,29 +134,23 @@ class TestCreate:
     def test_user_not_found(self, user_coupon_service, user_repo):
         user_repo.get_by_id.return_value = None
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(UserNotFoundException):
             user_coupon_service.create(UserCouponCreate(user_id=1, coupon_id=1))
-
-        assert str(exc.value) == "No user found with id 1"
 
     def test_coupon_not_found(self, user_coupon_service, user_repo, coupon_repo):
         user_repo.get_by_id.return_value = make_user()
         coupon_repo.get_by_id.return_value = None
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(CouponNotFoundException):
             user_coupon_service.create(UserCouponCreate(user_id=1, coupon_id=99))
-
-        assert str(exc.value) == "No coupon found with id 99"
 
     def test_duplicate(self, user_coupon_service, user_repo, coupon_repo, user_coupon_repo):
         user_repo.get_by_id.return_value = make_user()
         coupon_repo.get_by_id.return_value = make_coupon()
         user_coupon_repo.get_by_user_and_coupon.return_value = make_user_coupon()
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(ConflictException):
             user_coupon_service.create(UserCouponCreate(user_id=1, coupon_id=1))
-
-        assert "already has coupon" in str(exc.value)
 
 
 class TestDelete:
@@ -175,15 +166,11 @@ class TestDelete:
     def test_not_found(self, user_coupon_service, user_coupon_repo):
         user_coupon_repo.get_by_id.return_value = None
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(NotFoundException):
             user_coupon_service.delete(99, 1)
-
-        assert str(exc.value) == "No user coupon found with id 99"
 
     def test_not_owned(self, user_coupon_service, user_coupon_repo):
         user_coupon_repo.get_by_id.return_value = make_user_coupon(user_id=2)
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(CouponNotAssignedException):
             user_coupon_service.delete(1, 1)
-
-        assert str(exc.value) == "User coupon is not owned by user"

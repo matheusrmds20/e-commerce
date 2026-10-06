@@ -4,11 +4,6 @@ from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db
-from app.api.exceptions import (
-    ConflictException,
-    NotFoundException,
-    ReviewForbiddenException,
-)
 from app.models.user import User
 from app.schemas.review import ReviewCreate, ReviewResponse, ReviewUpdate
 from app.services.review_service import ReviewService
@@ -23,30 +18,6 @@ def get_review_service(db: DbSession) -> ReviewService:
     return ReviewService(db)
 
 
-def _traduzir_value_error(exc: ValueError):
-    """Traduz os ``ValueError`` do service em erros HTTP (senão viram 500)."""
-    msg = str(exc)
-
-    if "not owned by user" in msg:
-        return ReviewForbiddenException(msg)
-
-    if "Admin permission required" in msg:
-        return ReviewForbiddenException(
-            "Apenas administradores podem acessar avaliações de outros usuários."
-        )
-
-    if "already reviewed" in msg:
-        return ConflictException(msg, code="DUPLICATE_REVIEW")
-
-    if "No review found" in msg:
-        return NotFoundException(msg, code="REVIEW_NOT_FOUND")
-
-    if "No user found" in msg:
-        return NotFoundException(msg, code="USER_NOT_FOUND")
-
-    return NotFoundException(msg, code="PRODUCT_NOT_FOUND")
-
-
 @review_router.post(
     "/create",
     response_model=ReviewResponse,
@@ -56,10 +27,7 @@ def _traduzir_value_error(exc: ValueError):
 def create_review(
     data: ReviewCreate, current_user: AuthUser, db: DbSession
 ) -> ReviewResponse:
-    try:
-        return get_review_service(db).create(current_user, data)
-    except ValueError as exc:
-        raise _traduzir_value_error(exc) from exc
+    return get_review_service(db).create(current_user, data)
 
 
 @review_router.get(
@@ -76,10 +44,7 @@ def list_reviews(
     ] = None,
 ) -> list:
     """Minhas avaliações. Com ``user_id``, restrito a administradores."""
-    try:
-        return get_review_service(db).get_by_user_id(current_user, user_id)
-    except ValueError as exc:
-        raise _traduzir_value_error(exc) from exc
+    return get_review_service(db).get_by_user_id(current_user, user_id)
 
 
 @review_router.get(
@@ -88,10 +53,7 @@ def list_reviews(
     summary="Lista as avaliações de um produto (público)",
 )
 def get_reviews_by_product(product_id: int, db: DbSession) -> list:
-    try:
-        return get_review_service(db).get_by_product_id(product_id)
-    except ValueError as exc:
-        raise _traduzir_value_error(exc) from exc
+    return get_review_service(db).get_by_product_id(product_id)
 
 
 @review_router.patch(
@@ -105,10 +67,7 @@ def update_review(
     current_user: AuthUser,
     db: DbSession,
 ) -> ReviewResponse:
-    try:
-        return get_review_service(db).update(review_id, data, current_user)
-    except ValueError as exc:
-        raise _traduzir_value_error(exc) from exc
+    return get_review_service(db).update(review_id, data, current_user)
 
 
 @review_router.delete(
@@ -117,7 +76,4 @@ def update_review(
     summary="Exclui uma avaliação (autor ou admin)",
 )
 def delete_review(review_id: int, current_user: AuthUser, db: DbSession) -> ReviewResponse:
-    try:
-        return get_review_service(db).delete(review_id, current_user)
-    except ValueError as exc:
-        raise _traduzir_value_error(exc) from exc
+    return get_review_service(db).delete(review_id, current_user)

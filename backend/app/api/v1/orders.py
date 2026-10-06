@@ -4,15 +4,6 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db
-from app.api.exceptions import (
-    BadRequestException,
-    CouponNotAssignedException,
-    ForbiddenException,
-    InsufficientStockException,
-    InvalidCouponException,
-    NotFoundException,
-    ProductNotFoundException,
-)
 from app.models.user import User
 from app.schemas.order import (
     OrderCreate,
@@ -31,49 +22,6 @@ def get_order_service(db: DbSession) -> OrderService:
     return OrderService(db)
 
 
-def _traduzir_value_error(exc: ValueError) -> BadRequestException:
-    """Converte os ``ValueError`` do service no erro HTTP correspondente.
-
-    O ``OrderService`` sinaliza falhas de negócio com ``ValueError`` genérico.
-    Sem esta tradução o handler global devolveria 500 para casos que o cliente
-    precisa distinguir (404 endereço/produto, 403 dono, 409 estoque, 400 cupom).
-    """
-    msg = str(exc)
-
-    if "not owned by user" in msg:
-        return ForbiddenException(msg)
-
-    if "Insufficient stock" in msg:
-        # Formato: "Insufficient stock for 'Título'. Available: N"
-        titulo = msg.split("'", 2)[1] if "'" in msg else "produto"
-        disponivel = 0
-        if "Available:" in msg:
-            try:
-                disponivel = int(msg.split("Available:")[1].split(",")[0].strip())
-            except (IndexError, ValueError):
-                disponivel = 0
-        return InsufficientStockException(titulo, disponivel)
-
-    if "No product found" in msg or "is not active" in msg:
-        return ProductNotFoundException()
-
-    if "not assigned to user" in msg:
-        # Cupom válido, porém não resgatado (vinculado) por este usuário.
-        # Usa a mensagem padrão em português da exceção, não o texto cru inglês.
-        return CouponNotAssignedException()
-
-    if "coupon" in msg.lower():
-        return InvalidCouponException(msg)
-
-    if "No order" in msg or "No items" in msg or "No address" in msg:
-        return NotFoundException(msg)
-
-    if "Receipt not generated" in msg:
-        return NotFoundException(msg)
-
-    return BadRequestException(msg)
-
-
 @order_router.post(
     "/create",
     response_model=OrderResponse,
@@ -83,10 +31,7 @@ def _traduzir_value_error(exc: ValueError) -> BadRequestException:
 def create_order(
     data: OrderCreate, user: UserDb, db: DbSession
 ) -> OrderResponse:
-    try:
-        return get_order_service(db).create(user.id, data)
-    except ValueError as exc:
-        raise _traduzir_value_error(exc) from exc
+    return get_order_service(db).create(user.id, data)
 
 
 @order_router.get(
@@ -95,10 +40,7 @@ def create_order(
     summary="Lista todos os pedidos do usuário autenticado",
 )
 def list_orders(user: UserDb, db: DbSession) -> list:
-    try:
-        return get_order_service(db).get_by_user_id(user.id)
-    except ValueError as exc:
-        raise _traduzir_value_error(exc) from exc
+    return get_order_service(db).get_by_user_id(user.id)
 
 
 @order_router.patch(
@@ -112,10 +54,7 @@ def update_order(
     user: UserDb,
     db: DbSession,
 ) -> OrderResponse:
-    try:
-        return get_order_service(db).update(order_id, user.id, data)
-    except ValueError as exc:
-        raise _traduzir_value_error(exc) from exc
+    return get_order_service(db).update(order_id, user.id, data)
 
 
 @order_router.delete(
@@ -126,10 +65,7 @@ def update_order(
 def delete_order(
     order_id: int, user: UserDb, db: DbSession
 ) -> OrderResponse:
-    try:
-        return get_order_service(db).delete(order_id, user.id)
-    except ValueError as exc:
-        raise _traduzir_value_error(exc) from exc
+    return get_order_service(db).delete(order_id, user.id)
 
 
 @order_router.post(
@@ -140,10 +76,7 @@ async def send_order_confirmation_email(
     order_id: int, user: UserDb, db: DbSession
 ):
 
-    try:
-        return get_order_service(db).send_confirmation_email(order_id, user)
-    except ValueError as exc:
-        raise _traduzir_value_error(exc) from exc
+    return get_order_service(db).send_confirmation_email(order_id, user)
 
 
 @order_router.get(
@@ -155,10 +88,7 @@ async def get_task_status(
     db: DbSession,
 ):
 
-    try:
-        return await get_order_service(db).get_task_status(task_id)
-    except ValueError as exc:
-        raise _traduzir_value_error(exc) from exc
+    return await get_order_service(db).get_task_status(task_id)
 
 
 @order_router.get(
@@ -173,10 +103,7 @@ def download_receipt(
 ):
     from fastapi.responses import FileResponse
 
-    try:
-        path = get_order_service(db).get_receipt_path(order_id, user.id)
-    except ValueError as exc:
-        raise _traduzir_value_error(exc) from exc
+    path = get_order_service(db).get_receipt_path(order_id, user.id)
 
     return FileResponse(
         path,

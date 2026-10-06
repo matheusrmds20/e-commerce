@@ -20,7 +20,7 @@ def _check_database(db: Session) -> DependencyHealth:
     try:
         db.execute(text("SELECT 1"))
         return DependencyHealth(name="database", status="ok")
-    except Exception as exc: 
+    except Exception as exc:
         return DependencyHealth(
             name="database",
             status="error",

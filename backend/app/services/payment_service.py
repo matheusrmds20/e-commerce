@@ -1,6 +1,13 @@
 import logging
 from datetime import datetime
 
+from app.api.exceptions import (
+    BadRequestException,
+    ConflictException,
+    ForbiddenException,
+    OrderNotFoundException,
+    PaymentNotFoundException,
+)
 from app.core.config import get_settings
 from app.integrations.MercadoPago.geteway import MercadoPagoGateway
 from app.models.order import OrderStatus
@@ -28,7 +35,7 @@ class PaymentService:
         order = self.order_repo.get_by_id(data.order_id)
 
         if not order:
-            raise ValueError(f"Order not found with id {data.order_id}")
+            raise OrderNotFoundException()
 
         payment = Payment(
             order_id=data.order_id,
@@ -50,17 +57,13 @@ class PaymentService:
         payment = self.repo.get_by_id(id)
 
         if payment is None:
-            raise ValueError(f"No payment found with id {id}")
+            raise PaymentNotFoundException()
 
         return payment
 
     def get_by_order_id(self, order_id: int) -> list[Payment]:
-        payments = self.repo.get_by_order_id(order_id)
-
-        if not payments:
-            raise ValueError(f"No payments found with order_id {order_id}")
-
-        return payments
+        # Pedido sem pagamentos é estado normal (lista vazia), não erro.
+        return self.repo.get_by_order_id(order_id)
 
     def create_checkout(self, order_id: int, user_id: int) -> dict:
 
@@ -68,22 +71,28 @@ class PaymentService:
         order = self.order_repo.get_by_id(order_id)
 
         if not order:
-            raise ValueError(f"Order not found with id {order_id}")
+            raise OrderNotFoundException()
 
         if order.user_id != user_id:
-            raise ValueError(f"Order {order_id} does not belong to user {user_id}")
+            raise ForbiddenException(
+                f"O pedido {order_id} não pertence a este usuário.",
+                code="ORDER_FORBIDDEN",
+            )
 
 
         order_items = self.order_repo.get_with_items_products(order_id)
 
         if not order_items:
-            raise ValueError(f"Order not found with id {order_id}")
+            raise OrderNotFoundException()
 
 
         payment_already_exists = self.repo.get_by_order_id(order_id)
 
         if payment_already_exists:
-            raise ValueError(f"Payment already exists for order {order_id}")
+            raise ConflictException(
+                "Já existe um pagamento para este pedido.",
+                code="PAYMENT_ALREADY_EXISTS",
+            )
 
         items = [
             {
@@ -155,7 +164,7 @@ class PaymentService:
             merchant_order = self.gateway.get_merchant_order(payment_provider_id)
             payments = merchant_order.get("payments") or []
             if not payments:
-                raise ValueError(
+                raise BadRequestException(
                     f"Merchant order {payment_provider_id} has no payments"
                 )
 
@@ -173,7 +182,7 @@ class PaymentService:
             merchant_order = self.gateway.get_merchant_order(payment_provider_id)
             payments = merchant_order.get("payments") or []
             if not payments:
-                raise ValueError(
+                raise BadRequestException(
                     f"{payment_provider_id} não é payment nem merchant_order "
                     "com payments"
                 ) from err
@@ -186,7 +195,7 @@ class PaymentService:
         external_reference = provider_payment.get("external_reference")
 
         if not external_reference:
-            raise ValueError(
+            raise BadRequestException(
                 f"Payment {payment_provider_id} has no external_reference"
             )
 
@@ -201,10 +210,10 @@ class PaymentService:
                 payment = payments[0] if payments else None
 
             if not payment:
-                raise ValueError(f"Payment not found for order {order_id}")
+                raise PaymentNotFoundException()
 
             if payment.order_id != order_id:
-                raise ValueError(
+                raise ConflictException(
                     f"Payment {payment_provider_id} does not match order {order_id}"
                 )
 
@@ -256,4 +265,3 @@ class PaymentService:
             self.session.refresh(payment)
 
             return payment
-

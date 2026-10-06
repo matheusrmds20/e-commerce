@@ -1,3 +1,8 @@
+from app.api.exceptions import (
+    ConflictException,
+    CouponNotFoundException,
+    ProductNotFoundException,
+)
 from app.models.coupon import Coupon
 from app.repositories.coupon_repo import CouponRepository
 from app.repositories.product_repo import ProductRepository
@@ -10,24 +15,22 @@ class CouponService:
         self.session = db
 
     def get_all(self) -> list:
-        coupons = self.repo.get_all()
-
-        if not coupons:
-            raise ValueError("No coupons found")
-
-        return coupons
+        return self.repo.get_all()
 
     def create(self, data) -> dict:
         with self.session.begin():
 
             existing_code = self.repo.get_by_code(data.code)
             if existing_code is not None:
-                raise ValueError(f"Coupon with code '{data.code}' already exists")
+                raise ConflictException(
+                    f"Já existe um cupom com o código '{data.code}'.",
+                    code="DUPLICATE_COUPON",
+                )
 
             if data.product_id is not None:
                 product = self.product_repo.get_by_id(data.product_id)
                 if product is None:
-                    raise ValueError(f"No product found with id {data.product_id}")
+                    raise ProductNotFoundException()
 
             coupon = self.repo.create(
                 Coupon(
@@ -52,17 +55,20 @@ class CouponService:
             coupon = self.repo.get_by_id(coupon_id)
 
             if coupon is None:
-                raise ValueError(f"No coupon found with id {coupon_id}")
+                raise CouponNotFoundException()
 
             if data.code is not None:
                 existing_code = self.repo.get_by_code(data.code)
                 if existing_code is not None and existing_code.id != coupon_id:
-                    raise ValueError(f"Coupon with code '{data.code}' already exists")
+                    raise ConflictException(
+                        f"Já existe um cupom com o código '{data.code}'.",
+                        code="DUPLICATE_COUPON",
+                    )
 
             if data.product_id is not None:
                 product = self.product_repo.get_by_id(data.product_id)
                 if product is None:
-                    raise ValueError(f"No product found with id {data.product_id}")
+                    raise ProductNotFoundException()
 
             for field, value in data.model_dump(exclude_unset=True).items():
                 setattr(coupon, field, value)
@@ -77,8 +83,7 @@ class CouponService:
             coupon = self.repo.get_by_id(coupon_id)
 
             if coupon is None:
-                raise ValueError(f"No coupon found with id {coupon_id}")
+                raise CouponNotFoundException()
 
             self.repo.delete(coupon)
             return coupon
-

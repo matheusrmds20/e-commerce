@@ -24,6 +24,7 @@ from app.api.exceptions import (
     NotFoundException,
     ProductNotFoundException,
     UserNotFoundException,
+    WishlistForbiddenException,
 )
 from app.models.user import UserRole
 
@@ -154,7 +155,7 @@ class TestListWishlistItems:
     def test_list_all_forbidden_for_customer(self, client, auth_user):
         auth_user(1, role="customer")
         svc = Mock(name="wishlist_service")
-        svc.get_all.side_effect = ValueError(
+        svc.get_all.side_effect = WishlistForbiddenException(
             "Admin permission required to list all wishlists"
         )
 
@@ -201,7 +202,7 @@ class TestDeleteWishlistItem:
     def test_delete_forbidden_for_other_user(self, client, auth_user):
         auth_user(2)
         svc = Mock(name="wishlist_service")
-        svc.delete.side_effect = ValueError("Wishlist item is not owned by user")
+        svc.delete.side_effect = WishlistForbiddenException()
 
         with patch("app.api.v1.wishlist.get_wishlist_service", return_value=svc):
             response = client.delete(f"{PREFIX}/delete/1")

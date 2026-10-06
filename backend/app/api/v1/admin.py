@@ -4,7 +4,6 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
-from app.api.exceptions import BadRequestException, NotFoundException
 from app.schemas.admin import (
     AdminOrderResponse,
     AdminOrderStatusUpdate,
@@ -59,15 +58,9 @@ def update_order_status(
     data: AdminOrderStatusUpdate,
     db: DbSession,
 ) -> AdminOrderResponse:
-    try:
-        return get_admin_service(db).update_order_status(
-            order_id=order_id, new_status=data.status
-        )
-    except ValueError as exc:
-        msg = str(exc)
-        if "não encontrado" in msg:
-            raise NotFoundException(msg) from exc
-        raise BadRequestException(msg) from exc
+    return get_admin_service(db).update_order_status(
+        order_id=order_id, new_status=data.status
+    )
 
 
 @admin_router.get(

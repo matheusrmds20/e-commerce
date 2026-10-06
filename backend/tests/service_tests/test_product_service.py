@@ -1,5 +1,11 @@
 import pytest
 
+from app.api.exceptions import (
+    CategoryNotFoundException,
+    DuplicateProductException,
+    InsufficientPermissionException,
+    ProductNotFoundException,
+)
 from app.models.category import Category
 from app.models.product import Product
 from app.models.user import User, UserRole
@@ -72,18 +78,16 @@ def test_get_single_success(product_service, product_repo, method, repo_method, 
 
 
 @pytest.mark.parametrize(
-    "method,repo_method,lookup,message",
+    "method,repo_method,lookup",
     [
-        ("get_by_id", "get_by_id", 99, "No product found with id 99"),
+        ("get_by_id", "get_by_id", 99),
     ],
 )
-def test_get_single_not_found(product_service, product_repo, method, repo_method, lookup, message):
+def test_get_single_not_found(product_service, product_repo, method, repo_method, lookup):
     getattr(product_repo, repo_method).return_value = None
 
-    with pytest.raises(ValueError) as exc:
+    with pytest.raises(ProductNotFoundException):
         getattr(product_service, method)(lookup)
-
-    assert str(exc.value) == message
 
 
 @pytest.mark.parametrize(
@@ -108,25 +112,25 @@ def test_get_list_success(product_service, product_repo, method, repo_method, lo
 
 
 @pytest.mark.parametrize(
-    "method,repo_method,lookup,message",
+    "method,repo_method,lookup",
     [
-        ("get_by_category_id", "get_by_category_id", 1, "No products found with category_id 1"),
+        ("get_by_category_id", "get_by_category_id", 1),
         # `get_by_discount_pct` NÃO entra aqui: lista vazia é resposta válida
         # (ausência de promoção não é erro). Coberto em TestVitrine.
-        ("get_by_is_active", "get_by_is_active", True, "No products found with is_active True"),
-        ("get_all", "get_all", None, "No products found"),
+        ("get_by_is_active", "get_by_is_active", True),
+        ("get_all", "get_all", None),
     ],
 )
-def test_get_list_empty(product_service, product_repo, method, repo_method, lookup, message):
+def test_get_list_empty(product_service, product_repo, method, repo_method, lookup):
+    """Lista vazia agora é resposta válida ([]), em vez de erro."""
     getattr(product_repo, repo_method).return_value = []
 
-    with pytest.raises(ValueError) as exc:
-        if lookup is None:
-            getattr(product_service, method)()
-        else:
-            getattr(product_service, method)(lookup)
+    if lookup is None:
+        result = getattr(product_service, method)()
+    else:
+        result = getattr(product_service, method)(lookup)
 
-    assert str(exc.value) == message
+    assert result == []
 
 
 class TestCreate:
@@ -151,29 +155,23 @@ class TestCreate:
     def test_create_category_not_found(self, product_service, category_repo):
         category_repo.get_by_id.return_value = None
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(CategoryNotFoundException):
             product_service.create(create_payload(), make_user())
-
-        assert str(exc.value) == "No category found with id 1"
 
     def test_create_title_already_exists(self, product_service, category_repo, product_repo):
         category_repo.get_by_id.return_value = make_category()
         product_repo.get_by_title.return_value = make_product()
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(DuplicateProductException):
             product_service.create(create_payload(), make_user())
-
-        assert "already exists" in str(exc.value)
 
     def test_create_slug_already_exists(self, product_service, category_repo, product_repo):
         category_repo.get_by_id.return_value = make_category()
         product_repo.get_by_title.return_value = None
         product_repo.get_by_slug.return_value = make_product()
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(DuplicateProductException):
             product_service.create(create_payload(), make_user())
-
-        assert "already exists" in str(exc.value)
 
 
 class TestUpdate:
@@ -191,10 +189,8 @@ class TestUpdate:
     def test_update_not_found(self, product_service, product_repo):
         product_repo.get_by_id.return_value = None
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(ProductNotFoundException):
             product_service.update(1, ProductUpdate(price=99.0), make_user())
-
-        assert str(exc.value) == "No product found with id 1"
 
     def test_update_title_conflict(self, product_service, product_repo):
         product = make_product()
@@ -202,19 +198,15 @@ class TestUpdate:
         product_repo.get_by_id.return_value = product
         product_repo.get_by_title.return_value = other
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(DuplicateProductException):
             product_service.update(1, ProductUpdate(title="Outro Livro"), make_user())
-
-        assert "already exists" in str(exc.value)
 
     def test_update_category_not_found(self, product_service, product_repo, category_repo):
         product_repo.get_by_id.return_value = make_product()
         category_repo.get_by_id.return_value = None
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(CategoryNotFoundException):
             product_service.update(1, ProductUpdate(category_id=99), make_user())
-
-        assert str(exc.value) == "No category found with id 99"
 
 
 class TestDelete:
@@ -230,10 +222,8 @@ class TestDelete:
     def test_delete_not_found(self, product_service, product_repo):
         product_repo.get_by_id.return_value = None
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(ProductNotFoundException):
             product_service.delete(1, make_user())
-
-        assert str(exc.value) == "No product found with id 1"
 
 
 class TestAdminPermission:
@@ -244,26 +234,23 @@ class TestAdminPermission:
     """
 
     def test_create_customer_forbidden(self, product_service, product_repo):
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(InsufficientPermissionException):
             product_service.create(create_payload(), make_user(role=UserRole.CUSTOMER))
 
-        assert "Admin permission required" in str(exc.value)
         product_repo.create.assert_not_called()
 
     def test_update_customer_forbidden(self, product_service, product_repo):
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(InsufficientPermissionException):
             product_service.update(
                 1, ProductUpdate(price=10.0), make_user(role=UserRole.CUSTOMER)
             )
 
-        assert "Admin permission required" in str(exc.value)
         product_repo.update.assert_not_called()
 
     def test_delete_customer_forbidden(self, product_service, product_repo):
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(InsufficientPermissionException):
             product_service.delete(1, make_user(role=UserRole.CUSTOMER))
 
-        assert "Admin permission required" in str(exc.value)
         product_repo.delete.assert_not_called()
 
 class TestVitrine:
@@ -424,10 +411,8 @@ class TestPaginacaoComFiltro:
     ):
         category_repo.get_by_id.return_value = None
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(CategoryNotFoundException):
             product_service.get_paginated(page=1, per_page=12, category_id=999)
-
-        assert "No category found with id 999" in str(exc.value)
 
     def test_paginated_sem_filtro_nao_valida_categoria(
         self, product_service, product_repo, category_repo

@@ -17,6 +17,11 @@ from unittest.mock import Mock, patch
 
 import pytest
 
+from app.api.exceptions import (
+    BadRequestException,
+    ForbiddenException,
+    OrderNotFoundException,
+)
 from app.models.order import Order, OrderStatus
 from app.models.order_item import OrderItem
 from app.models.product import Product
@@ -129,7 +134,7 @@ class TestSendConfirmationEmail:
         with patch(
             "app.services.order_service.send_order_confirmation_email"
         ) as task:
-            with pytest.raises(ValueError, match="not completed"):
+            with pytest.raises(BadRequestException):
                 asyncio.run(order_service.send_confirmation_email(10, user))
         task.delay.assert_not_called()
 
@@ -140,7 +145,7 @@ class TestSendConfirmationEmail:
         with patch(
             "app.services.order_service.send_order_confirmation_email"
         ) as task:
-            with pytest.raises(ValueError, match="No order found"):
+            with pytest.raises(OrderNotFoundException):
                 asyncio.run(order_service.send_confirmation_email(999, user))
         task.delay.assert_not_called()
 
@@ -153,6 +158,6 @@ class TestSendConfirmationEmail:
         with patch(
             "app.services.order_service.send_order_confirmation_email"
         ) as task:
-            with pytest.raises(ValueError, match="not owned"):
+            with pytest.raises(ForbiddenException):
                 asyncio.run(order_service.send_confirmation_email(10, outro_usuario))
         task.delay.assert_not_called()

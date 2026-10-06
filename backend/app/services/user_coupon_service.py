@@ -1,3 +1,10 @@
+from app.api.exceptions import (
+    ConflictException,
+    CouponNotAssignedException,
+    CouponNotFoundException,
+    NotFoundException,
+    UserNotFoundException,
+)
 from app.models.coupon import Coupon
 from app.models.user_coupon import UserCoupon
 from app.repositories.coupon_repo import CouponRepository
@@ -24,10 +31,12 @@ class UserCouponService:
         user_coupon = self.repo.get_by_id(user_coupon_id)
 
         if user_coupon is None:
-            raise ValueError(f"No user coupon found with id {user_coupon_id}")
+            raise NotFoundException(
+                "Vínculo de cupom não encontrado.", code="USER_COUPON_NOT_FOUND"
+            )
 
         if user_id is not None and user_coupon.user_id != user_id:
-            raise ValueError("User coupon is not owned by user")
+            raise CouponNotAssignedException()
 
         return user_coupon
 
@@ -35,7 +44,7 @@ class UserCouponService:
         user = self.user_repo.get_by_id(user_id)
 
         if user is None:
-            raise ValueError(f"No user found with id {user_id}")
+            raise UserNotFoundException(user_id=user_id)
 
         return self.repo.get_by_user_id(user_id)
 
@@ -43,7 +52,7 @@ class UserCouponService:
         coupon = self.coupon_repo.get_by_id(coupon_id)
 
         if coupon is None:
-            raise ValueError(f"No coupon found with id {coupon_id}")
+            raise CouponNotFoundException()
 
         return self.repo.get_by_coupon_id(coupon_id)
 
@@ -55,7 +64,7 @@ class UserCouponService:
         user = self.user_repo.get_by_id(user_id)
 
         if user is None:
-            raise ValueError(f"No user found with id {user_id}")
+            raise UserNotFoundException(user_id=user_id)
 
         return [link.coupons for link in self.repo.get_by_user_id(user_id)]
 
@@ -65,21 +74,21 @@ class UserCouponService:
             user = self.user_repo.get_by_id(data.user_id)
 
             if user is None:
-                raise ValueError(f"No user found with id {data.user_id}")
+                raise UserNotFoundException(user_id=data.user_id)
 
             coupon = self.coupon_repo.get_by_id(data.coupon_id)
 
             if coupon is None:
-                raise ValueError(f"No coupon found with id {data.coupon_id}")
+                raise CouponNotFoundException()
 
             existing = self.repo.get_by_user_and_coupon(
                 data.user_id, data.coupon_id
             )
 
             if existing is not None:
-                raise ValueError(
-                    f"User {data.user_id} already has coupon "
-                    f"{data.coupon_id}"
+                raise ConflictException(
+                    "Este cupom já está atribuído a este usuário.",
+                    code="USER_COUPON_DUPLICATE",
                 )
 
             user_coupon = self.repo.create(
@@ -97,10 +106,12 @@ class UserCouponService:
             user_coupon = self.repo.get_by_id(user_coupon_id)
 
             if user_coupon is None:
-                raise ValueError(f"No user coupon found with id {user_coupon_id}")
+                raise NotFoundException(
+                    "Vínculo de cupom não encontrado.", code="USER_COUPON_NOT_FOUND"
+                )
 
             if user_id is not None and user_coupon.user_id != user_id:
-                raise ValueError("User coupon is not owned by user")
+                raise CouponNotAssignedException()
 
             self.repo.delete(user_coupon)
             return user_coupon

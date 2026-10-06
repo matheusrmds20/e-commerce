@@ -2,6 +2,11 @@ from datetime import datetime, timedelta
 
 import pytest
 
+from app.api.exceptions import (
+    ConflictException,
+    CouponNotFoundException,
+    ProductNotFoundException,
+)
 from app.models.coupon import Coupon, DiscountType
 from app.schemas.coupon import CouponCreate, CouponUpdate
 
@@ -48,21 +53,21 @@ def test_get_list_success(coupon_service, coupon_repo, method, repo_method, look
 
 
 @pytest.mark.parametrize(
-    "method,repo_method,lookup,message",
+    "method,repo_method,lookup",
     [
-        ("get_all", "get_all", None, "No coupons found"),
+        ("get_all", "get_all", None),
     ],
 )
-def test_get_list_empty(coupon_service, coupon_repo, method, repo_method, lookup, message):
+def test_get_list_empty(coupon_service, coupon_repo, method, repo_method, lookup):
+    """Lista vazia agora é resposta válida ([]), em vez de erro."""
     getattr(coupon_repo, repo_method).return_value = []
 
-    with pytest.raises(ValueError) as exc:
-        if lookup is None:
-            getattr(coupon_service, method)()
-        else:
-            getattr(coupon_service, method)(lookup)
+    if lookup is None:
+        result = getattr(coupon_service, method)()
+    else:
+        result = getattr(coupon_service, method)(lookup)
 
-    assert str(exc.value) == message
+    assert result == []
 
 
 class TestCreate:
@@ -81,19 +86,15 @@ class TestCreate:
     def test_create_code_already_exists(self, coupon_service, coupon_repo):
         coupon_repo.get_by_code.return_value = make_coupon()
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(ConflictException):
             coupon_service.create(create_payload())
-
-        assert "already exists" in str(exc.value)
 
     def test_create_product_not_found(self, coupon_service, coupon_repo, product_repo):
         coupon_repo.get_by_code.return_value = None
         product_repo.get_by_id.return_value = None
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(ProductNotFoundException):
             coupon_service.create(create_payload(product_id=99))
-
-        assert str(exc.value) == "No product found with id 99"
 
 
 class TestUpdate:
@@ -112,10 +113,8 @@ class TestUpdate:
     def test_update_not_found(self, coupon_service, coupon_repo):
         coupon_repo.get_by_id.return_value = None
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(CouponNotFoundException):
             coupon_service.update(1, CouponUpdate(code="NOVO10"))
-
-        assert str(exc.value) == "No coupon found with id 1"
 
     def test_update_code_conflict(self, coupon_service, coupon_repo):
         coupon = make_coupon()
@@ -123,20 +122,16 @@ class TestUpdate:
         coupon_repo.get_by_id.return_value = coupon
         coupon_repo.get_by_code.return_value = other
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(ConflictException):
             coupon_service.update(1, CouponUpdate(code="NOVO10"))
-
-        assert "already exists" in str(exc.value)
 
     def test_update_product_not_found(self, coupon_service, coupon_repo, product_repo):
         coupon_repo.get_by_id.return_value = make_coupon()
         coupon_repo.get_by_code.return_value = None
         product_repo.get_by_id.return_value = None
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(ProductNotFoundException):
             coupon_service.update(1, CouponUpdate(product_id=99))
-
-        assert str(exc.value) == "No product found with id 99"
 
 
 class TestDelete:
@@ -152,7 +147,5 @@ class TestDelete:
     def test_delete_not_found(self, coupon_service, coupon_repo):
         coupon_repo.get_by_id.return_value = None
 
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(CouponNotFoundException):
             coupon_service.delete(1)
-
-        assert str(exc.value) == "No coupon found with id 1"

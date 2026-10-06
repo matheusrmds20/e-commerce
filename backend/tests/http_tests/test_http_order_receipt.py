@@ -15,6 +15,8 @@ from unittest.mock import Mock, patch
 
 import pytest
 
+from app.api.exceptions import ForbiddenException, NotFoundException
+
 PREFIX = "/api/v1/orders"
 
 
@@ -68,7 +70,9 @@ class TestDownloadReceipt:
     def test_forbidden_for_other_user(self, client, auth_user):
         auth_user(1)
         svc = Mock(name="order_service")
-        svc.get_receipt_path.side_effect = ValueError("Order is not owned by user")
+        svc.get_receipt_path.side_effect = ForbiddenException(
+            "Order is not owned by user"
+        )
 
         with patch("app.api.v1.orders.get_order_service", return_value=svc):
             response = client.get(f"{PREFIX}/7/comprovante")
@@ -80,8 +84,8 @@ class TestDownloadReceipt:
     def test_not_found_when_not_generated(self, client, auth_user):
         auth_user(1)
         svc = Mock(name="order_service")
-        svc.get_receipt_path.side_effect = ValueError(
-            "Receipt not generated yet for order 7"
+        svc.get_receipt_path.side_effect = NotFoundException(
+            "Receipt not generated yet for order 7", code="RECEIPT_NOT_FOUND"
         )
 
         with patch("app.api.v1.orders.get_order_service", return_value=svc):

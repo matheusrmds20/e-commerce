@@ -1,3 +1,9 @@
+from app.api.exceptions import (
+    CategoryNotFoundException,
+    DuplicateProductException,
+    InsufficientPermissionException,
+    ProductNotFoundException,
+)
 from app.models.product import Product
 from app.models.user import User, UserRole
 from app.repositories.category_repo import CategoryRepository
@@ -14,27 +20,24 @@ class ProductService:
     def _ensure_admin(current_user: User) -> None:
         """Escritas no catálogo exigem papel admin.
 
-        Mesma regra (e mesma mensagem) de `CategoryService`: o roteador traduz
-        este ValueError em 403 `INSUFFICIENT_PERMISSION`.
+        Lança ``InsufficientPermissionException`` (403) diretamente; a rota
+        não precisa traduzir nada.
         """
         if current_user.role != UserRole.ADMIN:
-            raise ValueError("Admin permission required to manage products")
+            raise InsufficientPermissionException()
 
     def get_by_id(self, product_id: int) -> dict:
         product = self.repo.get_by_id(product_id)
 
         if product is None:
-            raise ValueError(f"No product found with id {product_id}")
+            raise ProductNotFoundException()
 
         return product
 
     def get_by_category_id(self, category_id: int) -> list:
-        products = self.repo.get_by_category_id(category_id)
-
-        if not products:
-            raise ValueError(f"No products found with category_id {category_id}")
-
-        return products
+        # Categoria sem produtos é estado normal de catálogo: devolve lista vazia
+        # (HTTP 200), em vez de erro. Mesmo padrão de get_featured/bestsellers.
+        return self.repo.get_by_category_id(category_id)
 
     def get_by_discount_pct(self, discount_pct: int) -> list:
         """Produtos com desconto de pelo menos `discount_pct`.
@@ -46,12 +49,8 @@ class ProductService:
         return self.repo.get_by_discount_pct(discount_pct)
 
     def get_by_is_active(self, is_active: bool) -> list:
-        products = self.repo.get_by_is_active(is_active)
-
-        if not products:
-            raise ValueError(f"No products found with is_active {is_active}")
-
-        return products
+        # Lista vazia é resposta válida (não há erro em "nenhum produto ativo/inativo").
+        return self.repo.get_by_is_active(is_active)
 
     def get_featured(self, limit: int | None = None) -> list:
         """Produtos em destaque para a vitrine.
@@ -104,7 +103,7 @@ class ProductService:
         if category_id is not None:
             categoria = self.category_repo.get_by_id(category_id)
             if categoria is None:
-                raise ValueError(f"No category found with id {category_id}")
+                raise CategoryNotFoundException()
 
         items, total = self.repo.paginate(page, per_page, category_id, search=search)
         total_pages = (total + per_page - 1) // per_page if per_page else 0
@@ -120,31 +119,30 @@ class ProductService:
         }
 
     def get_all(self) -> list:
-        products = self.repo.get_all()
-
-        if not products:
-            raise ValueError("No products found")
-
-        return products
+        return self.repo.get_all()
 
 
     def create(self, data, current_user: User) -> dict:
-        """Cria um produto. Exige papel admin (roteador traduz ValueError)."""
+        """Cria um produto. Exige papel admin."""
         with self.session.begin():
             self._ensure_admin(current_user)
 
             category = self.category_repo.get_by_id(data.category_id)
 
             if category is None:
-                raise ValueError(f"No category found with id {data.category_id}")
+                raise CategoryNotFoundException()
 
             existing_title = self.repo.get_by_title(data.title)
             if existing_title is not None:
-                raise ValueError(f"Product with title '{data.title}' already exists")
+                raise DuplicateProductException(
+                    f"Já existe um produto com o título '{data.title}'."
+                )
 
             existing_slug = self.repo.get_by_slug(data.slug)
             if existing_slug is not None:
-                raise ValueError(f"Product with slug '{data.slug}' already exists")
+                raise DuplicateProductException(
+                    f"Já existe um produto com o slug '{data.slug}'."
+                )
 
             product = self.repo.create(
                 Product(
@@ -182,22 +180,26 @@ class ProductService:
             product = self.repo.get_by_id(product_id)
 
             if product is None:
-                raise ValueError(f"No product found with id {product_id}")
+                raise ProductNotFoundException()
 
             if data.category_id is not None:
                 category = self.category_repo.get_by_id(data.category_id)
                 if category is None:
-                    raise ValueError(f"No category found with id {data.category_id}")
+                    raise CategoryNotFoundException()
 
             if data.title is not None:
                 existing_title = self.repo.get_by_title(data.title)
                 if existing_title is not None and existing_title.id != product_id:
-                    raise ValueError(f"Product with title '{data.title}' already exists")
+                    raise DuplicateProductException(
+                        f"Já existe um produto com o título '{data.title}'."
+                    )
 
             if data.slug is not None:
                 existing_slug = self.repo.get_by_slug(data.slug)
                 if existing_slug is not None and existing_slug.id != product_id:
-                    raise ValueError(f"Product with slug '{data.slug}' already exists")
+                    raise DuplicateProductException(
+                        f"Já existe um produto com o slug '{data.slug}'."
+                    )
 
             for field, value in data.model_dump(exclude_unset=True).items():
                 setattr(product, field, value)
@@ -214,7 +216,7 @@ class ProductService:
             product = self.repo.get_by_id(product_id)
 
             if product is None:
-                raise ValueError(f"No product found with id {product_id}")
+                raise ProductNotFoundException()
 
             self.repo.delete(product)
             return product

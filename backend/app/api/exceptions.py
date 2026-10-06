@@ -59,18 +59,20 @@ class BadRequestException(BookCommerceException):
         super().__init__(message, code, status.HTTP_400_BAD_REQUEST)
 
 
-class EmptyCartException(BadRequestException):
-    """O carrinho está vazio e não pode ser usado no checkout."""
-
-    def __init__(self) -> None:
-        super().__init__("O carrinho está vazio.", code="EMPTY_CART")
-
-
 class InvalidCouponException(BadRequestException):
     """O cupom informado é inválido, expirado ou não aplicável."""
 
     def __init__(self, message: str = "Cupom inválido ou expirado.") -> None:
         super().__init__(message, code="INVALID_COUPON")
+
+
+class ProductInactiveException(BadRequestException):
+    """O produto existe, mas está desativado e não pode ser usado."""
+
+    def __init__(
+        self, message: str = "Produto indisponível no momento."
+    ) -> None:
+        super().__init__(message, code="PRODUCT_INACTIVE")
 
 
 class InvalidStateTransitionException(BadRequestException):
@@ -134,6 +136,15 @@ class InsufficientPermissionException(ForbiddenException):
     def __init__(self) -> None:
         super().__init__(
             "Acesso restrito a administradores.", code="INSUFFICIENT_PERMISSION"
+        )
+
+
+class AddressForbiddenException(ForbiddenException):
+    """O endereço pertence a outro usuário."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            "Este endereço pertence a outro usuário.", code="ADDRESS_FORBIDDEN"
         )
 
 
@@ -234,6 +245,44 @@ class AddressNotFoundException(NotFoundException):
         super().__init__("Endereço não encontrado.", code="ADDRESS_NOT_FOUND")
 
 
+class CartNotFoundException(NotFoundException):
+    """Carrinho não encontrado no banco."""
+
+    def __init__(self) -> None:
+        super().__init__("Carrinho não encontrado.", code="CART_NOT_FOUND")
+
+
+class CartItemNotFoundException(NotFoundException):
+    """Item de carrinho não encontrado no banco."""
+
+    def __init__(self) -> None:
+        super().__init__("Item do carrinho não encontrado.", code="CART_ITEM_NOT_FOUND")
+
+
+class CouponNotFoundException(NotFoundException):
+    """Cupom não encontrado no banco."""
+
+    def __init__(self) -> None:
+        super().__init__("Cupom não encontrado.", code="COUPON_NOT_FOUND")
+
+
+class PaymentNotFoundException(NotFoundException):
+    """Pagamento não encontrado no banco."""
+
+    def __init__(self) -> None:
+        super().__init__("Pagamento não encontrado.", code="PAYMENT_NOT_FOUND")
+
+
+class NewsletterSubscriberNotFoundException(NotFoundException):
+    """Inscrito da newsletter não encontrado."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            "Inscrição não encontrada para este e-mail.",
+            code="NEWSLETTER_SUBSCRIBER_NOT_FOUND",
+        )
+
+
 # ---------------------------------------------------------------------------
 # 409 - Conflict
 # ---------------------------------------------------------------------------
@@ -281,6 +330,15 @@ class DuplicateWishlistException(ConflictException):
         )
 
 
+class CartAlreadyExistsException(ConflictException):
+    """O usuário já possui um carrinho."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            "O usuário já possui um carrinho.", code="CART_ALREADY_EXISTS"
+        )
+
+
 class AddressLinkedToOrdersException(ConflictException):
     """Endereço não pode ser excluído pois há pedidos vinculados a ele."""
 
@@ -289,6 +347,13 @@ class AddressLinkedToOrdersException(ConflictException):
             "Este endereço está vinculado a pedidos e não pode ser excluído.",
             code="ADDRESS_LINKED_TO_ORDERS",
         )
+
+
+class DuplicateProductException(ConflictException):
+    """Produto com título/slug já cadastrado no sistema."""
+
+    def __init__(self, message: str = "Produto já cadastrado.") -> None:
+        super().__init__(message, code="DUPLICATE_PRODUCT")
 
 
 # ---------------------------------------------------------------------------

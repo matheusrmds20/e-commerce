@@ -1,5 +1,20 @@
 from datetime import datetime
 
+from app.api.exceptions import (
+    AddressForbiddenException,
+    AddressNotFoundException,
+    BadRequestException,
+    CouponNotAssignedException,
+    CouponNotFoundException,
+    ForbiddenException,
+    InsufficientStockException,
+    InvalidCouponException,
+    NotFoundException,
+    OrderNotFoundException,
+    ProductInactiveException,
+    ProductNotFoundException,
+    UserNotFoundException,
+)
 from app.models.coupon import DiscountType
 from app.models.order import Order, OrderStatus
 from app.repositories.address_repo import AddressRepository
@@ -56,10 +71,12 @@ class OrderService:
             product = self.product_repo.get_by_id_for_update(item.product_id)
 
             if product is None:
-                raise ValueError(f"No product found with id {item.product_id}")
+                raise ProductNotFoundException()
 
             if not product.is_active:
-                raise ValueError(f"Product '{product.title}' is not active")
+                raise ProductInactiveException(
+                    f"O produto '{product.title}' está indisponível no momento.",
+                )
 
             # Soma o que já foi reservado para este mesmo produto em outra
             # linha do payload.
@@ -68,10 +85,8 @@ class OrderService:
             )
 
             if product.stock_qty < item.quantity + ja_reservado:
-                raise ValueError(
-                    f"Insufficient stock for '{product.title}'. "
-                    f"Available: {product.stock_qty}, requested: "
-                    f"{item.quantity + ja_reservado}"
+                raise InsufficientStockException(
+                    product.title, product.stock_qty
                 )
 
             baixas_de_estoque.append((product, item.quantity))
@@ -101,26 +116,27 @@ class OrderService:
         coupon = self.coupon_repo.get_by_id(coupon_id)
 
         if coupon is None:
-            raise ValueError(f"No coupon found with id {coupon_id}")
+            raise CouponNotFoundException()
 
         # Ownership: o cupom precisa estar atribuído ao usuário do pedido.
         if self.user_coupon_repo.get_by_user_and_coupon(user_id, coupon_id) is None:
-            raise ValueError(
-                f"Coupon '{coupon.code}' is not assigned to user {user_id}"
-            )
+            raise CouponNotAssignedException()
 
         if not coupon.is_active:
-            raise ValueError(f"Coupon with code '{coupon.code}' is not active")
+            raise InvalidCouponException(
+                f"O cupom '{coupon.code}' não está ativo."
+            )
 
         if coupon.valid_until < datetime.now():
-            raise ValueError(f"Coupon with code '{coupon.code}' has expired")
+            raise InvalidCouponException(
+                f"O cupom '{coupon.code}' expirou."
+            )
 
         if coupon.product_id is not None:
             product_ids = {i.product_id for i in items}
             if coupon.product_id not in product_ids:
-                raise ValueError(
-                    f"Coupon '{coupon.code}' is not applicable to any "
-                    f"product in this order"
+                raise InvalidCouponException(
+                    f"O cupom '{coupon.code}' não se aplica a nenhum produto deste pedido."
                 )
 
         return coupon
@@ -137,10 +153,10 @@ class OrderService:
         discount_amount = 0.0
 
         if coupon is not None and subtotal < (coupon.min_purchase or 0):
-            raise ValueError(
-                f"Coupon '{coupon.code}' requires a minimum purchase "
-                f"of {coupon.min_purchase}"
-        )
+            raise InvalidCouponException(
+                f"O cupom '{coupon.code}' exige uma compra mínima "
+                f"de {coupon.min_purchase}."
+            )
 
         if coupon is not None and coupon.discount_type == DiscountType.PERCENTAGE:
             discount_amount = subtotal * (coupon.discount_value / 100)
@@ -162,12 +178,9 @@ class OrderService:
         user = self.user_repo.get_by_id(user_id)
 
         if not user:
-            raise ValueError(f"No user found with id {user_id}")
+            raise UserNotFoundException(user_id=user_id)
 
         orders = user.orders
-
-        if orders is None:
-            raise ValueError(f"No orders found with user_id {user_id}")
 
         return orders
 
@@ -177,13 +190,16 @@ class OrderService:
             address = self.address_repo.get_by_id(data.address_id)
 
             if address is None:
-                raise ValueError(f"No address found with id {data.address_id}")
+                raise AddressNotFoundException()
 
             if address.user_id != user_id:
-                raise ValueError("Address is not owned by user")
+                raise AddressForbiddenException()
 
             if not data.items:
-                raise ValueError("Order must have at least one item")
+                raise BadRequestException(
+                    "O pedido deve conter ao menos um item.",
+                    code="EMPTY_ORDER",
+                )
 
             # Guarda os itens validados como (product_id, quantity, price).
             # Eles só viram linhas de `order_items` DEPOIS que o pedido existe:
@@ -201,16 +217,15 @@ class OrderService:
                 product = self.product_repo.get_by_id_for_update(item.product_id)
 
                 if product is None:
-                    raise ValueError(f"No product found with id {item.product_id}")
+                    raise ProductNotFoundException()
 
                 if not product.is_active:
-                    raise ValueError(f"Product '{product.title}' is not active")
+                    raise ProductInactiveException(
+                        f"O produto '{product.title}' está indisponível no momento.",
+                    )
 
                 if product.stock_qty < item.quantity:
-                    raise ValueError(
-                        f"Insufficient stock for '{product.title}'. "
-                        f"Available: {product.stock_qty}"
-                    )
+                    raise InsufficientStockException(product.title, product.stock_qty)
 
                 # Defesa contra o mesmo produto repetido em `items` (ex.: duas
                 # linhas do produto 5 com 3 e 4 unidades). Cada linha passaria
@@ -220,10 +235,8 @@ class OrderService:
                 )
 
                 if product.stock_qty < item.quantity + ja_reservado:
-                    raise ValueError(
-                        f"Insufficient stock for '{product.title}'. "
-                        f"Available: {product.stock_qty}, requested: "
-                        f"{item.quantity + ja_reservado}"
+                    raise InsufficientStockException(
+                        product.title, product.stock_qty
                     )
 
                 baixas_de_estoque.append((product, item.quantity))
@@ -244,9 +257,9 @@ class OrderService:
 
             if coupon is not None:
                 if subtotal < (coupon.min_purchase or 0):
-                    raise ValueError(
-                        f"Coupon '{coupon.code}' requires a minimum purchase "
-                        f"of {coupon.min_purchase}"
+                    raise InvalidCouponException(
+                        f"O cupom '{coupon.code}' exige uma compra mínima "
+                        f"de {coupon.min_purchase}."
                     )
 
                 if coupon.discount_type == DiscountType.PERCENTAGE:
@@ -326,22 +339,28 @@ class OrderService:
             order = self.repo.get_by_id(order_id)
 
             if order is None:
-                raise ValueError(f"No order found with id {order_id}")
+                raise OrderNotFoundException()
 
             if order.user_id != user_id:
-                raise ValueError("Order is not owned by user")
+                raise ForbiddenException(
+                    "Este pedido pertence a outro usuário.",
+                    code="ORDER_FORBIDDEN",
+                )
 
             if data.address_id is not None:
                 address = self.address_repo.get_by_id(data.address_id)
 
                 if address is None:
-                    raise ValueError(f"No address found with id {data.address_id}")
+                    raise AddressNotFoundException()
 
                 if address.user_id != user_id:
-                    raise ValueError("Address is not owned by user")
+                    raise AddressForbiddenException()
 
             if data.status is not None and order.status == "cancelled":
-                raise ValueError("Cannot update a cancelled order")
+                raise BadRequestException(
+                    "Não é possível alterar um pedido cancelado.",
+                    code="ORDER_CANCELLED",
+                )
 
             if data.items is not None:
                 order_items = self._update_items(order, data.items)
@@ -349,7 +368,10 @@ class OrderService:
                 order_items = self.repo.get_with_items(order_id)
 
                 if not order_items:
-                    raise ValueError(f"No items found in order with id {order_id}")
+                    raise NotFoundException(
+                        f"Nenhum item encontrado no pedido {order_id}.",
+                        code="ORDER_ITEM_NOT_FOUND",
+                    )
 
             coupon = self._validate_coupon(order.coupon_id, order_items, user_id)
 
@@ -396,10 +418,13 @@ class OrderService:
             order = self.repo.get_by_id(order_id)
 
             if order is None:
-                raise ValueError(f"No order found with id {order_id}")
+                raise OrderNotFoundException()
 
             if order.user_id != user_id:
-                raise ValueError("Order is not owned by user")
+                raise ForbiddenException(
+                    "Este pedido pertence a outro usuário.",
+                    code="ORDER_FORBIDDEN",
+                )
 
             self.repo.delete(order)
             return order
@@ -410,18 +435,24 @@ class OrderService:
 
         Valida que o pedido existe e pertence ao usuário (anti-IDOR). Se o
         comprovante ainda não foi gerado (task ainda não rodou ou falhou),
-        levanta ``ValueError`` que a rota traduz para 404.
+        levanta ``NotFoundException`` (404).
         """
         order = self.repo.get_by_id(order_id)
 
         if order is None:
-            raise ValueError(f"No order found with id {order_id}")
+            raise OrderNotFoundException()
 
         if order.user_id != user_id:
-            raise ValueError("Order is not owned by user")
+            raise ForbiddenException(
+                "Este pedido pertence a outro usuário.",
+                code="ORDER_FORBIDDEN",
+            )
 
         if not order.receipt_path:
-            raise ValueError(f"Receipt not generated yet for order {order_id}")
+            raise NotFoundException(
+                f"O comprovante do pedido {order_id} ainda não foi gerado.",
+                code="RECEIPT_NOT_FOUND",
+            )
 
         return order.receipt_path
 
@@ -430,13 +461,19 @@ class OrderService:
         order = self.repo.get_by_id(order_id)
 
         if not order:
-            raise ValueError(f"No order found with id {order_id}")
+            raise OrderNotFoundException()
 
         if order.status != OrderStatus.COMPLETED:
-            raise ValueError(f"Order {order_id} is not completed")
+            raise BadRequestException(
+                f"O pedido {order_id} ainda não foi concluído.",
+                code="ORDER_NOT_COMPLETED",
+            )
 
         if order.user_id != user.id:
-            raise ValueError(f"Order {order_id} is not owned by user {user.id}")
+            raise ForbiddenException(
+                "Este pedido pertence a outro usuário.",
+                code="ORDER_FORBIDDEN",
+            )
 
         sended = send_order_confirmation_email.delay(
             order_id,

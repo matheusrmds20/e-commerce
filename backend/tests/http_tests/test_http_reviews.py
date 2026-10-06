@@ -27,6 +27,7 @@ from app.api.exceptions import (
     DuplicateReviewException,
     NotFoundException,
     ProductNotFoundException,
+    ReviewForbiddenException,
     UserNotFoundException,
 )
 from app.models.user import UserRole
@@ -151,7 +152,7 @@ class TestListMyReviews:
     def test_list_other_user_forbidden(self, client, auth_user):
         auth_user(2)
         svc = Mock(name="review_service")
-        svc.get_by_user_id.side_effect = ValueError("Review is not owned by user")
+        svc.get_by_user_id.side_effect = ReviewForbiddenException()
 
         with patch("app.api.v1.reviews.get_review_service", return_value=svc):
             response = client.get(f"{PREFIX}/list?user_id=1")
@@ -182,7 +183,7 @@ class TestGetReviewsByProduct:
 
     def test_get_by_product_not_found(self, client):
         svc = Mock(name="review_service")
-        svc.get_by_product_id.side_effect = ValueError("No product found with id 999")
+        svc.get_by_product_id.side_effect = ProductNotFoundException()
 
         with patch("app.api.v1.reviews.get_review_service", return_value=svc):
             response = client.get(f"{PREFIX}/product/999")
@@ -211,7 +212,7 @@ class TestUpdateReview:
     def test_update_not_owned(self, client, auth_user):
         auth_user(2)
         svc = Mock(name="review_service")
-        svc.update.side_effect = ValueError("Review is not owned by user")
+        svc.update.side_effect = ReviewForbiddenException()
 
         with patch("app.api.v1.reviews.get_review_service", return_value=svc):
             response = client.patch(f"{PREFIX}/update/1", json={"rating": 3})
@@ -255,7 +256,7 @@ class TestDeleteReview:
     def test_delete_not_owned(self, client, auth_user):
         auth_user(2)
         svc = Mock(name="review_service")
-        svc.delete.side_effect = ValueError("Review is not owned by user")
+        svc.delete.side_effect = ReviewForbiddenException()
 
         with patch("app.api.v1.reviews.get_review_service", return_value=svc):
             response = client.delete(f"{PREFIX}/delete/1")

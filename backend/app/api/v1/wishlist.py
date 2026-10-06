@@ -4,11 +4,6 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db
-from app.api.exceptions import (
-    ConflictException,
-    NotFoundException,
-    WishlistForbiddenException,
-)
 from app.models.user import User
 from app.schemas.wishlist import WishlistCreate, WishlistResponse
 from app.services.wishlist_service import WishlistService
@@ -23,24 +18,6 @@ def get_wishlist_service(db: DbSession) -> WishlistService:
     return WishlistService(db)
 
 
-def _traduzir_value_error(exc: ValueError):
-    """Traduz os ``ValueError`` do service em erros HTTP (senão viram 500)."""
-    msg = str(exc)
-
-    if "not owned by user" in msg:
-        return WishlistForbiddenException(msg)
-
-    if "Admin permission required" in msg:
-        return WishlistForbiddenException(
-            "Apenas administradores podem listar todas as listas de desejos."
-        )
-
-    if "already has product" in msg:
-        return ConflictException(msg, code="WISHLIST_DUPLICATE")
-
-    return NotFoundException(msg, code="WISHLIST_NOT_FOUND")
-
-
 @wishlist_router.post(
     "/create",
     response_model=WishlistResponse,
@@ -50,10 +27,7 @@ def _traduzir_value_error(exc: ValueError):
 def create_wishlist_item(
     data: WishlistCreate, current_user: AuthUser, db: DbSession
 ) -> WishlistResponse:
-    try:
-        return get_wishlist_service(db).create(data, current_user)
-    except ValueError as exc:
-        raise _traduzir_value_error(exc) from exc
+    return get_wishlist_service(db).create(data, current_user)
 
 
 @wishlist_router.get(
@@ -62,10 +36,7 @@ def create_wishlist_item(
     summary="Lista a wishlist do usuário autenticado",
 )
 def list_wishlist_items(current_user: AuthUser, db: DbSession) -> list:
-    try:
-        return get_wishlist_service(db).get_by_user_id(current_user)
-    except ValueError as exc:
-        raise _traduzir_value_error(exc) from exc
+    return get_wishlist_service(db).get_by_user_id(current_user)
 
 
 @wishlist_router.get(
@@ -74,10 +45,7 @@ def list_wishlist_items(current_user: AuthUser, db: DbSession) -> list:
     summary="Lista todos os itens de wishlists (restrito a administradores)",
 )
 def list_all_wishlist_items(current_user: AuthUser, db: DbSession) -> list:
-    try:
-        return get_wishlist_service(db).get_all(current_user)
-    except ValueError as exc:
-        raise _traduzir_value_error(exc) from exc
+    return get_wishlist_service(db).get_all(current_user)
 
 
 @wishlist_router.get(
@@ -88,10 +56,7 @@ def list_all_wishlist_items(current_user: AuthUser, db: DbSession) -> list:
 def get_wishlist_by_product_id(
     product_id: int, current_user: AuthUser, db: DbSession
 ) -> list:
-    try:
-        return get_wishlist_service(db).get_by_product_id(product_id, current_user)
-    except ValueError as exc:
-        raise _traduzir_value_error(exc) from exc
+    return get_wishlist_service(db).get_by_product_id(product_id, current_user)
 
 
 @wishlist_router.delete(
@@ -102,7 +67,4 @@ def get_wishlist_by_product_id(
 def delete_wishlist_item(
     wishlist_id: int, current_user: AuthUser, db: DbSession
 ) -> WishlistResponse:
-    try:
-        return get_wishlist_service(db).delete(wishlist_id, current_user)
-    except ValueError as exc:
-        raise _traduzir_value_error(exc) from exc
+    return get_wishlist_service(db).delete(wishlist_id, current_user)
