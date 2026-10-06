@@ -29,7 +29,7 @@ const ITENS_POR_PAGINA = 12
  * O catálogo é buscado no servidor a cada mudança de página **ou** de filtro;
  * as categorias ficam em cache no estado (buscadas uma única vez).
  */
-export default function Acervo({ onAbrirLivro }) {
+export default function Acervo({ onAbrirLivro, termoInicial = '', onLimparBuscaInicial }) {
   const [produtos, setProdutos] = useState([])
   const [meta, setMeta] = useState(null)
   const [categorias, setCategorias] = useState([])
@@ -38,12 +38,12 @@ export default function Acervo({ onAbrirLivro }) {
 
   // Busca livre. `termoBusca` é o que está na caixa; `busca` é o termo
   // efetivamente enviado ao backend, comitado após um debounce curto.
-  const [termoBusca, setTermoBusca] = useState('')
-  const [busca, setBusca] = useState(null)
+  const [termoBusca, setTermoBusca] = useState(termoInicial || '')
+  const [busca, setBusca] = useState(termoInicial?.trim() ? termoInicial.trim() : null)
   const timerBusca = useRef(null)
   // Espelho do termo comitado para comparar sem reler o state (o debounce
   // roda fora do render e precisa saber se o termo mudou de fato).
-  const buscaRef = useRef(null)
+  const buscaRef = useRef(termoInicial?.trim() ? termoInicial.trim() : null)
 
   const [pagina, setPagina] = useState(1)
   const [carregando, setCarregando] = useState(true)
@@ -120,6 +120,21 @@ export default function Acervo({ onAbrirLivro }) {
     setPagina(1)
   }, [])
 
+  // Sincroniza se o termo inicial mudar externamente (ex: busca na Navbar)
+  useEffect(() => {
+    if (termoInicial !== undefined) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setTermoBusca(termoInicial)
+      const limpo = termoInicial ? termoInicial.trim() : ''
+      const novo = limpo ? limpo : null
+      if (buscaRef.current !== novo) {
+        buscaRef.current = novo
+        setBusca(novo)
+        setPagina(1)
+      }
+    }
+  }, [termoInicial])
+
   // Debounce do termo digitado: comita a busca 300ms após a última tecla.
   useEffect(() => {
     timerBusca.current = setTimeout(() => {
@@ -141,6 +156,7 @@ export default function Acervo({ onAbrirLivro }) {
     setTermoBusca('')
     setBusca(null)
     setPagina(1)
+    onLimparBuscaInicial?.()
   }
 
   /** Troca de página e volta ao topo da listagem. */

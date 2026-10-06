@@ -7,9 +7,7 @@ import newsletterService from '../api/newsletter'
  * Newsletter — "Carta do Livreiro" com forte peso visual, estética de papelaria fina,
  * selo postal vintage, encarte de pergaminho e captura de e-mail de alta conversão.
  *
- * O formulário chama o endpoint de inscrição (`newsletterService.inscrever`).
- * Como o backend ainda não expõe esse recurso, a resposta 404 vira uma
- * mensagem clara de indisponibilidade — sem confirmar uma inscrição inexistente.
+ * O formulário chama o endpoint de inscrição (`newsletterService.inscrever` -> POST /newsletter/subscribe).
  */
 export default function Newsletter() {
   const [enviado, setEnviado] = useState(false)
