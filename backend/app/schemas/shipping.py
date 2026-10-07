@@ -23,7 +23,7 @@ class ShippingCalculateResponse(BaseModel):
     """Resultado da cotação de frete de um pedido."""
 
     order_id: int
-    offers: list[ShippingOffer]
+    offers: list[ShippingOffer] = Field(default_factory=list)
     # Index da oferta selecionada como a "melhor" (menor preço). None quando
     # não há ofertas disponíveis.
     best_offer_index: int | None = None

@@ -124,6 +124,16 @@ def payment_gateway():
 
 
 @pytest.fixture
+def shipping_gateway():
+    """Mock do MelhorEnvioGateway.
+
+    Isola os testes de shipping_service de qualquer chamada HTTP real à API
+    do Melhor Envio.
+    """
+    return Mock(name="shipping_gateway")
+
+
+@pytest.fixture
 def auth_service(db, user_repo):
     with (
         patch("app.services.auth_service.UserRepository", return_value=user_repo),
@@ -289,3 +299,15 @@ def payment_service(db, payment_repo, user_repo, order_repo, payment_gateway):
         from app.services.payment_service import PaymentService
 
         yield PaymentService(db)
+
+
+@pytest.fixture
+def shipping_service(db, order_repo, address_repo, shipping_gateway):
+    with (
+        patch("app.services.shipping_service.OrderRepository", return_value=order_repo),
+        patch("app.services.shipping_service.AddressRepository", return_value=address_repo),
+        patch("app.services.shipping_service.MelhorEnvioGateway", return_value=shipping_gateway),
+    ):
+        from app.services.shipping_service import ShippingService
+
+        yield ShippingService(db)
