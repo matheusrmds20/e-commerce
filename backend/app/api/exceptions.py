@@ -357,6 +357,41 @@ class DuplicateProductException(ConflictException):
 
 
 # ---------------------------------------------------------------------------
+# Frete (Melhor Envio)
+# ---------------------------------------------------------------------------
+
+
+class ShippingNotConfiguredException(BadRequestException):
+    """A integração de frete não está configurada (token ou CEP de origem)."""
+
+    def __init__(
+        self, message: str = "O cálculo de frete ainda não está configurado."
+    ) -> None:
+        super().__init__(message, code="SHIPPING_NOT_CONFIGURED")
+
+
+class ShippingIncompleteProductException(BadRequestException):
+    """Um ou mais produtos do pedido não possuem peso/dimensões para cotar."""
+
+    def __init__(self, message: str) -> None:
+        super().__init__(message, code="SHIPPING_INCOMPLETE_PRODUCT")
+
+
+class ShippingCalculationException(BadRequestException):
+    """Falha ao consultar a cotação no Melhor Envio."""
+
+    def __init__(self, message: str = "Não foi possível calcular o frete.") -> None:
+        super().__init__(message, code="SHIPPING_CALCULATION_ERROR")
+
+
+class ShippingApplyException(BadRequestException):
+    """Falha ao aplicar o frete ao pedido (oferta inválida ou sem pedido)."""
+
+    def __init__(self, message: str) -> None:
+        super().__init__(message, code="SHIPPING_APPLY_ERROR")
+
+
+# ---------------------------------------------------------------------------
 # Handlers Globais
 # ---------------------------------------------------------------------------
 

@@ -12,6 +12,7 @@ from app.api.v1.orders import order_router
 from app.api.v1.payments import payment_router
 from app.api.v1.products import product_router
 from app.api.v1.reviews import review_router
+from app.api.v1.shipping import shipping_router
 from app.api.v1.user_coupons import user_coupon_router
 from app.api.v1.users import user_router
 from app.api.v1.wishlist import wishlist_router
@@ -29,6 +30,7 @@ router.include_router(coupon_router, prefix="/coupons", tags=["coupons"])
 router.include_router(wishlist_router, prefix="/wishlists", tags=["wishlists"])
 router.include_router(auth_router, prefix="/auth", tags=["auth"])
 router.include_router(review_router, prefix="/reviews", tags=["reviews"])
+router.include_router(shipping_router, prefix="/shipping", tags=["shipping"])
 router.include_router(admin_router, prefix="/admin", tags=["admin"])
 router.include_router(user_coupon_router, prefix="/user-coupons", tags=["user-coupons"])
 router.include_router(newsletter_router, prefix="/newsletter", tags=["newsletter"])
