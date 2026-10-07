@@ -127,6 +127,66 @@ class TestCalculate:
         assert response.status_code == 400
 
 
+class TestQuote:
+    def test_quote_requires_auth(self, client):
+        response = client.post(PREFIX + "/quote", json={"postal_code": "01310-100"})
+        assert response.status_code == 401
+
+    def test_quote_success(self, client, auth_user, patch_shipping_service):
+        auth_user(1)
+        service = Mock(name="shipping_service")
+        service.quote.return_value = {
+            "postal_code": "01310100",
+            "offers": CALCULATE_OFFERS,
+            "best_offer_index": 0,
+            "is_real": True,
+        }
+
+        with patch_shipping_service(service):
+            response = client.post(
+                PREFIX + "/quote", json={"postal_code": "01310-100"}
+            )
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["is_real"] is True
+        assert body["postal_code"] == "01310100"
+        assert len(body["offers"]) == 2
+        assert body["best_offer_index"] == 0
+        service.quote.assert_called_once()
+        # user.id e postal_code são repassados por posição.
+        assert service.quote.call_args.args[0] == 1
+        assert service.quote.call_args.args[1] == "01310-100"
+
+    def test_quote_fallback(self, client, auth_user, patch_shipping_service):
+        auth_user(1)
+        service = Mock(name="shipping_service")
+        service.quote.return_value = {
+            "postal_code": "01310100",
+            "offers": [],
+            "best_offer_index": None,
+            "is_real": False,
+            "fallback_reason": "frete ainda não configurado",
+        }
+
+        with patch_shipping_service(service):
+            response = client.post(
+                PREFIX + "/quote", json={"postal_code": "01310-100"}
+            )
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["is_real"] is False
+        assert body["offers"] == []
+        assert body["fallback_reason"] == "frete ainda não configurado"
+
+    def test_quote_missing_postal_code(self, client, auth_user):
+        auth_user(1)
+        response = client.post(PREFIX + "/quote", json={})
+
+        assert_validation_error(response)
+
+
 class TestApply:
     def test_apply_success(self, client, auth_user, patch_shipping_service):
         auth_user(1)

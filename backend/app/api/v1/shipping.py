@@ -9,6 +9,8 @@ from app.schemas.shipping import (
     ShippingApplyRequest,
     ShippingApplyResponse,
     ShippingCalculateResponse,
+    ShippingQuoteRequest,
+    ShippingQuoteResponse,
 )
 from app.services.shipping_service import ShippingService
 
@@ -20,6 +22,17 @@ UserDb = Annotated[User, Depends(get_current_user)]
 
 def get_shipping_service(db: DbSession) -> ShippingService:
     return ShippingService(db)
+
+
+@shipping_router.post(
+    "/quote",
+    response_model=ShippingQuoteResponse,
+    summary="Cota o frete do carrinho do usuário por CEP (sem criar pedido)",
+)
+def quote_shipping(data: ShippingQuoteRequest, user: UserDb, db: DbSession):
+    """Calcula as opções de frete a partir do carrinho do usuário autenticado
+    e do CEP informado. Não cria pedido nem baixa estoque."""
+    return get_shipping_service(db).quote(user.id, data.postal_code)
 
 
 @shipping_router.post(

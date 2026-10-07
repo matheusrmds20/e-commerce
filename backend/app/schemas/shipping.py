@@ -32,6 +32,26 @@ class ShippingCalculateResponse(BaseModel):
     is_real: bool = True
 
 
+class ShippingQuoteRequest(BaseModel):
+    """Requisição de cotação pré-checkout (por CEP, sem criar pedido)."""
+
+    postal_code: str = Field(
+        description="CEP de entrega (usado no estado de origem -> destino)"
+    )
+
+
+class ShippingQuoteResponse(BaseModel):
+    """Resultado da cotação pré-checkout (baseada no carrinho do usuário)."""
+
+    postal_code: str = ""
+    offers: list[ShippingOffer] = Field(default_factory=list)
+    best_offer_index: int | None = None
+    is_real: bool = True
+    fallback_reason: str | None = Field(
+        None, description="Motivo quando is_real=False (fallback offline)"
+    )
+
+
 class ShippingApplyRequest(BaseModel):
     order_id: int = Field(description="ID do pedido")
     price: float = Field(..., ge=0, description="Valor do frete a aplicar")

@@ -19,7 +19,11 @@ class CartItemResponse(BaseModel):
     cart_id: int
     product_id: int
     quantity: int
-    product: ProductResponse
+    # ``product`` vem quando a relação é serializável (leitura/criação). Pode
+    # ser None em fluxos que deletam a linha e respondem a partir de um objeto
+    # que já não suporta lazy-load (ex.: remover da sacola), evitando
+    # DetachedInstanceError. O front sempre trata ``product`` vazio.
+    product: ProductResponse | None = None
 
     model_config = ConfigDict(from_attributes=True)
 

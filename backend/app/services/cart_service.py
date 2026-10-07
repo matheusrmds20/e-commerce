@@ -14,7 +14,7 @@ from app.repositories.cart_item_repo import CartItemRepository
 from app.repositories.cart_repo import CartRepository
 from app.repositories.product_repo import ProductRepository
 from app.repositories.user_repo import UserRepository
-from app.schemas.cart import CartCreate, CartItemCreate
+from app.schemas.cart import CartCreate, CartItemCreate, CartItemResponse
 
 MAX_ADD_ITEM_TENTATIVAS = 2
 
@@ -35,6 +35,21 @@ class CartService:
         self.session.refresh(cart_item)
         return cart_item
 
+    def _to_response(self, cart_item):
+        """Materializa um ``CartItemResponse`` a partir do ORM ainda vivo.
+
+        Usado nos fluxos que DELETAM o item antes de responder (remover, e
+        ``update_item`` com quantidade 0). Devolver o ORM deletado faria o
+        pydantic tentar lazy-load de ``product`` após o commit com a sessão
+        expirada e dispararia ``DetachedInstanceError``. Capturamos tudo agora.
+        """
+        return CartItemResponse(
+            id=cart_item.id,
+            cart_id=cart_item.cart_id,
+            product_id=cart_item.product_id,
+            quantity=cart_item.quantity,
+            product=cart_item.product,
+        )
 
     def _remove_item(self, cart_item):
 
@@ -138,8 +153,9 @@ class CartService:
 
             if quantity <= 0:
 
+                resposta = self._to_response(cart_item)
                 self.cart_item_repo.delete(cart_item)
-                return cart_item
+                return resposta
 
             if quantity > cart_item.quantity:
                 product = self.product_repo.get_by_id_for_update(cart_item.product_id)
@@ -155,7 +171,7 @@ class CartService:
 
 
 
-    def remove_item(self, cart_id: int, user_id: int, item_id: int):
+    def remove_item(self,cart_id: int, user_id: int, item_id: int):
         with self.session.begin():
 
             cart = self.cart_repo.get_by_id(cart_id)
@@ -171,15 +187,13 @@ class CartService:
 
             cart_item = self.cart_item_repo.get_by_id(item_id)
 
-
             if not cart_item:
                 raise CartItemNotFoundException()
 
 
-
-
+            resposta = self._to_response(cart_item)
             self.cart_item_repo.delete(cart_item)
-            return cart_item
+            return resposta
 
     def clear(self, cart_id: int, user_id: int):
         with self.session.begin():

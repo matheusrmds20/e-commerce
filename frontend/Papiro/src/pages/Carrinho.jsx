@@ -28,7 +28,7 @@ export default function Carrinho({ onCheckout, onIrParaLogin }) {
   const [recomendadosLista, setRecomendadosLista] = useState([])
   const [acaoErro, setAcaoErro] = useState(null)
 
-  // Totais derivados dos itens atuais (frete grátis a partir de R$ 150).
+  // Totais derivados dos itens atuais (subtotal = total; frete só no checkout).
   const { subtotal, total } = useMemo(() => calcularTotais(itens), [itens])
 
   // Busca recomendações no catálogo real.

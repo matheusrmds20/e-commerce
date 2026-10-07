@@ -9,6 +9,7 @@ from app.core.config import get_settings
 from app.integrations.MelhorEnvio.gateway import MelhorEnvioGateway
 from app.models.order import OrderStatus
 from app.repositories.address_repo import AddressRepository
+from app.repositories.cart_repo import CartRepository
 from app.repositories.order_repo import OrderRepository
 
 settings = get_settings()
@@ -28,12 +29,70 @@ class ShippingService:
     def __init__(self, db):
         self.order_repo = OrderRepository(db)
         self.address_repo = AddressRepository(db)
+        self.cart_repo = CartRepository(db)
         self.gateway = MelhorEnvioGateway()
         self.session = db
 
     # ------------------------------------------------------------------
     # Cálculo
     # ------------------------------------------------------------------
+
+    def quote(self, user_id: int, postal_code: str) -> dict:
+        """Cota o frete a partir do CARTão do usuário, sem criar pedido.
+
+        Usado antes do checkout para o cliente ver/escolher as opções reais de
+        frete. Não baixa estoque nem limpa o carrinho (ao contrário de criar um
+        pedido).
+        """
+        cart_items = self.cart_repo.get_by_user_id_cart_items(user_id)
+        if not cart_items:
+            return self._fallback_quote(postal_code, "carrinho vazio")
+
+        # Verifica se a integração está pronta para cotar de verdade.
+        if not self._is_configured():
+            return self._fallback_quote(postal_code, "frete ainda não configurado")
+
+        products = self._build_products(cart_items)
+        if products is None:
+            return self._fallback_quote(
+                postal_code, "produtos sem peso/dimensões cadastrados"
+            )
+
+        payload = {
+            "from": {"postal_code": settings.MELHOR_ENVIO_ORIGIN_ZIP},
+            "to": {"postal_code": self._normalize_zip(postal_code)},
+            "products": products,
+            "options": {"receipt": False, "own_hand": False},
+        }
+
+        try:
+            raw_offers = self.gateway.calculate_shipping(payload)
+        except RuntimeError as exc:
+            raise ShippingCalculationException(str(exc)) from exc
+
+        if not raw_offers:
+            return self._fallback_quote(postal_code, "nenhuma oferta retornada")
+
+        offers = [self._normalize_offer(o) for o in raw_offers]
+        offers = [o for o in offers if o is not None]
+        if not offers:
+            return self._fallback_quote(postal_code, "nenhuma oferta válida")
+
+        return {
+            "postal_code": self._normalize_zip(postal_code),
+            "offers": offers,
+            "best_offer_index": self._best_offer_index(offers),
+            "is_real": True,
+        }
+
+    def _fallback_quote(self, postal_code: str, motivo: str) -> dict:
+        return {
+            "postal_code": self._normalize_zip(postal_code),
+            "offers": [],
+            "best_offer_index": None,
+            "is_real": False,
+            "fallback_reason": motivo,
+        }
 
     def calculate(self, order_id: int, user_id: int) -> dict:
         order = self._get_owned_order(order_id, user_id)
@@ -180,10 +239,16 @@ class ShippingService:
     def _build_products(self, items) -> list[dict] | None:
         """Monta o payload ``products``. Retorna ``None`` se houver item sem
         peso/dimensões (cotação não pode ser feita).
+
+        Aceita tanto ``OrderItem`` (atributo ``product``/``.products``) quanto
+        ``CartItem`` (atributo ``product``).
         """
         products = []
         for item in items:
-            product = getattr(item, "products", None)
+            product = (
+                getattr(item, "product", None)
+                or getattr(item, "products", None)
+            )
             if product is None:
                 return None
             weight = getattr(product, "weight_kg", None)
@@ -203,7 +268,10 @@ class ShippingService:
                     "height": float(height),
                     "length": float(length),
                     "weight": float(weight),
-                    "insurance_value": float(item.price),
+                    # CartItem não tem ``price``; reusa o preço do produto.
+                    "insurance_value": float(
+                        getattr(item, "price", None) or product.price
+                    ),
                     "quantity": int(item.quantity),
                 }
             )

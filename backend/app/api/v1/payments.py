@@ -66,7 +66,7 @@ def get_payments_by_order_id(
     order_id: int, user: UserDb, db: DbSession
 ) -> list:
 
-    return get_payment_service(db).get_by_order_id(order_id)
+    return get_payment_service(db).get_by_order_id(user, order_id)
 
 @payment_router.post(
     "/checkout/{order_id}",

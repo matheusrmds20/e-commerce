@@ -14,6 +14,17 @@ import api from './client'
  */
 export const shippingService = {
   /**
+   * Cota o frete do carrinho do usuário por CEP, SEM criar pedido.
+   * Usado no fluxo de checkout antes do pagamento.
+   * @param {{ postal_code: string }} payload
+   * @returns {Promise<{postal_code:string, offers:Array, best_offer_index:number|null, is_real:boolean, fallback_reason?:string|null}>}
+   */
+  async quotar({ postal_code }) {
+    const { data } = await api.post('/shipping/quote', { postal_code })
+    return data
+  },
+
+  /**
    * Cota o frete de um pedido (deve existir no fluxo de finalização).
    * @param {number} orderId
    * @returns {Promise<{order_id:number, offers:Array, best_offer_index:number|null, is_real:boolean}>}

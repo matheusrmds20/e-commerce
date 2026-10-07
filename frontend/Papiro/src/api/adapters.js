@@ -138,14 +138,14 @@ export const formatarPreco = (valor) =>
 
 /**
  * Totais do carrinho.
- * Regra atual do front: frete grátis a partir de R$ 150, senão R$ 24,90.
+ * Não há mais cálculo de frete por aqui — o frete real é cotado no checkout
+ * (Melhor Envio) e exibido apenas lá. Aqui retornamos o subtotal como total.
  */
 export function calcularTotais(itens) {
   const subtotal = itens.reduce(
     (acc, item) => acc + item.preco * item.quantidade,
     0,
   )
-  const frete = subtotal === 0 || subtotal >= 150 ? 0 : 24.9
-  return { subtotal, frete, total: subtotal + frete }
+  return { subtotal, total: subtotal }
 }
 

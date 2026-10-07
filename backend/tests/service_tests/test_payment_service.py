@@ -174,6 +174,42 @@ class TestCreateCheckout:
             "/api/v1/payments/webhook/"
         )
 
+    def test_create_checkout_inclui_frete_na_preferencia(
+        self, payment_service, order_repo, payment_repo, payment_gateway
+    ):
+        """Quando o pedido tem frete, ele entra como item da preferência para
+        o Mercado Pago cobrar o total (subtotal - desconto + frete)."""
+        order_repo.get_by_id.return_value = make_order(
+            subtotal=100.0, shipping_cost=27.5, total=127.5
+        )
+        order_repo.get_with_items_products.return_value = [make_order_item()]
+        payment_repo.get_by_order_id.return_value = []
+        payment_gateway.create_preference.return_value = {
+            "id": "PREF1",
+            "init_point": "https://mp/checkout/PREF1",
+        }
+
+        payment_service.create_checkout(1, 1)
+
+        preference_data = payment_gateway.create_preference.call_args.args[0]
+        items = preference_data["items"]
+        assert items == [
+            {
+                "id": "1",
+                "title": "Livro X",
+                "quantity": 2,
+                "unit_price": 50.0,
+                "currency_id": "BRL",
+            },
+            {
+                "id": "frete",
+                "title": "Frete",
+                "quantity": 1,
+                "unit_price": 27.5,
+                "currency_id": "BRL",
+            },
+        ]
+
     def test_create_checkout_usa_sandbox_init_point(
         self, payment_service, order_repo, payment_repo, payment_gateway
     ):
