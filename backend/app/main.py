@@ -27,11 +27,7 @@ celery.conf.imports = ("app.utils.email", "app.utils.receipt_tasks")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-
-        "https://e-commerce.matheuslab.xyz",
-        "https://api-e-commerce.matheuslab.xyz",
-    ],
+    allow_origins=get_settings().CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
