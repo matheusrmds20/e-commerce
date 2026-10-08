@@ -1,3 +1,5 @@
+from unittest.mock import Mock
+
 import pytest
 
 from app.api.exceptions import (
@@ -112,17 +114,70 @@ class TestGetById:
 
 
 class TestGetByOrderId:
-    def test_get_by_order_id_success(self, payment_service, payment_repo):
+    def _make_user(self, user_id: int = 1):
+        user = Mock(name="user")
+        user.id = user_id
+        return user
+
+    def test_get_by_order_id_success(
+        self, payment_service, payment_repo, user_repo, order_repo
+    ):
+        user = self._make_user()
+        # get_by_order_id valida usuário e pedido antes de listar os payments.
+        user_repo.get_by_id.return_value = user
+        order_repo.get_by_id.return_value = make_order(user_id=1)
         payments = [make_payment()]
         payment_repo.get_by_order_id.return_value = payments
 
-        assert payment_service.get_by_order_id(1) == payments
+        assert payment_service.get_by_order_id(user, 1) == payments
 
-    def test_get_by_order_id_empty(self, payment_service, payment_repo):
+    def test_get_by_order_id_empty(
+        self, payment_service, payment_repo, user_repo, order_repo
+    ):
         """Pedido sem pagamentos devolve [] (estado normal), não erro."""
+        user = self._make_user()
+        user_repo.get_by_id.return_value = user
+        order_repo.get_by_id.return_value = make_order(user_id=1)
         payment_repo.get_by_order_id.return_value = []
 
-        assert payment_service.get_by_order_id(1) == []
+        assert payment_service.get_by_order_id(user, 1) == []
+
+
+class TestGetHistory:
+    def _make_user(self, user_id: int = 1):
+        user = Mock(name="user")
+        user.id = user_id
+        return user
+
+    def test_get_history_success(self, payment_service, payment_repo, user_repo):
+        """Retorna todos os pagamentos do usuário em uma única consulta."""
+        user = self._make_user()
+        user_repo.get_by_id.return_value = user
+        pagamentos = [make_payment(), make_payment(id=2)]
+        payment_repo.get_by_user_id.return_value = pagamentos
+
+        assert payment_service.get_history(1) == pagamentos
+        payment_repo.get_by_user_id.assert_called_once_with(1)
+
+    def test_get_history_user_inexistente_levanta_erro(
+        self, payment_service, user_repo
+    ):
+        from app.api.exceptions import UserNotFoundException
+
+        user_repo.get_by_id.return_value = None
+
+        with pytest.raises(UserNotFoundException):
+            payment_service.get_history(99)
+
+    def test_get_history_sem_pagamentos_retorna_lista_vazia(
+        self, payment_service, payment_repo, user_repo
+    ):
+        """Usuário sem pagamentos devolve [] (estado normal), não erro."""
+        user = self._make_user()
+        user_repo.get_by_id.return_value = user
+        payment_repo.get_by_user_id.return_value = []
+
+        assert payment_service.get_history(1) == []
 
 
 class TestCreateCheckout:
@@ -145,7 +200,9 @@ class TestCreateCheckout:
         assert result["payment_id"] == result["id"]
         assert result["checkout_url"] == "https://mp/checkout/PREF1"
         payment_service.session.add.assert_called_once()
-        payment_service.session.commit.assert_called_once()
+        # create_checkout commita 2x: (1) libera a transação de leitura antes
+        # da chamada externa ao MP (FASE 2), (2) persiste o novo Payment.
+        assert payment_service.session.commit.call_count == 2
 
     def test_create_checkout_sends_correct_preference(
         self, payment_service, order_repo, payment_repo, payment_gateway
@@ -173,6 +230,42 @@ class TestCreateCheckout:
         assert preference_data["notification_url"].endswith(
             "/api/v1/payments/webhook/"
         )
+
+    def test_create_checkout_inclui_frete_na_preferencia(
+        self, payment_service, order_repo, payment_repo, payment_gateway
+    ):
+        """Quando o pedido tem frete, ele entra como item da preferência para
+        o Mercado Pago cobrar o total (subtotal - desconto + frete)."""
+        order_repo.get_by_id.return_value = make_order(
+            subtotal=100.0, shipping_cost=27.5, total=127.5
+        )
+        order_repo.get_with_items_products.return_value = [make_order_item()]
+        payment_repo.get_by_order_id.return_value = []
+        payment_gateway.create_preference.return_value = {
+            "id": "PREF1",
+            "init_point": "https://mp/checkout/PREF1",
+        }
+
+        payment_service.create_checkout(1, 1)
+
+        preference_data = payment_gateway.create_preference.call_args.args[0]
+        items = preference_data["items"]
+        assert items == [
+            {
+                "id": "1",
+                "title": "Livro X",
+                "quantity": 2,
+                "unit_price": 50.0,
+                "currency_id": "BRL",
+            },
+            {
+                "id": "frete",
+                "title": "Frete",
+                "quantity": 1,
+                "unit_price": 27.5,
+                "currency_id": "BRL",
+            },
+        ]
 
     def test_create_checkout_usa_sandbox_init_point(
         self, payment_service, order_repo, payment_repo, payment_gateway

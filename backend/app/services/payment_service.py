@@ -7,6 +7,7 @@ from app.api.exceptions import (
     ForbiddenException,
     OrderNotFoundException,
     PaymentNotFoundException,
+    UserNotFoundException,
 )
 from app.core.config import get_settings
 from app.integrations.MercadoPago.geteway import MercadoPagoGateway
@@ -61,9 +62,39 @@ class PaymentService:
 
         return payment
 
-    def get_by_order_id(self, order_id: int) -> list[Payment]:
-        # Pedido sem pagamentos é estado normal (lista vazia), não erro.
+    def get_by_order_id(self, user, order_id: int) -> list[Payment]:
+
+        user = self.user_repo.get_by_id(user.id)
+
+        if not user:
+            raise UserNotFoundException(user_id=user.id)
+
+        order = self.order_repo.get_by_id(order_id)
+
+        if not order:
+            raise OrderNotFoundException()
+
+        if order.user_id != user.id:
+            raise ForbiddenException(
+                f"O pedido {order_id} não pertence a este usuário.",
+                code="ORDER_FORBIDDEN",
+            )
+
         return self.repo.get_by_order_id(order_id)
+
+    def get_history(self, user_id: int) -> list[Payment]:
+        """Retorna o histórico de pagamentos do usuário em uma única query.
+
+        A aba "Pagamentos" da Minha Conta não precisa mais fazer 1 request por
+        pedido (antes um ``Promise.all`` de ``get_by_order_id`` por pedido).
+        Se o usuário não existe, levanta erro de autenticação.
+        """
+        user = self.user_repo.get_by_id(user_id)
+
+        if not user:
+            raise UserNotFoundException(user_id=user_id)
+
+        return self.repo.get_by_user_id(user_id)
 
     def create_checkout(self, order_id: int, user_id: int) -> dict:
 
@@ -105,6 +136,20 @@ class PaymentService:
             for item in order_items
         ]
 
+        # Se o pedido tem frete, inclui-o como item da preferência para que o
+        # Mercado Pago cobre o total (subtotal - desconto + frete). Sem isso o
+        # MP soma apenas os produtos (subtotal) e o frete ficaria de fora.
+        if order.shipping_cost and order.shipping_cost > 0:
+            items.append(
+                {
+                    "id": "frete",
+                    "title": "Frete",
+                    "quantity": 1,
+                    "unit_price": order.shipping_cost,
+                    "currency_id": "BRL",
+                }
+            )
+
 
         preference_data = {
             "items": items,
@@ -125,6 +170,18 @@ class PaymentService:
 
 
 
+        # Total do pedido capturado ANTES do commit: ao encerrar a transação de
+        # leitura, os atributos de `order` ficam expirados/recarregados no acesso.
+        total_para_cobrar = order.total
+
+        # FASE 2: encerra a transação de LEITURA antes da chamada externa ao
+        # Mercado Pago. Com autocommit=False, a primeira query (get_by_id)
+        # abriria uma transação que permaneceria aberta durante todo o request
+        # de rede, segurando uma conexão do pool por até o timeout. O commit
+        # abaixo fecha essa transação e libera a conexão; o `Payment` é
+        # persistido numa transação nova, logo após o retorno do MP.
+        self.session.commit()
+
         preference = self.gateway.create_preference(preference_data)
 
         payment = Payment(
@@ -132,7 +189,7 @@ class PaymentService:
             provider="mercadopago",
             provider_payment_id=None,
             provider_preference_id=preference["id"],
-            amount=order.total,
+            amount=total_para_cobrar,
             currency="BRL",
             status="pending",
         )

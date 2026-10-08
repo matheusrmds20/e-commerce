@@ -25,6 +25,10 @@ class Product(Base):
     price = Column(Float, nullable=False)
     discount_pct = Column(Integer, nullable=True)
     stock_qty = Column(Integer, nullable=False)
+    weight_kg = Column(Float, nullable=True)
+    height_cm = Column(Float, nullable=True)
+    width_cm = Column(Float, nullable=True)
+    length_cm = Column(Float, nullable=True)
     image_url = Column(String(500), nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
     is_featured = Column(

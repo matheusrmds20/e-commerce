@@ -271,6 +271,7 @@ export default function Admin({ onVoltarParaLoja }) {
             data: p.created_at ? new Date(p.created_at).toLocaleDateString('pt-BR') : 'Hoje',
             status: p.status,
             statusLabel: formatarStatus(p.status),
+            frete: Number(p.shipping_cost) || 0,
             total: Number(p.total) || 0,
           }))
           setPedidos(formatados)
@@ -1359,6 +1360,7 @@ export default function Admin({ onVoltarParaLoja }) {
                       <th className="py-3.5 px-6 font-semibold">Itens</th>
                       <th className="py-3.5 px-6 font-semibold">Data</th>
                       <th className="py-3.5 px-6 font-semibold">Status</th>
+                      <th className="py-3.5 px-6 font-semibold">Frete</th>
                       <th className="py-3.5 px-6 font-semibold">Total</th>
                       <th className="py-3.5 px-6 font-semibold text-right">Alterar Status</th>
                     </tr>
@@ -1393,6 +1395,11 @@ export default function Admin({ onVoltarParaLoja }) {
                         </td>
                         <td className="py-4 px-6 font-display font-bold text-coffee text-base">
                           R$ {Number(pedido.total).toFixed(2).replace('.', ',')}
+                        </td>
+                        <td className="py-4 px-6 text-xs text-coffee-soft">
+                          {Number(pedido.frete) > 0
+                            ? `R$ ${Number(pedido.frete).toFixed(2).replace('.', ',')}`
+                            : 'Grátis/—'}
                         </td>
                         <td className="py-4 px-6 text-right">
                           <select

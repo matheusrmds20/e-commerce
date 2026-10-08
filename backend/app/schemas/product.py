@@ -24,6 +24,11 @@ class ProductCreate(BaseModel):
     synopsis: str | None = Field(None, max_length=500, description="Sinopse do produto")
     discount_pct: int | None = Field(None, ge=0, le=100, description="Percentual de desconto")
     stock_qty: int = Field(..., ge=0, description="Quantidade de estoque do produto")
+    # Dimensões e peso para cálculo de frete no Melhor Envio (cm / kg).
+    weight_kg: float | None = Field(None, gt=0, description="Peso em kg")
+    height_cm: float | None = Field(None, gt=0, description="Altura em cm")
+    width_cm: float | None = Field(None, gt=0, description="Largura em cm")
+    length_cm: float | None = Field(None, gt=0, description="Comprimento em cm")
 
     @field_validator("price")
     @classmethod
@@ -54,6 +59,10 @@ class ProductUpdate(BaseModel):
     synopsis: str | None = Field(None, max_length=500)
     discount_pct: int | None = Field(None, ge=0, le=100)
     stock_qty: int | None = Field(None, ge=0)
+    weight_kg: float | None = Field(None, gt=0, description="Peso em kg")
+    height_cm: float | None = Field(None, gt=0, description="Altura em cm")
+    width_cm: float | None = Field(None, gt=0, description="Largura em cm")
+    length_cm: float | None = Field(None, gt=0, description="Comprimento em cm")
 
 
 class ProductResponse(BaseModel):
@@ -78,6 +87,10 @@ class ProductResponse(BaseModel):
     synopsis: str | None
     discount_pct: int | None
     stock_qty: int
+    weight_kg: float | None = None
+    height_cm: float | None = None
+    width_cm: float | None = None
+    length_cm: float | None = None
     created_at: datetime
     updated_at: datetime
 

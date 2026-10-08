@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import ResumoPedido from '../components/ResumoPedido'
 import SeletorEndereco from '../components/SeletorEndereco'
+import SeletorFrete from '../components/SeletorFrete'
 import SeletorPagamento from '../components/SeletorPagamento'
 import ModalEndereco from '../components/ModalEndereco'
 import SecaoCupons from '../components/SecaoCupons'
@@ -11,6 +12,7 @@ import { calcularTotais, formatarPreco } from '../api/adapters'
 import addressService from '../api/addresses'
 import orderService from '../api/orders'
 import paymentService from '../api/payments'
+import shippingService from '../api/shipping'
 import couponService from '../api/coupons'
 
 export default function Checkout({ onIrParaLogin }) {
@@ -36,15 +38,32 @@ export default function Checkout({ onIrParaLogin }) {
   const [enviando, setEnviando] = useState(false)
   const [pedido, setPedido] = useState(null)
 
+  // Estados de Frete (Melhor Envio)
+  const [ofertasFrete, setOfertasFrete] = useState([])
+  const [freteSelecionadoIndex, setFreteSelecionadoIndex] = useState(null)
+  // Metadata da última cotação (is_real, fallback_reason) p/ UX.
+  const [cotacaoFrete, setCotacaoFrete] = useState(null)
+  // true enquanto a cotação pré-checkout está rodando (UX do seletor).
+  // Inicia true p/ mostrar o placeholder de carregamento no primeiro load.
+  const [cotandoFrete, setCotandoFrete] = useState(true)
+
   // Estados de Cupons
   const [cupons, setCupons] = useState([])
   const [cupomSelecionado, setCupomSelecionado] = useState(null)
 
-  // Totais do carrinho
-  const { subtotal, frete, total: totalBase } = useMemo(
-    () => calcularTotais(itens),
-    [itens],
+  // Totais do carrinho: o subtotal vem da regra anterior (sem frete); o
+  // frete agora é a oferta selecionada no seletor (ou 0 enquanto não escolhida).
+  const { subtotal } = useMemo(() => calcularTotais(itens), [itens])
+
+  // Oferta de frete efetivamente selecionada (index no array de ofertas).
+  const freteSelecionado = useMemo(
+    () =>
+      freteSelecionadoIndex != null
+        ? ofertasFrete[freteSelecionadoIndex] ?? null
+        : null,
+    [freteSelecionadoIndex, ofertasFrete],
   )
+  const frete = freteSelecionado ? Number(freteSelecionado.price) : 0
 
   // Cupons válidos para a sacola atual: ativos, não expirados, aplicáveis a
   // algum item da sacola e com compra mínima atingida.
@@ -85,7 +104,7 @@ export default function Checkout({ onIrParaLogin }) {
     return Math.min(cupomAplicado.discount_value, subtotal)
   }, [cupomAplicado, subtotal])
 
-  const total = Math.max(0, totalBase - desconto)
+  const total = Math.max(0, subtotal - desconto + frete)
 
   // Carrega os cupons ATRIBUÍDOS ao usuário autenticado (ownership).
   // Sem login não há vínculo: a lista simplesmente fica vazia (não busca).
@@ -169,6 +188,51 @@ export default function Checkout({ onIrParaLogin }) {
     }
   }, [autenticado])
 
+  // Cota o frete (Melhor Envio) a partir do carrinho + CEP do endereço
+  // selecionado, SEM criar pedido. Roda sempre que o endereço/itens mudam,
+  // para o cliente ver as opções reais antes de pagar.
+  useEffect(() => {
+    let ativo = true
+
+    // Zera o estado de forma defasada (evita setState síncrono no efeito).
+    queueMicrotask(() => {
+      if (ativo) {
+        setOfertasFrete([])
+        setCotacaoFrete(null)
+        setFreteSelecionadoIndex(null)
+      }
+    })
+
+    if (!autenticado || !enderecoSelecionado || itens.length === 0) return
+
+    shippingService
+      .quotar({ postal_code: enderecoSelecionado.zip_code ?? '' })
+      .then((cotacao) => {
+        if (!ativo) return
+        const ofertas = Array.isArray(cotacao?.offers) ? cotacao.offers : []
+        setOfertasFrete(ofertas)
+        setCotacaoFrete(cotacao)
+        // Seleciona a melhor (menor preço) para esta cotação.
+        setFreteSelecionadoIndex(
+          ofertas.length > 0 ? (cotacao?.best_offer_index ?? 0) : null,
+        )
+      })
+      .catch(() => {
+        // Falha na cotação não bloqueia o checkout; cai no frete 0.
+        if (ativo) {
+          setOfertasFrete([])
+          setCotacaoFrete(null)
+          setFreteSelecionadoIndex(null)
+        }
+      })
+      .finally(() => {
+        if (ativo) setCotandoFrete(false)
+      })
+    return () => {
+      ativo = false
+    }
+  }, [autenticado, enderecoSelecionado, itens])
+
   // Handlers para os Modais
   const abrirModalEndereco = ({ modo = 'lista', endereco = null } = {}) => {
     setModalEnderecoConfig({ modo, endereco })
@@ -230,6 +294,24 @@ export default function Checkout({ onIrParaLogin }) {
       setPedido(criado)
       // O backend esvazia o carrinho no checkout; sincroniza o badge/estado.
       await recarregar()
+
+      // 1b. Aplica o frete já cotado (pelo carrinho + CEP) ao pedido criado,
+      //     para que o total cobrado no Mercado Pago inclua o valor do frete.
+      //     Sem ofertas/-se cotação falhou, o frete fica 0.
+      try {
+        const escolhida = freteSelecionado
+        if (cotacaoFrete?.is_real && escolhida) {
+          await shippingService.aplicar({
+            order_id: criado.id,
+            price: escolhida.price,
+            delivery_time: escolhida.delivery_time ?? null,
+          })
+        }
+      } catch (e) {
+        // Falha em aplicar o frete não bloqueia a compra: o valor é ajustado
+        // depois pela equipe (o pedido não deixa de ser criado).
+        console.warn('Falha ao aplicar frete:', e)
+      }
 
       // 2. Cria a preferência no Mercado Pago e redireciona o cliente.
       //    O processamento do pagamento acontece no domínio do MP.
@@ -348,7 +430,22 @@ export default function Checkout({ onIrParaLogin }) {
 
                   <div className="border-t border-line" />
 
-                  {/* 2. Seletor de Cupom de Desconto */}
+                  {/* 2. Frete (cotação Melhor Envio) */}
+                  <fieldset disabled={enviando || !autenticado}>
+                    <SeletorFrete
+                      ofertas={ofertasFrete}
+                      ofertaSelecionadaId={freteSelecionadoIndex}
+                      onSelecionarOferta={setFreteSelecionadoIndex}
+                      carregando={cotandoFrete || carregandoEnderecos}
+                      isReal={cotacaoFrete?.is_real ?? true}
+                      fallbackMotivo={cotacaoFrete?.fallback_reason ?? ''}
+                      formatarPreco={formatarPreco}
+                    />
+                  </fieldset>
+
+                  <div className="border-t border-line" />
+
+                  {/* 3. Seletor de Cupom de Desconto */}
                   <SecaoCupons
                     cuponsDisponiveis={cuponsDisponiveis}
                     cupomSelecionado={cupomSelecionado}

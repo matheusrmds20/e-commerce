@@ -223,6 +223,45 @@ def payment_payload(**overrides):
     return payload
 
 
+def shipping_offer_payload(**overrides):
+    """Payload compatível com ShippingOffer."""
+    payload = {
+        "service_id": "1",
+        "name": "PAC",
+        "company_name": "Correios",
+        "price": 27.5,
+        "delivery_time": 4,
+        "delivery_time_text": None,
+    }
+    payload.update(overrides)
+    return payload
+
+
+def shipping_calculate_response(**overrides):
+    """Payload compatível com ShippingCalculateResponse."""
+    payload = {
+        "order_id": 1,
+        "offers": [shipping_offer_payload()],
+        "best_offer_index": 0,
+        "is_real": True,
+    }
+    payload.update(overrides)
+    return payload
+
+
+def shipping_apply_response(**overrides):
+    """Payload compatível com ShippingApplyResponse."""
+    payload = {
+        "order_id": 1,
+        "applied": True,
+        "shipping_cost": 27.5,
+        "total": 147.3,
+        "status": "pending",
+    }
+    payload.update(overrides)
+    return payload
+
+
 # ---------------------------------------------------------------------------
 # Assertions auxiliares
 # ---------------------------------------------------------------------------

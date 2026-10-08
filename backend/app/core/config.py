@@ -17,8 +17,27 @@ class Settings(BaseSettings):
 
     FRONTEND_URL: str
     BACKEND_URL: str
+    # Origens permitidas pelo CORS. O default cobre os dev servers do Vite
+    # (5173) e o preview (4173) — necessários para desenvolvimento local e para
+    # a suíte E2E (front em localhost:5173 chamando o backend em localhost:8000)
+    # — além dos domínios de produção. Sobrescreva via env em formato JSON, ex.:
+    # CORS_ORIGINS=["https://e-commerce.matheuslab.xyz"]
+    CORS_ORIGINS: list[str] = [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:4173",
+        "http://127.0.0.1:4173",
+        "https://e-commerce.matheuslab.xyz",
+        "https://api-e-commerce.matheuslab.xyz",
+    ]
     MERCADO_PAGO_ACCESS_TOKEN: str
     MERCADO_PAGO_WEBHOOK_SECRET: str
+    # Melhor Envio — API de frete.
+    MELHOR_ENVIO_API_TOKEN: str = ""
+    # CEP de origem (da loja) usado na cotação de frete.
+    MELHOR_ENVIO_ORIGIN_ZIP: str = ""
+    # True usa https://sandbox.melhorenvio.com.br ; False usa produção.
+    MELHOR_ENVIO_SANDBOX: bool = True
     MERCADO_PAGO_WEBHOOK_SECRETS_EXTRA: str = ""
     VALIDATE_WEBHOOK_SIGNATURE: bool = True
     SECRET_KEY: str = Field(default="change-me-to-a-very-long-secret-key", min_length=32)

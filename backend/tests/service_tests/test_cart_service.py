@@ -13,6 +13,7 @@ from app.models.cart import Cart
 from app.models.cart_item import CartItem
 from app.models.product import Product
 from app.models.user import User, UserRole
+from app.schemas.cart import CartItemResponse
 
 
 def make_cart(**kwargs):
@@ -206,7 +207,12 @@ class TestUpdateItem:
 
         result = cart_service.update_item(1, 1, 1, 0)
 
-        assert result is item
+        # Item removido (qty=0): a resposta agora é um CartItemResponse
+        # materializado (não o ORM), para evitar DetachedInstanceError na
+        # serialização de um objeto recém-deletado.
+        assert isinstance(result, CartItemResponse)
+        assert result.id == item.id
+        assert result.product_id == item.product_id
         cart_item_repo.delete.assert_called_once_with(item)
         cart_item_repo.update_quantity.assert_not_called()
 
@@ -226,7 +232,11 @@ class TestRemoveItem:
 
         result = cart_service.remove_item(1, 1, 1)
 
-        assert result is item
+        # A resposta agora é um CartItemResponse materializado (não o ORM),
+        # evitando DetachedInstanceError ao serializar o item deletado.
+        assert isinstance(result, CartItemResponse)
+        assert result.id == item.id
+        assert result.product_id == item.product_id
         cart_item_repo.delete.assert_called_once_with(item)
 
     def test_item_not_found(self, cart_service, cart_repo, cart_item_repo):

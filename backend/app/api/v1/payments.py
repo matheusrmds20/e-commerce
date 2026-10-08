@@ -9,6 +9,7 @@ from mercadopago.webhook import (
     WebhookSignatureValidator,
 )
 from sqlalchemy.orm import Session
+from starlette.concurrency import run_in_threadpool
 
 from app.api.deps import get_current_user, get_db
 from app.core.config import get_settings
@@ -66,7 +67,24 @@ def get_payments_by_order_id(
     order_id: int, user: UserDb, db: DbSession
 ) -> list:
 
-    return get_payment_service(db).get_by_order_id(order_id)
+    return get_payment_service(db).get_by_order_id(user, order_id)
+
+
+@payment_router.get(
+    "/history",
+    response_model=list[PaymentResponse],
+    summary="Lista o histórico de pagamentos do usuário autenticado (1 request)",
+)
+def get_payments_history(
+    user: UserDb, db: DbSession
+) -> list:
+    """Retorna todos os pagamentos do usuário em uma única consulta agregada.
+
+    Substitui o padrão anterior da aba "Pagamentos" (Minha Conta) que fazia
+    ``Promise.all`` de N requests (1 por pedido). Aqui o front faz 1 único
+    request.
+    """
+    return get_payment_service(db).get_history(user.id)
 
 @payment_router.post(
     "/checkout/{order_id}",
@@ -215,9 +233,20 @@ async def process_webhook(
     if not payment_id:
         return {"status": "ignored"}
 
+    # O processamento real (chamada de rede ao Mercado Pago + atualização do
+    # pedido) é executado em um THREAD via ``run_in_threadpool``, NÃO no event
+    # loop. Este endpoint é `async def` e o SDK do Mercado Pago é síncrono/
+    # HTTP bloqueante: rodar direto aqui bloquearia o event loop único do
+    # uvicorn durante todo o request ao MP. ``run_in_threadpool`` move a
+    # chamada para um thread de worker do asyncio, mantendo o restante do
+    # servidor responsivo. (Trade-off leve em vez de um worker Celery dedicado
+    # — ver ADR em README; jobs pesados de e-mail/comprovante ainda usam
+    # Celery.)
     try:
-        get_payment_service(db).process_webhook(
-            str(payment_id), topic=topic or None
+        await run_in_threadpool(
+            get_payment_service(db).process_webhook,
+            str(payment_id),
+            topic or None,
         )
     except Exception:  # noqa: BLE001
         # Registra o erro mas responde 200: o MP reenvia por 15 min em caso de

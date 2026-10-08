@@ -76,6 +76,10 @@ backend/_auth_test.db
 
 # ===== Documentacao Markdown (não versionar) =====
 *.md
+# Exceções: docs públicos de arquitetura/deploy que devem ser versionados.
+!README.md
+!backend/README.md
+
 
 
 # ===== Artefatos gerados em runtime =====
@@ -105,3 +109,5 @@ desktop.ini
 *.njsproj
 *.sln
 *.sw?
+
+test.py
