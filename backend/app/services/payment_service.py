@@ -79,9 +79,22 @@ class PaymentService:
                 f"O pedido {order_id} não pertence a este usuário.",
                 code="ORDER_FORBIDDEN",
             )
-        
 
         return self.repo.get_by_order_id(order_id)
+
+    def get_history(self, user_id: int) -> list[Payment]:
+        """Retorna o histórico de pagamentos do usuário em uma única query.
+
+        A aba "Pagamentos" da Minha Conta não precisa mais fazer 1 request por
+        pedido (antes um ``Promise.all`` de ``get_by_order_id`` por pedido).
+        Se o usuário não existe, levanta erro de autenticação.
+        """
+        user = self.user_repo.get_by_id(user_id)
+
+        if not user:
+            raise UserNotFoundException(user_id=user_id)
+
+        return self.repo.get_by_user_id(user_id)
 
     def create_checkout(self, order_id: int, user_id: int) -> dict:
 
@@ -157,6 +170,18 @@ class PaymentService:
 
 
 
+        # Total do pedido capturado ANTES do commit: ao encerrar a transação de
+        # leitura, os atributos de `order` ficam expirados/recarregados no acesso.
+        total_para_cobrar = order.total
+
+        # FASE 2: encerra a transação de LEITURA antes da chamada externa ao
+        # Mercado Pago. Com autocommit=False, a primeira query (get_by_id)
+        # abriria uma transação que permaneceria aberta durante todo o request
+        # de rede, segurando uma conexão do pool por até o timeout. O commit
+        # abaixo fecha essa transação e libera a conexão; o `Payment` é
+        # persistido numa transação nova, logo após o retorno do MP.
+        self.session.commit()
+
         preference = self.gateway.create_preference(preference_data)
 
         payment = Payment(
@@ -164,7 +189,7 @@ class PaymentService:
             provider="mercadopago",
             provider_payment_id=None,
             provider_preference_id=preference["id"],
-            amount=order.total,
+            amount=total_para_cobrar,
             currency="BRL",
             status="pending",
         )

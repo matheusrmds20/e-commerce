@@ -75,6 +75,10 @@ class TestAuthRequired:
         response = client.get(f"{PREFIX}/order/1")
         assert response.status_code == 401
 
+    def test_history_requires_auth(self, client):
+        response = client.get(f"{PREFIX}/history")
+        assert response.status_code == 401
+
     def test_checkout_requires_auth(self, client):
         response = client.post(f"{PREFIX}/checkout/1")
         assert response.status_code == 401
@@ -165,6 +169,38 @@ class TestGetPayment:
         assert_validation_error(response)
 
 
+class TestGetHistory:
+    """GET /payments/history devolve o histórico do usuário em 1 request."""
+
+    def test_history_success(self, client, auth_user, patch_payment_service):
+        auth_user(1)
+        service = Mock(name="payment_service")
+        service.get_history.return_value = [
+            payment_payload(id=1),
+            payment_payload(id=2, status="approved"),
+        ]
+
+        with patch_payment_service(service):
+            response = client.get(f"{PREFIX}/history")
+
+        assert response.status_code == 200
+        body = response.json()
+        assert len(body) == 2
+        assert [p["id"] for p in body] == [1, 2]
+        service.get_history.assert_called_once_with(1)
+
+    def test_history_vazio(self, client, auth_user, patch_payment_service):
+        auth_user(1)
+        service = Mock(name="payment_service")
+        service.get_history.return_value = []
+
+        with patch_payment_service(service):
+            response = client.get(f"{PREFIX}/history")
+
+        assert response.status_code == 200
+        assert response.json() == []
+
+
 class TestGetPaymentsByOrder:
     def test_get_by_order_success(self, client, auth_user, patch_payment_service):
         auth_user(1)
@@ -181,7 +217,12 @@ class TestGetPaymentsByOrder:
         body = response.json()
         assert len(body) == 2
         assert [p["id"] for p in body] == [1, 2]
-        service.get_by_order_id.assert_called_once_with(1)
+        # A rota repassa (user, order_id) para o service. `user` é o objeto
+        # autenticado injetado pelo override de `get_current_user`.
+        args, _ = service.get_by_order_id.call_args
+        chamado_user, chamado_order_id = args
+        assert chamado_order_id == 1
+        assert chamado_user.id == 1
 
     def test_get_by_order_empty_list(self, client, auth_user, patch_payment_service):
         auth_user(1)
@@ -333,7 +374,7 @@ class TestWebhook:
 
         assert response.status_code == 200
         assert response.json()["status"] == "ok"
-        service.process_webhook.assert_called_once_with("MP-1", topic="payment")
+        service.process_webhook.assert_called_once_with("MP-1", "payment")
 
     def test_webhook_sucesso_formato_novo(
         self, client, patch_payment_service, validar_assinatura
@@ -355,7 +396,7 @@ class TestWebhook:
             )
 
         assert response.status_code == 200
-        service.process_webhook.assert_called_once_with("MP-1", topic="merchant_order")
+        service.process_webhook.assert_called_once_with("MP-1", "merchant_order")
 
     def test_webhook_formato_ipn_classico_e_ignorado(
         self, client, patch_payment_service

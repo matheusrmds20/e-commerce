@@ -9,6 +9,8 @@ import api from './client'
  *                                         { id, payment_id, checkout_url } (201).
  *   GET  /payments/get/{payment_id}    -> busca um pagamento pelo ID.
  *   GET  /payments/order/{order_id}    -> lista os pagamentos de um pedido.
+ *   GET  /payments/history             -> lista TODOS os pagamentos do usuário
+ *                                         (1 request; usado na aba Pagamentos).
  *
  * FLUXO REAL: o cliente finaliza o pedido (`orderService.criar`), chamamos
  * `criarCheckout(order.id)` e redirecionamos o navegador para `checkout_url`.
@@ -67,6 +69,16 @@ export const paymentService = {
    */
   async listarPorPedido(orderId) {
     const { data } = await api.get(`/payments/order/${orderId}`)
+    return data
+  },
+
+  /**
+   * Lista TODOS os pagamentos do usuário autenticado em uma única chamada.
+   * Usado pela aba "Pagamentos" da Minha Conta (evita 1 request por pedido).
+   * @returns {Promise<Array>}
+   */
+  async historico() {
+    const { data } = await api.get('/payments/history')
     return data
   },
 }

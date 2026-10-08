@@ -1063,7 +1063,9 @@ const ESTILO_STATUS_PAGAMENTO = {
 
 function AbaPagamentos() {
   // Os pagamentos são processados pelo Mercado Pago; aqui apenas listamos o
-  // histórico (status por pedido), consultado via GET /payments/order/{id}.
+  // histórico (status por pedido). FASE 3: faz UMA única consulta agregada
+  // via GET /payments/history — antes faria 1 request por pedido (Promise.all
+  // de GET /payments/order/{id}), além de re-buscar /orders/list.
   const [pagamentos, setPagamentos] = useState([])
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState(null)
@@ -1074,27 +1076,9 @@ function AbaPagamentos() {
     async function carregar() {
       try {
         setCarregando(true)
-        const pedidos = await orderService.listar()
-        const lista = Array.isArray(pedidos) ? pedidos : []
-
-        // Busca os pagamentos de cada pedido; pedidos sem pagamento geram 500
-        // no backend (ValueError) — tratamos como lista vazia, sem quebrar.
-        const resultados = await Promise.all(
-          lista.map(async (pedido) => {
-            try {
-              const pagos = await paymentService.listarPorPedido(pedido.id)
-              return Array.isArray(pagos) ? pagos : []
-            } catch {
-              return []
-            }
-          }),
-        )
-
+        const lista = await paymentService.historico()
         if (!ativo) return
-        const achatado = resultados
-          .flat()
-          .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-        setPagamentos(achatado)
+        setPagamentos(Array.isArray(lista) ? lista : [])
         setErro(null)
       } catch (err) {
         if (ativo) setErro(err?.message ?? 'Não foi possível carregar os pagamentos.')
