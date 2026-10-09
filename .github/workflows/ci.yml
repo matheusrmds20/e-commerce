@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main, Frontend]
+    branches: [main, Frontend, Backend]
   pull_request:
-    branches: [main, Frontend]
+    branches: [main, Frontend, Backend]
   workflow_dispatch:
 
 # Serializa execuções do mesmo branch SEM cancelar as que já estão rodando.
