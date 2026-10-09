@@ -99,7 +99,10 @@ class TestCreatePayment:
         assert body["provider"] == "mercadopago"
         assert body["status"] == "pending"
         assert body["order_id"] == 1
+        # SEGURANÇA: a rota repassa o id do usuário do token ao service, que
+        # valida a posse do pedido e deriva o valor.
         service.create.assert_called_once()
+        assert service.create.call_args.args[1] == 1
 
     def test_create_response_matches_schema(self, client, auth_user, patch_payment_service):
         """Todos os campos do PaymentResponse devem estar presentes."""
@@ -149,7 +152,8 @@ class TestGetPayment:
 
         assert response.status_code == 200
         assert response.json()["id"] == 7
-        service.get_by_id.assert_called_once_with(7)
+        # SEGURANÇA: o user_id do token é enviado ao service (checagem de dono).
+        service.get_by_id.assert_called_once_with(7, 1)
 
     def test_get_by_id_not_found_is_500(self, client, auth_user, patch_payment_service):
         """O service lança ValueError; sem handler dedicado, vira 500."""
@@ -170,35 +174,49 @@ class TestGetPayment:
 
 
 class TestGetHistory:
-    """GET /payments/history devolve o histórico do usuário em 1 request."""
+    """GET /payments/history devolve o histórico paginado em 1 request."""
+
+    @staticmethod
+    def _pagina(items):
+        return {
+            "data": items,
+            "meta": {
+                "page": 1,
+                "per_page": 20,
+                "total": len(items),
+                "total_pages": 1 if items else 0,
+            },
+        }
 
     def test_history_success(self, client, auth_user, patch_payment_service):
         auth_user(1)
         service = Mock(name="payment_service")
-        service.get_history.return_value = [
-            payment_payload(id=1),
-            payment_payload(id=2, status="approved"),
-        ]
+        service.get_history_paginated.return_value = self._pagina(
+            [
+                payment_payload(id=1),
+                payment_payload(id=2, status="approved"),
+            ]
+        )
 
         with patch_payment_service(service):
             response = client.get(f"{PREFIX}/history")
 
         assert response.status_code == 200
         body = response.json()
-        assert len(body) == 2
-        assert [p["id"] for p in body] == [1, 2]
-        service.get_history.assert_called_once_with(1)
+        assert len(body["data"]) == 2
+        assert [p["id"] for p in body["data"]] == [1, 2]
+        service.get_history_paginated.assert_called_once_with(1, 1, 20)
 
     def test_history_vazio(self, client, auth_user, patch_payment_service):
         auth_user(1)
         service = Mock(name="payment_service")
-        service.get_history.return_value = []
+        service.get_history_paginated.return_value = self._pagina([])
 
         with patch_payment_service(service):
             response = client.get(f"{PREFIX}/history")
 
         assert response.status_code == 200
-        assert response.json() == []
+        assert response.json()["data"] == []
 
 
 class TestGetPaymentsByOrder:

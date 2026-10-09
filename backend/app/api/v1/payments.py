@@ -2,7 +2,7 @@ import logging
 import time
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Request, status
+from fastapi import APIRouter, Depends, Query, Request, status
 from fastapi.exceptions import HTTPException
 from mercadopago.webhook import (
     InvalidWebhookSignatureError,
@@ -12,8 +12,10 @@ from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
 from app.api.deps import get_current_user, get_db
+from app.api.limiter import limiter
 from app.core.config import get_settings
 from app.models.user import User
+from app.schemas.common import Page
 from app.schemas.payment import (
     PaymentCheckoutResponse,
     PaymentCreate,
@@ -43,19 +45,18 @@ def get_payment_service(db: DbSession) -> PaymentService:
 def create_payment(
     data: PaymentCreate, user: UserDb, db: DbSession
 ):
-
-    return get_payment_service(db).create(data)
+    return get_payment_service(db).create(data, user.id)
 
 @payment_router.get(
     "/get/{payment_id}",
     response_model=PaymentResponse,
-    summary="Busca um pagamento pelo ID",
+    summary="Busca um pagamento pelo ID (somente o dono)",
 )
 def get_payment(
     payment_id: int, user: UserDb, db: DbSession
 ) -> PaymentResponse:
 
-    return get_payment_service(db).get_by_id(payment_id)
+    return get_payment_service(db).get_by_id(payment_id, user.id)
 
 
 @payment_router.get(
@@ -72,19 +73,23 @@ def get_payments_by_order_id(
 
 @payment_router.get(
     "/history",
-    response_model=list[PaymentResponse],
-    summary="Lista o histórico de pagamentos do usuário autenticado (1 request)",
+    response_model=Page[PaymentResponse],
+    summary="Histórico de pagamentos do usuário autenticado (paginado)",
 )
 def get_payments_history(
-    user: UserDb, db: DbSession
-) -> list:
-    """Retorna todos os pagamentos do usuário em uma única consulta agregada.
+    user: UserDb,
+    db: DbSession,
+    page: Annotated[int, Query(ge=1, description="Página (começa em 1)")] = 1,
+    per_page: Annotated[
+        int, Query(ge=1, le=100, description="Itens por página (max 100)")
+    ] = 20,
+) -> dict:
+    """Histórico de pagamentos paginado no envelope ``{ data, meta }``.
 
-    Substitui o padrão anterior da aba "Pagamentos" (Minha Conta) que fazia
-    ``Promise.all`` de N requests (1 por pedido). Aqui o front faz 1 único
-    request.
+    Mantém a vantagem original (1 request em vez de N) e agora limita o volume
+    devolvido, com contagem e ``offset`` feitos no banco.
     """
-    return get_payment_service(db).get_history(user.id)
+    return get_payment_service(db).get_history_paginated(user.id, page, per_page)
 
 @payment_router.post(
     "/checkout/{order_id}",
@@ -111,6 +116,7 @@ def create_payment_checkout(
     status_code=status.HTTP_200_OK,
     summary="Processa um webhook de pagamento",
 )
+@limiter.limit("120/minute")
 async def process_webhook(
     request: Request,
     db: DbSession,

@@ -223,6 +223,26 @@ class TestUpdateItem:
         with pytest.raises(CartItemNotFoundException):
             cart_service.update_item(1, 1, 99, 5)
 
+    def test_item_de_outro_carrinho_e_rejeitado(
+        self, cart_service, cart_repo, cart_item_repo
+    ):
+        """SEGURANÇA (IDOR): item de OUTRO carrinho não pode ser alterado.
+
+        `cart_id` é do usuário (posse do carrinho passa), mas o `item_id`
+        aponta para o carrinho de outra pessoa — antes isso mutava o item
+        alheio.
+        """
+        cart_repo.get_by_id.return_value = make_cart(id=1, user_id=1)
+        cart_item_repo.get_by_id.return_value = make_cart_item(
+            id=50, cart_id=999
+        )
+
+        with pytest.raises(CartItemNotFoundException):
+            cart_service.update_item(1, 1, 50, 5)
+
+        cart_item_repo.update_quantity.assert_not_called()
+        cart_item_repo.delete.assert_not_called()
+
 
 class TestRemoveItem:
     def test_success(self, cart_service, cart_repo, cart_item_repo):
@@ -245,6 +265,20 @@ class TestRemoveItem:
 
         with pytest.raises(CartItemNotFoundException):
             cart_service.remove_item(1, 1, 99)
+
+    def test_nao_remove_item_de_outro_carrinho(
+        self, cart_service, cart_repo, cart_item_repo
+    ):
+        """SEGURANÇA (IDOR): não exclui item que pertence a outro carrinho."""
+        cart_repo.get_by_id.return_value = make_cart(id=1, user_id=1)
+        cart_item_repo.get_by_id.return_value = make_cart_item(
+            id=50, cart_id=999
+        )
+
+        with pytest.raises(CartItemNotFoundException):
+            cart_service.remove_item(1, 1, 50)
+
+        cart_item_repo.delete.assert_not_called()
 
 
 class TestClear:

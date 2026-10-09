@@ -15,7 +15,6 @@ from app.api.exceptions import (
     ProductNotFoundException,
     UserNotFoundException,
 )
-from app.models.coupon import DiscountType
 from app.models.order import Order, OrderStatus
 from app.repositories.address_repo import AddressRepository
 from app.repositories.cart_repo import CartRepository
@@ -25,6 +24,8 @@ from app.repositories.order_repo import OrderRepository
 from app.repositories.product_repo import ProductRepository
 from app.repositories.user_coupon_repo import UserCouponRepository
 from app.repositories.user_repo import UserRepository
+from app.services.pricing import calcular_totais
+from app.services.order_state_machine import assert_client_transition
 from app.utils.email import build_order_details, send_order_confirmation_email
 
 
@@ -108,18 +109,36 @@ class OrderService:
 
 
 
-    def _validate_coupon(self, coupon_id, items, user_id):
+    def _validate_coupon(self, coupon_id, items, user_id, for_update=False):
+        """Valida o cupom e devolve ``(coupon, vinculo)``.
+
+        ``vinculo`` é o ``UserCoupon`` (ownership) — devolvido para que o
+        checkout possa marcar ``used_at`` quando o cupom for de uso único por
+        cliente. Quando não há cupom, devolve ``(None, None)``.
+        """
 
         if coupon_id is None:
-            return None
+            return None, None
 
-        coupon = self.coupon_repo.get_by_id(coupon_id)
+        # No checkout (`for_update=True`) a linha do cupom é travada até o
+        # commit, para que a checagem de `max_uses` + incremento sejam atômicos
+        # e dois pedidos concorrentes não ultrapassem o limite.
+        if for_update:
+            coupon = self.coupon_repo.get_by_id_for_update(coupon_id)
+            vinculo = self.user_coupon_repo.get_by_user_and_coupon_for_update(
+                user_id, coupon_id
+            )
+        else:
+            coupon = self.coupon_repo.get_by_id(coupon_id)
+            vinculo = self.user_coupon_repo.get_by_user_and_coupon(
+                user_id, coupon_id
+            )
 
         if coupon is None:
             raise CouponNotFoundException()
 
         # Ownership: o cupom precisa estar atribuído ao usuário do pedido.
-        if self.user_coupon_repo.get_by_user_and_coupon(user_id, coupon_id) is None:
+        if vinculo is None:
             raise CouponNotAssignedException()
 
         if not coupon.is_active:
@@ -132,6 +151,19 @@ class OrderService:
                 f"O cupom '{coupon.code}' expirou."
             )
 
+        # Uso único por cliente: cada usuário consome o cupom uma vez.
+        if getattr(coupon, "single_use_per_user", False) and vinculo.used_at is not None:
+            raise InvalidCouponException(
+                f"O cupom '{coupon.code}' já foi utilizado."
+            )
+
+        # Limite de usos: antes `max_uses` era gravado e nunca lido, então o
+        # mesmo cupom podia ser aplicado infinitas vezes.
+        if coupon.max_uses is not None and (coupon.used_count or 0) >= coupon.max_uses:
+            raise InvalidCouponException(
+                f"O cupom '{coupon.code}' atingiu o limite de usos."
+            )
+
         if coupon.product_id is not None:
             product_ids = {i.product_id for i in items}
             if coupon.product_id not in product_ids:
@@ -139,38 +171,20 @@ class OrderService:
                     f"O cupom '{coupon.code}' não se aplica a nenhum produto deste pedido."
                 )
 
-        return coupon
+        return coupon, vinculo
 
 
 
 
     def _calculate_totals(self, items, coupon=None):
-        subtotal = 0.0
+        """Delegado ao helper único ``app.services.pricing.calcular_totais``.
 
-        for item in items:
-            subtotal += item.price * item.quantity
-
-        discount_amount = 0.0
-
-        if coupon is not None and subtotal < (coupon.min_purchase or 0):
-            raise InvalidCouponException(
-                f"O cupom '{coupon.code}' exige uma compra mínima "
-                f"de {coupon.min_purchase}."
-            )
-
-        if coupon is not None and coupon.discount_type == DiscountType.PERCENTAGE:
-            discount_amount = subtotal * (coupon.discount_value / 100)
-        elif coupon is not None:
-            discount_amount = coupon.discount_value
-
-        if coupon is not None and coupon.max_discount is not None:
-            discount_amount = min(discount_amount, coupon.max_discount)
-
-        shipping_cost = 0.0
-
-        total = subtotal - discount_amount + shipping_cost
-
-        return subtotal, discount_amount, shipping_cost, total
+        A regra de desconto estava duplicada aqui e em ``create``; manter as
+        duas em sincronia era fonte de divergência (e ambas sofriam deriva de
+        centavos por usarem ``float``). O frete começa em 0 e é aplicado depois
+        pelo fluxo de shipping.
+        """
+        return calcular_totais(items, coupon=coupon, shipping_cost=0)
 
 
 
@@ -180,9 +194,26 @@ class OrderService:
         if not user:
             raise UserNotFoundException(user_id=user_id)
 
-        orders = user.orders
+        # `get_by_user_id_eager` carrega os itens numa segunda query, em vez de
+        # 1 por pedido ao serializar (N+1).
+        return self.repo.get_by_user_id_eager(user_id)
 
-        return orders
+    def get_paginated_by_user_id(
+        self, user_id: int, page: int = 1, per_page: int = 20
+    ) -> dict:
+        """Pedidos do usuário paginados no envelope ``Page[T]``.
+
+        Substitui o retorno ilimitado de ``/orders/list`` para contas antigas.
+        A contagem e o ``offset``/``limit`` rodam no banco.
+        """
+        from app.schemas.common import montar_pagina
+
+        user = self.user_repo.get_by_id(user_id)
+        if not user:
+            raise UserNotFoundException(user_id=user_id)
+
+        items, total = self.repo.paginate_by_user_id(user_id, page, per_page)
+        return montar_pagina(items, page, per_page, total)
 
     def create(self, user_id: int, data) -> Order:
         with self.session.begin():
@@ -249,29 +280,21 @@ class OrderService:
                     }
                 )
 
-            coupon = self._validate_coupon(data.coupon_id, data.items, user_id)
+            # `for_update=True`: trava a linha do cupom até o commit, tornando
+            # a validação + o incremento de `used_count` atômicos.
+            coupon, vinculo = self._validate_coupon(
+                data.coupon_id, data.items, user_id, for_update=True
+            )
 
-            # `_calculate_totals` só lê `price` e `quantity` de cada item.
-            subtotal = sum(i["price"] * i["quantity"] for i in itens_validados)
-            discount_amount = 0.0
+            # Cálculo único (Decimal, arredondado a centavos). Substitui o
+            # bloco duplicado que somava em float e podia divergir do
+            # `_calculate_totals` usado no update.
+            subtotal, discount_amount, shipping_cost, total = calcular_totais(
+                itens_validados, coupon=coupon, shipping_cost=0
+            )
 
-            if coupon is not None:
-                if subtotal < (coupon.min_purchase or 0):
-                    raise InvalidCouponException(
-                        f"O cupom '{coupon.code}' exige uma compra mínima "
-                        f"de {coupon.min_purchase}."
-                    )
-
-                if coupon.discount_type == DiscountType.PERCENTAGE:
-                    discount_amount = subtotal * (coupon.discount_value / 100)
-                else:
-                    discount_amount = coupon.discount_value
-
-                if coupon.max_discount is not None:
-                    discount_amount = min(discount_amount, coupon.max_discount)
-
-            shipping_cost = 0.0
-            total = subtotal - discount_amount + shipping_cost
+            # Consome o cupom (contador global + marca de uso do cliente).
+            self._consumir_cupom(coupon, vinculo)
 
             order_data = Order(
                 user_id=user_id,
@@ -373,7 +396,21 @@ class OrderService:
                         code="ORDER_ITEM_NOT_FOUND",
                     )
 
-            coupon = self._validate_coupon(order.coupon_id, order_items, user_id)
+            # O cupom só é revalidado quando o payload o informa. Antes a
+            # validação rodava sempre com `order.coupon_id`, então editar um
+            # campo qualquer (ex.: `notes`) de um pedido cujo cupom expirou
+            # desde a compra falhava com INVALID_COUPON.
+            cupom_alterado = "coupon_id" in data.model_fields_set
+            coupon_id_novo = data.coupon_id if cupom_alterado else order.coupon_id
+
+            coupon, vinculo = self._validate_coupon(
+                coupon_id_novo, order_items, user_id, for_update=cupom_alterado
+            )
+
+            # Consome apenas quando o cupom realmente entrou/trocou neste
+            # update (senão um update de endereço queimaria um uso).
+            if cupom_alterado and coupon is not None and coupon.id != order.coupon_id:
+                self._consumir_cupom(coupon, vinculo)
 
             subtotal, discount_amount, shipping_cost, total = self._calculate_totals(order_items, coupon)
 
@@ -387,8 +424,15 @@ class OrderService:
 
             status_anterior = order.status
 
-            if update_data.get("status") is not None:
-                order.status = update_data.pop("status")
+            raw_target_status = update_data.pop("status", None)
+
+            # O cliente pode apenas CANCELAR o próprio pedido, e somente de um
+            # estado em aberto. A máquina de estados rejeita qualquer outra
+            # mudança de status (R2/R3) e preserva os efeitos colaterais de
+            # cancelamento abaixo.
+            if raw_target_status is not None:
+                assert_client_transition(status_anterior, raw_target_status)
+                order.status = raw_target_status
 
             # R38: ao cancelar, o estoque é reposto (rollback de inventário).
             # `OrderStatus.CANCELLED` é StrEnum, então compara com "cancelled".
@@ -406,11 +450,61 @@ class OrderService:
                     if product is not None:
                         self.product_repo.restock(product, order_item.quantity)
 
+                # Devolve a unidade do cupom consumida na criação do pedido.
+                # Sem isso, cancelar um pedido "gastava" para sempre um uso do
+                # cupom, esgotando `max_uses` sem venda correspondente.
+                self._devolver_uso_do_cupom(order.coupon_id, order.user_id)
+
             for field, value in update_data.items():
                 setattr(order, field, value)
 
 
             return order
+
+    def _consumir_cupom(self, coupon, vinculo) -> None:
+        """Registra o uso do cupom: contador global + marca por cliente.
+
+        Chamado só depois de TODAS as validações (estoque, cupom, mínimo de
+        compra), então um checkout que falha não queima uso.
+        """
+        if coupon is not None:
+            # `or 0` cobre linhas legadas/instâncias sem o contador hidratado
+            # (o default do Column só vale no INSERT).
+            coupon.used_count = (coupon.used_count or 0) + 1
+            self.session.add(coupon)
+
+        # Marca o uso para o limite "uma vez por cliente".
+        if vinculo is not None:
+            vinculo.used_at = datetime.now()
+            self.session.add(vinculo)
+
+    def _devolver_uso_do_cupom(
+        self, coupon_id: int | None, user_id: int | None = None
+    ) -> None:
+        """Devolve o uso do cupom quando o pedido é cancelado/excluído.
+
+        Espelha a reposição de estoque: cancelar/excluir um pedido desfaz os
+        consumos que ele causou. Trava as linhas (``FOR UPDATE``) para não
+        perder a devolução numa corrida com outro checkout do mesmo cupom.
+        """
+        if coupon_id is None:
+            return
+
+        coupon = self.coupon_repo.get_by_id_for_update(coupon_id)
+
+        if coupon is not None:
+
+            coupon.used_count = max((coupon.used_count or 0) - 1, 0)
+            self.session.add(coupon)
+
+        # Libera o cupom para o cliente poder usá-lo de novo.
+        if user_id is not None:
+            vinculo = self.user_coupon_repo.get_by_user_and_coupon_for_update(
+                user_id, coupon_id
+            )
+            if vinculo is not None:
+                vinculo.used_at = None
+                self.session.add(vinculo)
 
     def delete(self, order_id: int, user_id: int) -> dict:
         with self.session.begin():
@@ -425,6 +519,10 @@ class OrderService:
                     "Este pedido pertence a outro usuário.",
                     code="ORDER_FORBIDDEN",
                 )
+
+            # Devolve a unidade do cupom antes de remover o pedido: depois do
+            # delete não haveria mais `order.coupon_id` para consultar.
+            self._devolver_uso_do_cupom(order.coupon_id, order.user_id)
 
             self.repo.delete(order)
             return order

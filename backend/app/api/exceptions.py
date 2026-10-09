@@ -13,6 +13,7 @@ from typing import Any
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from slowapi.errors import RateLimitExceeded
 
 logger = logging.getLogger(__name__)
 
@@ -396,8 +397,45 @@ class ShippingApplyException(BadRequestException):
 # ---------------------------------------------------------------------------
 
 
+def rate_limit_exceeded_handler(
+    request: Request, exc: RateLimitExceeded
+) -> JSONResponse:
+    """Converte RateLimitExceeded (slowapi) em resposta 429 padronizada.
+
+    Segue o mesmo contrato JSON das demais exceções (BookCommerceException) e
+    avisa o cliente quando pode tentar de novo via header ``Retry-After``
+    (segundos até o fim da janela do limite atingido).
+    """
+    logger.warning(
+        "Rate limit excedido: %s (path=%s, ip=%s)",
+        exc.detail,
+        request.url.path,
+        request.client.host if request.client else "?",
+    )
+    try:
+        # exc.limit.limit é o RateLimitItem (limits): get_expiry retorna a
+        # duração da janela em segundos (ex.: 60 para "10/minute").
+        retry_after = str(max(1, int(exc.limit.limit.get_expiry())))
+    except (AttributeError, TypeError, ValueError):
+        retry_after = "60"
+    return JSONResponse(
+        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+        content={
+            "error": {
+                "code": "RATE_LIMIT_EXCEEDED",
+                "message": "Muitas requisições. Tente novamente em instantes.",
+            }
+        },
+        headers={"Retry-After": retry_after},
+    )
+
+
 def register_exception_handlers(app: FastAPI) -> None:
     """Registra todos os handlers de exceção no app FastAPI."""
+
+    # 429 - rate limiting (slowapi). Registrado aqui para que os testes HTTP,
+    # que chamam register_exception_handlers(app), validem o mesmo contrato.
+    app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
 
     @app.exception_handler(BookCommerceException)
     async def bookcommerce_exception_handler(

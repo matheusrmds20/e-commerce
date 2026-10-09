@@ -8,6 +8,9 @@ os.environ.setdefault(
     "SECRET_KEY",
     "test-secret-key-0123456789-0123456789-0123456789-0123456789",
 )
+# Rate limiting desligado nos testes: os casos HTTP batem nas mesmas rotas
+# várias vezes (ex.: login) e o limiter por-IP (in-memory) quebraria a suíte.
+os.environ.setdefault("RATE_LIMIT_ENABLED", "false")
 
 
 @pytest.fixture

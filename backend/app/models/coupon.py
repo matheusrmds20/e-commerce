@@ -28,6 +28,18 @@ class Coupon(Base):
     max_discount = Column(Float, nullable=True)
     valid_until = Column(DateTime, nullable=False)
     max_uses = Column(Integer, nullable=True)
+    # Quando True, cada usuário só pode usar o cupom UMA vez (padrão de cupom
+    # pessoal). O limite global `max_uses` continua valendo em paralelo.
+    single_use_per_user = Column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
+    # Quantas vezes o cupom já foi efetivamente aplicado a um pedido.
+    # Antes não existia contador: `max_uses` era gravado mas nunca lido, então
+    # um cupom podia ser reutilizado indefinidamente. Incrementado dentro da
+    # transação do checkout, com a linha do cupom travada (FOR UPDATE).
+    used_count = Column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
     is_active = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime, nullable=False, default=datetime.now)
     updated_at = Column(DateTime, nullable=False, default=datetime.now)

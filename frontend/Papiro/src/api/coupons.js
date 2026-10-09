@@ -102,13 +102,17 @@ export const couponService = {
   },
 
   /**
-   * Atribui (resgata) um cupom para um usuário.
-   * Backend: `POST /user-coupons/create` -> UserCouponResponse (201).
+   * Atribui (resgata) um cupom a um usuário. Uso ADMINISTRATIVO.
+   * Backend: `POST /user-coupons/admin/assign` -> UserCouponResponse (201).
+   *
+   * A rota administrativa aceita `user_id` explícito; a rota de cliente
+   * (`/user-coupons/create`) sempre vincula ao usuário do token e por isso
+   * não é usada aqui (o painel precisa conceder cupons a terceiros).
    * @param {number} userId
    * @param {number} couponId
    */
   async atribuir(userId, couponId) {
-    const { data } = await api.post('/user-coupons/create', {
+    const { data } = await api.post('/user-coupons/admin/assign', {
       user_id: userId,
       coupon_id: couponId,
     })
@@ -116,15 +120,14 @@ export const couponService = {
   },
 
   /**
-   * Remove o vínculo de um cupom com um usuário.
-   * Backend: `DELETE /user-coupons/delete/{id}?user_id=` -> UserCouponResponse.
+   * Remove o vínculo de um cupom com um usuário (admin ou dono).
+   * Backend: `DELETE /user-coupons/delete/{id}` -> UserCouponResponse.
+   * A posse é resolvida no servidor a partir do token, então o `user_id` não
+   * é mais enviado (antes era usado como prova de posse — IDOR).
    * @param {number} vinculoId id do vínculo (não do cupom)
-   * @param {number} userId
    */
-  async removerVinculo(vinculoId, userId) {
-    const { data } = await api.delete(`/user-coupons/delete/${vinculoId}`, {
-      params: { user_id: userId },
-    })
+  async removerVinculo(vinculoId) {
+    const { data } = await api.delete(`/user-coupons/delete/${vinculoId}`)
     return data
   },
 }

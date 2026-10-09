@@ -66,11 +66,21 @@ def create_product(
 
 @product_router.get(
     "/list",
-    response_model=list[ProductResponse],
-    summary="Lista todos os produtos",
+    response_model=Page[ProductResponse],
+    summary="Lista todos os produtos (paginado)",
 )
-def list_products(db: DbSession) -> list:
-    return get_product_service(db).get_all()
+def list_products(
+    db: DbSession,
+    page: PageNumber = 1,
+    per_page: PerPage = 20,
+) -> dict:
+    """Catálogo completo paginado no envelope ``{ data, meta }``.
+
+    Antes devolvia ``.all()`` — a tabela inteira numa resposta. Use
+    ``/paginated`` quando precisar de filtro por categoria/busca; este aqui é o
+    "tudo", agora limitado.
+    """
+    return get_product_service(db).get_paginated(page, per_page)
 
 
 @product_router.get(

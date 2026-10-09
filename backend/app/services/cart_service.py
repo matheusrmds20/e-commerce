@@ -151,6 +151,13 @@ class CartService:
             if not cart_item:
                 raise CartItemNotFoundException()
 
+            # SEGURANÇA: o item precisa pertencer ao carrinho informado. Sem
+            # isso, `cart_id` (próprio) + `item_id` (de outra pessoa) burlava a
+            # checagem de posse do carrinho e permitia alterar/excluir itens
+            # alheios (IDOR).
+            if cart_item.cart_id != cart_id:
+                raise CartItemNotFoundException()
+
             if quantity <= 0:
 
                 resposta = self._to_response(cart_item)
@@ -188,6 +195,10 @@ class CartService:
             cart_item = self.cart_item_repo.get_by_id(item_id)
 
             if not cart_item:
+                raise CartItemNotFoundException()
+
+            # SEGURANÇA: só remove item que pertence a ESTE carrinho (IDOR).
+            if cart_item.cart_id != cart_id:
                 raise CartItemNotFoundException()
 
 

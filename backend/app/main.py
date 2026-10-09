@@ -3,10 +3,16 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.exceptions import register_exception_handlers
+from app.api.limiter import limiter
 from app.api.router import router
 from app.core.config import get_settings
 
 app = FastAPI()
+
+# Rate limiting (slowapi): instância global usada pelos @limiter.limit(...)
+# das rotas. Obrigatório setar app.state.limiter para o slowapi funcionar;
+# o handler de 429 é registrado dentro de register_exception_handlers().
+app.state.limiter = limiter
 
 
 

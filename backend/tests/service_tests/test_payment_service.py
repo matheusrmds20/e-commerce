@@ -78,9 +78,9 @@ def create_payload(**kwargs):
 
 class TestCreate:
     def test_create_success(self, payment_service, order_repo, payment_repo):
-        order_repo.get_by_id.return_value = make_order()
+        order_repo.get_by_id.return_value = make_order(user_id=1, total=100.0)
 
-        result = payment_service.create(create_payload())
+        result = payment_service.create(create_payload(), user_id=1)
 
         assert result.order_id == 1
         assert result.provider == "mercadopago"
@@ -90,11 +90,33 @@ class TestCreate:
         # O pagamento precisa ACABAR no session, senão o commit não persiste nada.
         payment_service.session.add.assert_called_once_with(result)
 
+    def test_create_deriva_amount_do_pedido(self, payment_service, order_repo):
+        """SEGURANÇA: o valor cobrado vem do PEDIDO, nunca do cliente."""
+        order_repo.get_by_id.return_value = make_order(user_id=1, total=250.0)
+
+        result = payment_service.create(
+            create_payload(amount=1.0, status="approved"), user_id=1
+        )
+
+        assert result.amount == 250.0
+        assert result.status == "pending"
+
     def test_create_order_not_found(self, payment_service, order_repo, payment_repo):
         order_repo.get_by_id.return_value = None
 
         with pytest.raises(OrderNotFoundException):
-            payment_service.create(create_payload(order_id=99))
+            payment_service.create(create_payload(order_id=99), user_id=1)
+
+        payment_service.session.add.assert_not_called()
+
+    def test_create_pedido_de_outro_usuario_e_proibido(
+        self, payment_service, order_repo
+    ):
+        """SEGURANÇA (IDOR): não dá para registrar pagamento em pedido alheio."""
+        order_repo.get_by_id.return_value = make_order(user_id=2)
+
+        with pytest.raises(ForbiddenException):
+            payment_service.create(create_payload(order_id=1), user_id=1)
 
         payment_service.session.add.assert_not_called()
 
@@ -111,6 +133,31 @@ class TestGetById:
 
         with pytest.raises(PaymentNotFoundException):
             payment_service.get_by_id(99)
+
+    def test_get_by_id_do_dono_ok(self, payment_service, payment_repo, order_repo):
+        payment_repo.get_by_id.return_value = make_payment(order_id=1)
+        order_repo.get_by_id.return_value = make_order(id=1, user_id=1)
+
+        assert payment_service.get_by_id(1, user_id=1) is not None
+
+    def test_get_by_id_de_outro_usuario_e_proibido(
+        self, payment_service, payment_repo, order_repo
+    ):
+        """SEGURANÇA (IDOR): um usuário não lê o pagamento de outro."""
+        payment_repo.get_by_id.return_value = make_payment(order_id=1)
+        order_repo.get_by_id.return_value = make_order(id=1, user_id=2)
+
+        with pytest.raises(ForbiddenException):
+            payment_service.get_by_id(1, user_id=1)
+
+    def test_get_by_id_order_inexistente_e_proibido(
+        self, payment_service, payment_repo, order_repo
+    ):
+        payment_repo.get_by_id.return_value = make_payment(order_id=1)
+        order_repo.get_by_id.return_value = None
+
+        with pytest.raises(ForbiddenException):
+            payment_service.get_by_id(1, user_id=1)
 
 
 class TestGetByOrderId:
@@ -200,9 +247,11 @@ class TestCreateCheckout:
         assert result["payment_id"] == result["id"]
         assert result["checkout_url"] == "https://mp/checkout/PREF1"
         payment_service.session.add.assert_called_once()
-        # create_checkout commita 2x: (1) libera a transação de leitura antes
-        # da chamada externa ao MP (FASE 2), (2) persiste o novo Payment.
-        assert payment_service.session.commit.call_count == 2
+        # (1) `commit()` explícito libera a transação de leitura antes da
+        # chamada externa ao MP (FASE 2); (2) a persistência do novo Payment
+        # acontece em `with session.begin()`, que commita no exit.
+        payment_service.session.commit.assert_called_once()
+        payment_service.session.begin.assert_called()
 
     def test_create_checkout_sends_correct_preference(
         self, payment_service, order_repo, payment_repo, payment_gateway
@@ -266,6 +315,52 @@ class TestCreateCheckout:
                 "currency_id": "BRL",
             },
         ]
+
+    def test_create_checkout_inclui_desconto_negativo(
+        self, payment_service, order_repo, payment_repo, payment_gateway
+    ):
+        """O desconto entra como item NEGATIVO, senão o cliente paga a mais.
+
+        Antes o desconto existia em `order.total` mas era omitido da
+        preferência, então o Mercado Pago cobrava o subtotal cheio.
+        """
+        order_repo.get_by_id.return_value = make_order(
+            subtotal=100.0, discount_amount=10.0, shipping_cost=0.0, total=90.0
+        )
+        order_repo.get_with_items_products.return_value = [make_order_item()]
+        payment_repo.get_by_order_id.return_value = []
+        payment_gateway.create_preference.return_value = {
+            "id": "PREF1",
+            "init_point": "https://mp/checkout/PREF1",
+        }
+
+        payment_service.create_checkout(1, 1)
+
+        items = payment_gateway.create_preference.call_args.args[0]["items"]
+        assert {
+            "id": "desconto",
+            "title": "Desconto",
+            "quantity": 1,
+            "unit_price": -10.0,
+            "currency_id": "BRL",
+        } in items
+        # A soma dos itens bate com o total cobrado (90.0).
+        assert round(sum(i["unit_price"] * i["quantity"] for i in items), 2) == 90.0
+
+    def test_create_checkout_recusa_total_inconsistente(
+        self, payment_service, order_repo, payment_repo, payment_gateway
+    ):
+        """Defesa: se a soma dos itens divergir do total, não cobra."""
+        order_repo.get_by_id.return_value = make_order(
+            subtotal=100.0, discount_amount=0.0, shipping_cost=0.0, total=999.0
+        )
+        order_repo.get_with_items_products.return_value = [make_order_item()]
+        payment_repo.get_by_order_id.return_value = []
+
+        with pytest.raises(ConflictException):
+            payment_service.create_checkout(1, 1)
+
+        payment_gateway.create_preference.assert_not_called()
 
     def test_create_checkout_usa_sandbox_init_point(
         self, payment_service, order_repo, payment_repo, payment_gateway
@@ -386,7 +481,9 @@ class TestProcessWebhook:
         assert result.status == "approved"
         assert result.provider_payment_id == "MP-PAY-1"
         assert order_repo.get_by_id(1).status == OrderStatus.COMPLETED
-        payment_service.session.commit.assert_called_once()
+        # A transação é aberta com `session.begin()` como context manager, que
+        # faz o commit no exit (não há mais `session.commit()` manual).
+        payment_service.session.begin.assert_called()
 
     def test_webhook_approved_dispara_email_automatico(
         self, payment_service, payment_repo, order_repo, payment_gateway
@@ -581,7 +678,8 @@ class TestProcessWebhook:
         result = payment_service.process_webhook("MP-PAY-1")
 
         assert result.status == "approved"
-        # Já aprovado: não deve reabrir transação nem reprocessar o pedido.
+        # Já aprovado: não deve reprocessar o pedido. (A transação de leitura
+        # ainda é aberta pelo `with`, mas nenhuma alteração é persistida.)
         payment_service.session.commit.assert_not_called()
         order_repo.get_by_id.assert_not_called()
 

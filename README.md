@@ -290,6 +290,7 @@ VITE_API_URL=http://localhost:8000/api/v1
 | `MELHOR_ENVIO_API_TOKEN` / `MELHOR_ENVIO_ORIGIN_ZIP` / `MELHOR_ENVIO_SANDBOX` | Cotação de frete |
 | `SMTP_*` | Envio de e-mail de confirmação |
 | `CELERY_BROKER_URL` / `CELERY_RESULT_BACKEND` | Redis para o worker |
+| `RATE_LIMIT_ENABLED` / `RATE_LIMIT_DEFAULT` / `RATE_LIMIT_STORAGE_URI` | Rate limiting por IP (slowapi). Com multi-worker use `RATE_LIMIT_STORAGE_URI=redis://…`; desligue em testes |
 
 A lista completa, comentada, está em [`backend/.env.example`](backend/.env.example).
 

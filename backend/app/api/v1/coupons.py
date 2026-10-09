@@ -3,11 +3,14 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db
+from app.api.deps import get_current_admin, get_db
 from app.schemas.coupon import CouponCreate, CouponResponse, CouponUpdate
 from app.services.coupon_service import CouponService
 
-coupon_router = APIRouter()
+# Cupons são catálogo administrativo: criar/editar/excluir/listar exige
+# administrador. Antes este router era totalmente anônimo, então qualquer
+# pessoa podia emitir um cupom de 100% de desconto.
+coupon_router = APIRouter(dependencies=[Depends(get_current_admin)])
 
 DbSession = Annotated[Session, Depends(get_db)]
 

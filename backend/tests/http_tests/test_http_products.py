@@ -143,28 +143,43 @@ class TestCreateProduct:
 
 
 class TestListProducts:
+    @staticmethod
+    def _pagina(items):
+        return {
+            "data": items,
+            "meta": {
+                "page": 1,
+                "per_page": 20,
+                "total": len(items),
+                "total_pages": 1 if items else 0,
+            },
+        }
+
     def test_list_success(self, client):
         svc = Mock(name="product_service")
-        svc.get_all.return_value = [product_payload(), product_payload(id=2)]
+        svc.get_paginated.return_value = self._pagina(
+            [product_payload(), product_payload(id=2)]
+        )
 
         with patch("app.api.v1.products.get_product_service", return_value=svc):
             response = client.get(f"{PREFIX}/list")
 
         assert response.status_code == 200
         body = response.json()
-        assert isinstance(body, list)
-        assert len(body) == 2
+        # Envelope paginado: { data, meta }.
+        assert len(body["data"]) == 2
+        assert body["meta"]["total"] == 2
 
     def test_list_empty(self, client):
-        """Lista vazia: devolve 200 com [] (estado normal de catálogo)."""
+        """Lista vazia: 200 com ``data: []`` (estado normal de catálogo)."""
         svc = Mock(name="product_service")
-        svc.get_all.return_value = []
+        svc.get_paginated.return_value = self._pagina([])
 
         with patch("app.api.v1.products.get_product_service", return_value=svc):
             response = client.get(f"{PREFIX}/list")
 
         assert response.status_code == 200
-        assert response.json() == []
+        assert response.json()["data"] == []
 
 
 class TestGetProduct:

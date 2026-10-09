@@ -20,18 +20,23 @@ class UserRepository(BaseRepository[User]):
             .values(password_hash=password)
         )
 
-    def deactivate(self, user_id: int) -> User:
-        with self.session.begin():
+    def deactivate(self, user_id: int) -> User | None:
+        """Marca o usuário como inativo (soft delete).
 
-            self.session.execute(
-                update(User)
-                .where(User.id == user_id)
-                .values(is_active=False)
-            )
+        NÃO abre transação própria: quem orquestra é o service, que já está
+        dentro de um ``with session.begin()``. Abrir um segundo ``begin()``
+        aqui lançava ``InvalidRequestError: A transaction is already begun``
+        (SQLAlchemy 2.0, autocommit=False) e quebrava o
+        ``DELETE /users/delete/{id}``. Um repositório não deve gerenciar
+        fronteira de transação — apenas o service.
+        """
+        self.session.execute(
+            update(User)
+            .where(User.id == user_id)
+            .values(is_active=False)
+        )
 
-            user = self.session.get(User, user_id)
-
-        return user
+        return self.session.get(User, user_id)
 
 
 

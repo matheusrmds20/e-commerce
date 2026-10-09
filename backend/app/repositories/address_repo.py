@@ -31,21 +31,26 @@ class AddressRepository(BaseRepository[Address]):
 
 
     def set_default(self, user_id: int, address_id: int) -> Address:
-        with self.session.begin():
+        """Define ``address_id`` como padrão do usuário.
 
-            new_default = self.get_by_id(address_id)
+        NÃO abre transação própria (ver ``UserRepository.deactivate``): a
+        fronteira de transação pertence à camada de service. O service que
+        chama hoje (``AddressService.set_default``) envolve a operação no seu
+        próprio ``with session.begin()``.
+        """
+        new_default = self.get_by_id(address_id)
 
-            if new_default.user_id != user_id:
-                raise ValueError("Address is not owned by user")
+        if new_default.user_id != user_id:
+            raise ValueError("Address is not owned by user")
 
-            self.session.execute(
-                update(Address)
-                .where(Address.user_id == user_id)
-                .values(is_default=False)
-            )
+        self.session.execute(
+            update(Address)
+            .where(Address.user_id == user_id)
+            .values(is_default=False)
+        )
 
-            new_default.is_default = True
+        new_default.is_default = True
 
-            self.session.flush()
-            self.session.refresh(new_default)
-            return new_default
+        self.session.flush()
+        self.session.refresh(new_default)
+        return new_default

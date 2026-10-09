@@ -10,6 +10,7 @@ from app.api.exceptions import (
     UserNotFoundException,
 )
 from app.core.config import get_settings
+from app.db.transaction import transacao
 from app.integrations.MercadoPago.geteway import MercadoPagoGateway
 from app.models.order import OrderStatus
 from app.models.payment import Payment
@@ -32,33 +33,67 @@ class PaymentService:
         self.gateway = MercadoPagoGateway()
         self.session = db
 
-    def create(self, data) -> Payment:
+    def create(self, data, user_id: int) -> Payment:
+        """Registra um pagamento para um pedido DO PRÓPRIO usuário.
+
+        SEGURANÇA: antes o `user_id` nem chegava aqui e `amount`/`status`/
+        `currency`/`provider_payment_id` vinham crus do cliente, permitindo
+        injetar um pagamento `approved` de valor arbitrário em qualquer pedido
+        (e ainda bloquear o checkout real via `PAYMENT_ALREADY_EXISTS`).
+        Agora: (1) o pedido precisa pertencer ao usuário; (2) o valor cobrado é
+        sempre o total do pedido; (3) o status inicial é sempre `pending`.
+        A promoção para `approved` só acontece pelo webhook assinado do
+        provedor (``process_webhook``).
+        """
         order = self.order_repo.get_by_id(data.order_id)
 
         if not order:
             raise OrderNotFoundException()
 
+        if order.user_id != user_id:
+            raise ForbiddenException(
+                f"O pedido {data.order_id} não pertence a este usuário.",
+                code="ORDER_FORBIDDEN",
+            )
+
         payment = Payment(
             order_id=data.order_id,
             provider=data.provider,
             provider_payment_id=data.provider_payment_id,
-            amount=data.amount,
-            currency=data.currency,
-            status=data.status,
+            amount=order.total,
+            currency="BRL",
+            status="pending",
         )
 
-        self.session.add(payment)
-        self.session.commit()
+        # Transação explícita: o `with` faz o commit no exit. Antes era um
+        # `commit()` solto, que deixava a fronteira de transação implícita.
+        with transacao(self.session):
+            self.session.add(payment)
+
         self.session.refresh(payment)
 
         return payment
 
 
-    def get_by_id(self, id: int) -> Payment:
+    def get_by_id(self, id: int, user_id: int | None = None) -> Payment:
+        """Busca um pagamento pelo ID.
+
+        Quando `user_id` é informado, exige que o pagamento pertença a um
+        pedido do usuário — fecha o IDOR que devolvia o pagamento de qualquer
+        pessoa para qualquer usuário autenticado.
+        """
         payment = self.repo.get_by_id(id)
 
         if payment is None:
             raise PaymentNotFoundException()
+
+        if user_id is not None:
+            order = self.order_repo.get_by_id(payment.order_id)
+            if order is None or order.user_id != user_id:
+                raise ForbiddenException(
+                    f"O pagamento {id} não pertence a este usuário.",
+                    code="PAYMENT_FORBIDDEN",
+                )
 
         return payment
 
@@ -95,6 +130,19 @@ class PaymentService:
             raise UserNotFoundException(user_id=user_id)
 
         return self.repo.get_by_user_id(user_id)
+
+    def get_history_paginated(
+        self, user_id: int, page: int = 1, per_page: int = 20
+    ) -> dict:
+        """Histórico de pagamentos paginado no envelope ``Page[T]``."""
+        from app.schemas.common import montar_pagina
+
+        user = self.user_repo.get_by_id(user_id)
+        if not user:
+            raise UserNotFoundException(user_id=user_id)
+
+        items, total = self.repo.paginate_by_user_id(user_id, page, per_page)
+        return montar_pagina(items, page, per_page, total)
 
     def create_checkout(self, order_id: int, user_id: int) -> dict:
 
@@ -136,6 +184,21 @@ class PaymentService:
             for item in order_items
         ]
 
+        # Se o pedido tem desconto, entra como item de valor NEGATIVO para que
+        # o Mercado Pago cobre `subtotal - desconto (+ frete)`. Antes o
+        # desconto existia em `order.total` mas era omitido da preferência, e
+        # o cliente pagava o subtotal cheio (a mais que o próprio pedido).
+        if order.discount_amount and order.discount_amount > 0:
+            items.append(
+                {
+                    "id": "desconto",
+                    "title": "Desconto",
+                    "quantity": 1,
+                    "unit_price": -float(order.discount_amount),
+                    "currency_id": "BRL",
+                }
+            )
+
         # Se o pedido tem frete, inclui-o como item da preferência para que o
         # Mercado Pago cobre o total (subtotal - desconto + frete). Sem isso o
         # MP soma apenas os produtos (subtotal) e o frete ficaria de fora.
@@ -174,12 +237,30 @@ class PaymentService:
         # leitura, os atributos de `order` ficam expirados/recarregados no acesso.
         total_para_cobrar = order.total
 
+        # Coerência de centavos: a soma dos itens da preferência é o que o MP
+        # efetivamente cobra. Se divergir do total do pedido (arredondamento de
+        # float acumulado), o valor pago não bate com o registrado — melhor
+        # falhar alto do que cobrar um valor inconsistente.
+        soma_itens = round(sum(float(i["unit_price"]) * i["quantity"] for i in items), 2)
+        if soma_itens != round(float(total_para_cobrar), 2):
+            logger.error(
+                "Checkout %s: soma dos itens (%.2f) != total do pedido (%.2f)."
+                " Abortando para não cobrar valor divergente.",
+                order_id,
+                soma_itens,
+                float(total_para_cobrar),
+            )
+            raise ConflictException(
+                "O total do pedido está inconsistente. Tente novamente.",
+                code="ORDER_TOTAL_MISMATCH",
+            )
+
         # FASE 2: encerra a transação de LEITURA antes da chamada externa ao
         # Mercado Pago. Com autocommit=False, a primeira query (get_by_id)
         # abriria uma transação que permaneceria aberta durante todo o request
-        # de rede, segurando uma conexão do pool por até o timeout. O commit
-        # abaixo fecha essa transação e libera a conexão; o `Payment` é
-        # persistido numa transação nova, logo após o retorno do MP.
+        # de rede, segurando uma conexão do pool por até o timeout. Fechar essa
+        # transação agora libera a conexão; o `Payment` é persistido numa
+        # transação nova, logo após o retorno do MP.
         self.session.commit()
 
         preference = self.gateway.create_preference(preference_data)
@@ -194,9 +275,11 @@ class PaymentService:
             status="pending",
         )
 
+        # Transação explícita para persistir o pagamento.
+        with transacao(self.session):
+            self.session.add(payment)
 
-        self.session.add(payment)
-        self.session.commit()
+        payment_id = payment.id
 
 
 
@@ -209,8 +292,8 @@ class PaymentService:
 
 
         return {
-            "id": payment.id,
-            "payment_id": payment.id,
+            "id": payment_id,
+            "payment_id": payment_id,
             "checkout_url": checkout_url,
         }
 
@@ -258,7 +341,10 @@ class PaymentService:
 
         order_id = int(external_reference)
 
-        with self.session.begin():
+        # `transacao` reaproveita a transação caso a sessão já tenha feito query
+        # antes (autobegin) — o `begin()` direto lançaria InvalidRequestError.
+        # O commit acontece no exit; não chamamos `commit()` lá dentro.
+        with transacao(self.session):
 
             payment = self.repo.get_by_provider_payment_id_for_update(payment_provider_id)
 
@@ -275,6 +361,8 @@ class PaymentService:
                 )
 
             if payment.status == "approved":
+                # O pedido já estava aprovado: nada a fazer. O `with` abaixo
+                # faz o commit (sem mudanças) ao sair do bloco.
                 return payment
 
             payment.status = provider_payment["status"]
@@ -318,7 +406,10 @@ class PaymentService:
                     order.status = OrderStatus.CANCELLED
                 order.updated_at = datetime.now()
 
-            self.session.commit()
-            self.session.refresh(payment)
-
-            return payment
+        # Commit feito por `transacao(self.session)` ao sair do bloco.
+        # Não chamamos `commit()`/`refresh()` lá dentro: o commit manual
+        # encerrava a transação antes do `__exit__` do context manager, que
+        # então operava sobre uma transação já finalizada (e um erro entre o
+        # commit manual e o exit deixava os dois estados inconsistentes).
+        self.session.refresh(payment)
+        return payment

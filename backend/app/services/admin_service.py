@@ -11,6 +11,7 @@ from app.models.order import Order, OrderStatus
 from app.models.order_item import OrderItem
 from app.models.product import Product
 from app.models.user import User
+from app.services.order_state_machine import assert_admin_transition
 from app.schemas.admin import (
     AdminOrderResponse,
     AdminOrderUser,
@@ -210,6 +211,10 @@ class AdminService:
                 current=order.status.value if hasattr(order.status, "value") else str(order.status),
                 target=new_status,
             ) from exc
+
+        # Máquina de estados: o admin transita livremente pelo fluxo, mas não
+        # pode reabrir um pedido fechado (cancelado/reembolsado).
+        assert_admin_transition(current=order.status, target=status_enum)
 
         order.status = status_enum
         order.updated_at = datetime.now()

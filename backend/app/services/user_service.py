@@ -8,6 +8,7 @@ from app.api.exceptions import (
     UserNotFoundException,
 )
 from app.core.security import hash_password, verify_password
+from app.db.transaction import transacao
 from app.models.user import User, UserRole
 from app.repositories.user_repo import UserRepository
 from app.schemas.auth import MessageResponse
@@ -51,8 +52,10 @@ class UserService:
     def create(
         self, data: AdminUserCreate | CustomerUserCreate, current_user: User
     ) -> UserResponse:
-        self._ensure_admin(current_user)
-        with self.session.begin():
+        # `transacao` evita o InvalidRequestError quando a sessão já iniciou
+        # transação ao ler atributos de `current_user` (autobegin).
+        with transacao(self.session):
+            self._ensure_admin(current_user)
 
             self._check_email_available(data.email)
 
@@ -88,16 +91,17 @@ class UserService:
     def update(
         self, user_id: int, data: UserUpdate, current_user: User
     ) -> UserResponse:
-        self._ensure_owner_or_admin(current_user, user_id)
-        with self.session.begin():
+        # `transacao` reaproveita a transação já aberta pelo autobegin (ex.: ao
+        # ler atributos de `current_user`), evitando o
+        # "A transaction is already begun on this Session".
+        with transacao(self.session):
+            self._ensure_owner_or_admin(current_user, user_id)
             user = self.user_repo.get_by_id(user_id)
 
             if user is None:
                 raise UserNotFoundException(user_id=user_id)
 
             self._check_email_available(data.email, exclude_user_id=user_id)
-
-
 
             for field, value in data.model_dump(exclude_unset=True).items():
                 setattr(user, field, value)
@@ -113,8 +117,8 @@ class UserService:
         new_password: str,
         current_user: User,
     ) -> MessageResponse:
-        self._ensure_owner_or_admin(current_user, user_id)
-        with self.session.begin():
+        with transacao(self.session):
+            self._ensure_owner_or_admin(current_user, user_id)
             user = self.user_repo.get_by_id(user_id)
 
             if user is None:
@@ -130,13 +134,12 @@ class UserService:
             return MessageResponse(message="Senha alterada com sucesso.")
 
     def deactivate(self, user_id: int, current_user: User) -> UserResponse:
-        self._ensure_owner_or_admin(current_user, user_id)
-        with self.session.begin():
+        with transacao(self.session):
+            self._ensure_owner_or_admin(current_user, user_id)
             user = self.user_repo.get_by_id(user_id)
 
             if user is None:
                 raise UserNotFoundException(user_id=user_id)
-
 
             user_deactivated = self.user_repo.deactivate(user_id)
 

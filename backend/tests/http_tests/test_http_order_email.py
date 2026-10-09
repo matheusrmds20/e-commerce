@@ -56,8 +56,16 @@ class TestSendConfirmationEmail:
 
 
 class TestGetTaskStatus:
-    def test_returns_status(self, client):
-        """Endpoint não exige auth (consulta de status é pública)."""
+    def test_require_auth(self, client):
+        """SEGURANÇA: o status de tarefa não é mais público."""
+        response = client.get(
+            f"{PREFIX}/send-confirmation-email/status/task_abc"
+        )
+        assert response.status_code == 401
+
+    def test_returns_status(self, client, auth_user):
+        """Endpoint exige Bearer token (a tarefa vaza dados do pedido)."""
+        auth_user(1)
         svc = AsyncMock(name="order_service")
         svc.get_task_status.return_value = {
             "task_id": "task_abc",

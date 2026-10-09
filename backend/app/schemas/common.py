@@ -71,3 +71,21 @@ class HealthResponse(BaseModel):
         default_factory=list,
         description="Resultado de cada dependência checada",
     )
+
+
+def montar_pagina(data: list, page: int, per_page: int, total: int) -> dict:
+    """Monta o envelope ``Page[T]`` a partir de itens + total.
+
+    Centraliza o cálculo de ``total_pages`` (antes duplicado em cada service)
+    para que todas as listagens paginadas respondam no mesmo formato.
+    """
+    total_pages = (total + per_page - 1) // per_page if per_page else 0
+    return {
+        "data": data,
+        "meta": {
+            "page": page,
+            "per_page": per_page,
+            "total": total,
+            "total_pages": total_pages,
+        },
+    }

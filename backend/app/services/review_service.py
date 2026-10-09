@@ -61,6 +61,41 @@ class ReviewService:
         # Sem avaliações é estado normal (lista vazia), não erro.
         return reviews
 
+    def get_paginated_by_user_id(
+        self,
+        current_user: User,
+        user_id: int | None = None,
+        page: int = 1,
+        per_page: int = 20,
+    ) -> dict:
+        """Avaliações do usuário paginadas no envelope ``Page[T]``."""
+        from app.schemas.common import montar_pagina
+
+        alvo = current_user.id if user_id is None else user_id
+        self._ensure_owner_or_admin(current_user, alvo)
+
+        user = self.user_repo.get_by_id(alvo)
+        if user is None:
+            raise UserNotFoundException(user_id=alvo)
+
+        items, total = self.repo.paginate_by_user_id(alvo, page, per_page)
+        return montar_pagina(items, page, per_page, total)
+
+    def get_paginated_by_product_id(
+        self, product_id: int, page: int = 1, per_page: int = 20
+    ) -> dict:
+        """Avaliações de um produto paginadas no envelope ``Page[T]``."""
+        from app.schemas.common import montar_pagina
+
+        product = self.product_repo.get_by_id(product_id)
+        if product is None:
+            raise ProductNotFoundException()
+
+        items, total = self.repo.paginate_by_product_id(
+            product_id, page, per_page
+        )
+        return montar_pagina(items, page, per_page, total)
+
     def get_by_product_id(self, product_id: int) -> list:
         product = self.product_repo.get_by_id(product_id)
 

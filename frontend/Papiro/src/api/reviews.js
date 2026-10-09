@@ -21,25 +21,28 @@ import api from './client'
  */
 export const reviewService = {
   /**
-   * Lista as avaliações de um produto.
+   * Lista as avaliações de um produto (paginado no backend).
+   * Desembrulha `.data` do envelope `{ data, meta }`.
    * @param {number|string} productId
+   * @param {{ page?: number, per_page?: number }} [params]
    * @returns {Promise<Array>} ReviewResponse[]
    */
-  async listarPorProduto(productId) {
-    const { data } = await api.get(`/reviews/product/${productId}`)
-    return data
+  async listarPorProduto(productId, params = {}) {
+    const { data } = await api.get(`/reviews/product/${productId}`, { params })
+    return data?.data ?? data
   },
 
   /**
    * Lista as avaliações do usuário autenticado ("minhas avaliações").
    * @param {number} [userId] alvo alternativo — apenas administradores.
+   * @param {{ page?: number, per_page?: number }} [params]
    * @returns {Promise<Array>} ReviewResponse[]
    */
-  async listarMinhas(userId) {
+  async listarMinhas(userId, params = {}) {
     const { data } = await api.get('/reviews/list', {
-      params: userId ? { user_id: userId } : undefined,
+      params: { ...(userId ? { user_id: userId } : {}), ...params },
     })
-    return data
+    return data?.data ?? data
   },
 
   /**

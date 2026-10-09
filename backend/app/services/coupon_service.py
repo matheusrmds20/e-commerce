@@ -42,6 +42,7 @@ class CouponService:
                     max_discount=data.max_discount,
                     valid_until=data.valid_until,
                     max_uses=data.max_uses,
+                    single_use_per_user=data.single_use_per_user,
                     is_active=data.is_active,
                 )
             )

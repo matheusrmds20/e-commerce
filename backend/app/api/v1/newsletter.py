@@ -1,9 +1,10 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Request, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db
+from app.api.limiter import limiter
 from app.models.user import User
 from app.schemas.newsletter import (
     NewsletterMessageResponse,
@@ -29,7 +30,13 @@ def get_newsletter_service(db: DbSession) -> NewsletterService:
     status_code=status.HTTP_201_CREATED,
     summary="Inscreve um e-mail na newsletter (público)",
 )
-def subscribe(data: NewsletterSubscribe, db: DbSession):
+@limiter.limit("5/minute")
+def subscribe(
+    request: Request,
+    data: NewsletterSubscribe,
+    db: DbSession,
+):
+    """Público e vetor de spam: limite por IP bem apertado."""
     return get_newsletter_service(db).subscribe(data)
 
 

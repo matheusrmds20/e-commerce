@@ -10,7 +10,7 @@ class Address(Base):
     __tablename__ = "addresses"
 
     id = Column(Integer, primary_key=True, autoincrement=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     street = Column(String(255), nullable=False)
     number = Column(String(20), nullable=False)
     complement = Column(String(100), nullable=True)

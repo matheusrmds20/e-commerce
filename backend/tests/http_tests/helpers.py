@@ -98,6 +98,7 @@ def coupon_payload(**overrides):
         "max_discount": None,
         "valid_until": "2025-12-31T23:59:59",
         "max_uses": 100,
+        "used_count": 0,
         "is_active": True,
         "created_at": CREATED_AT,
         "updated_at": UPDATED_AT,

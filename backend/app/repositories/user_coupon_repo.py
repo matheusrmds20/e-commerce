@@ -33,3 +33,22 @@ class UserCouponRepository(BaseRepository[UserCoupon]):
             )
             .first()
         )
+
+    def get_by_user_and_coupon_for_update(
+        self, user_id: int, coupon_id: int
+    ) -> UserCoupon | None:
+        """Como ``get_by_user_and_coupon``, mas travando a linha.
+
+        Necessário no checkout de cupom de uso único por cliente: sem o lock,
+        dois pedidos simultâneos do mesmo usuário leem ``used_at = NULL`` e
+        ambos aplicam o desconto.
+        """
+        return (
+            self.session.query(UserCoupon)
+            .filter(
+                UserCoupon.user_id == user_id,
+                UserCoupon.coupon_id == coupon_id,
+            )
+            .with_for_update()
+            .first()
+        )

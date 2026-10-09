@@ -1,10 +1,12 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, Request, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db
+from app.api.limiter import limiter
 from app.models.user import User
+from app.schemas.common import Page
 from app.schemas.review import ReviewCreate, ReviewResponse, ReviewUpdate
 from app.services.review_service import ReviewService
 
@@ -24,16 +26,20 @@ def get_review_service(db: DbSession) -> ReviewService:
     status_code=status.HTTP_201_CREATED,
     summary="Cria uma avaliação para o usuário autenticado",
 )
+@limiter.limit("10/minute")
 def create_review(
-    data: ReviewCreate, current_user: AuthUser, db: DbSession
+    request: Request,
+    data: ReviewCreate,
+    current_user: AuthUser,
+    db: DbSession,
 ) -> ReviewResponse:
     return get_review_service(db).create(current_user, data)
 
 
 @review_router.get(
     "/list",
-    response_model=list[ReviewResponse],
-    summary="Lista as avaliações do usuário autenticado (admin pode alvejar ?user_id=)",
+    response_model=Page[ReviewResponse],
+    summary="Lista as avaliações do usuário autenticado (paginado; admin pode alvejar ?user_id=)",
 )
 def list_reviews(
     current_user: AuthUser,
@@ -42,18 +48,33 @@ def list_reviews(
         int | None,
         Query(ge=1, description="Alvo (apenas administradores)"),
     ] = None,
-) -> list:
-    """Minhas avaliações. Com ``user_id``, restrito a administradores."""
-    return get_review_service(db).get_by_user_id(current_user, user_id)
+    page: Annotated[int, Query(ge=1, description="Página (começa em 1)")] = 1,
+    per_page: Annotated[
+        int, Query(ge=1, le=100, description="Itens por página (max 100)")
+    ] = 20,
+) -> dict:
+    """Minhas avaliações, paginadas. Com ``user_id``, restrito a administradores."""
+    return get_review_service(db).get_paginated_by_user_id(
+        current_user, user_id, page, per_page
+    )
 
 
 @review_router.get(
     "/product/{product_id}",
-    response_model=list[ReviewResponse],
-    summary="Lista as avaliações de um produto (público)",
+    response_model=Page[ReviewResponse],
+    summary="Lista as avaliações de um produto (público, paginado)",
 )
-def get_reviews_by_product(product_id: int, db: DbSession) -> list:
-    return get_review_service(db).get_by_product_id(product_id)
+def get_reviews_by_product(
+    product_id: int,
+    db: DbSession,
+    page: Annotated[int, Query(ge=1, description="Página (começa em 1)")] = 1,
+    per_page: Annotated[
+        int, Query(ge=1, le=100, description="Itens por página (max 100)")
+    ] = 20,
+) -> dict:
+    return get_review_service(db).get_paginated_by_product_id(
+        product_id, page, per_page
+    )
 
 
 @review_router.patch(

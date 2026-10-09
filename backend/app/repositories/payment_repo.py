@@ -35,6 +35,30 @@ class PaymentRepository(BaseRepository[Payment]):
             .all()
         )
 
+    def paginate_by_user_id(
+        self, user_id: int, page: int, per_page: int
+    ) -> tuple[list[Payment], int]:
+        """Histórico de pagamentos do usuário paginado no banco.
+
+        Mesmo join de ``get_by_user_id``, mas com ``count`` + ``offset``/``limit``
+        para o histórico não crescer indefinidamente com o tempo de conta.
+        """
+        from app.models.order import Order
+
+        query = (
+            self.session.query(Payment)
+            .join(Order, Payment.order_id == Order.id)
+            .filter(Order.user_id == user_id)
+        )
+        total = query.count()
+        items = (
+            query.order_by(Payment.created_at.desc(), Payment.id.desc())
+            .offset((page - 1) * per_page)
+            .limit(per_page)
+            .all()
+        )
+        return items, total
+
     def get_by_provider_payment_id_for_update(self, provider_payment_id: str) -> Payment | None:
 
         return (

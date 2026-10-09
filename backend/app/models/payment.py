@@ -14,9 +14,9 @@ class Payment(Base):
 
 
     id = Column(Integer, primary_key=True, autoincrement=True, index=True)
-    order_id = Column(Integer, ForeignKey("orders.id"), nullable=False)
+    order_id = Column(Integer, ForeignKey("orders.id"), nullable=False, index=True)
     provider = Column(String(255), nullable=False)
-    provider_payment_id = Column(String(255), nullable=True)
+    provider_payment_id = Column(String(255), nullable=True, index=True)
     provider_preference_id = Column(String(255), nullable=True)
     amount = Column(Float, nullable=False)
     currency = Column(String(3), nullable=False)

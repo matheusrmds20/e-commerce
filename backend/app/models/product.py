@@ -11,9 +11,9 @@ class Product(Base):
     __tablename__ = "products"
 
     id = Column(Integer, primary_key=True, autoincrement=True, index=True)
-    category_id = Column(Integer, ForeignKey("categories.id"), nullable=False)
+    category_id = Column(Integer, ForeignKey("categories.id"), nullable=False, index=True)
     title = Column(String(255), nullable=False)
-    slug = Column(String(300), nullable=False)
+    slug = Column(String(300), nullable=False, index=True)
     description = Column(String(500), nullable=False)
     author = Column(String(255), nullable=False)
     isbn = Column(String(20), nullable=True)

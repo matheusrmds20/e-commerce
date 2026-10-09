@@ -5,6 +5,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db
+from app.api.limiter import limiter
 from app.core.config import get_settings
 from app.core.security import REFRESH_COOKIE_NAME
 from app.models.user import User
@@ -65,7 +66,14 @@ def _expire_refresh_cookie(response: Response, request: Request) -> None:
     status_code=status.HTTP_201_CREATED,
     summary="Registra um novo usuário",
 )
-def register(data: RegisterRequest, db: DbSession) -> AuthResponse:
+@limiter.limit("10/minute")
+def register(request: Request, data: RegisterRequest, db: DbSession) -> AuthResponse:
+    """Publico e sujeito a brute force: limite por IP.
+
+    ``request`` (obrigatório para o slowapi) é declarado antes de ``data``
+    apenas para o FastAPI injetar por nome — a ordem dos params não muda o
+    comportamento.
+    """
     return get_auth_service(db).register(data)
 
 
@@ -74,12 +82,14 @@ def register(data: RegisterRequest, db: DbSession) -> AuthResponse:
     response_model=TokenResponse,
     summary="Autentica um usuário e retorna o access token (refresh em cookie)",
 )
+@limiter.limit("10/minute")
 def login(
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
     db: DbSession,
     response: Response,
     request: Request,
 ) -> TokenResponse:
+    """Publico e alvo clássico de brute force: limite por IP."""
     result = get_auth_service(db).login(form_data)
     if result.refresh_token:
         _set_refresh_cookie(response, request, result.refresh_token)
@@ -91,6 +101,7 @@ def login(
     response_model=RefreshResponse,
     summary="Renova o access token a partir do refresh token (rotação)",
 )
+@limiter.limit("30/minute")
 def refresh(
     db: DbSession,
     request: Request,
