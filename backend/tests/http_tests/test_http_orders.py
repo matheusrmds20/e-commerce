@@ -85,13 +85,17 @@ class TestAuthRequired:
         """
         auth_user(1)
         svc = Mock(name="order_service")
-        svc.get_by_user_id.return_value = [order_payload()]
+        svc.get_paginated_by_user_id.return_value = {
+            "data": [order_payload()],
+            "meta": {"page": 1, "per_page": 20, "total": 1, "total_pages": 1},
+        }
 
         with patch("app.api.v1.orders.get_order_service", return_value=svc):
             response = client.get(f"{PREFIX}/list?user_id=999")
 
         assert response.status_code == 200
-        svc.get_by_user_id.assert_called_once_with(1)
+        # O primeiro argumento (dono) vem do token, não da query.
+        assert svc.get_paginated_by_user_id.call_args.args[0] == 1
 
 
 class TestCreateOrder:
@@ -221,22 +225,50 @@ class TestCreateOrder:
 
 
 class TestListOrders:
+    @staticmethod
+    def _pagina(items):
+        return {
+            "data": items,
+            "meta": {
+                "page": 1,
+                "per_page": 20,
+                "total": len(items),
+                "total_pages": 1,
+            },
+        }
+
     def test_list_success(self, client, auth_user):
         auth_user(1)
         svc = Mock(name="order_service")
-        svc.get_by_user_id.return_value = [order_payload(), order_payload(id=2)]
+        svc.get_paginated_by_user_id.return_value = self._pagina(
+            [order_payload(), order_payload(id=2)]
+        )
 
         with patch("app.api.v1.orders.get_order_service", return_value=svc):
             response = client.get(f"{PREFIX}/list")
 
         assert response.status_code == 200
-        assert len(response.json()) == 2
-        svc.get_by_user_id.assert_called_once_with(1)
+        body = response.json()
+        # Envelope paginado: { data, meta }.
+        assert len(body["data"]) == 2
+        assert body["meta"]["total"] == 2
+        svc.get_paginated_by_user_id.assert_called_once_with(1, 1, 20)
+
+    def test_list_respeita_parametros_de_paginacao(self, client, auth_user):
+        auth_user(1)
+        svc = Mock(name="order_service")
+        svc.get_paginated_by_user_id.return_value = self._pagina([])
+
+        with patch("app.api.v1.orders.get_order_service", return_value=svc):
+            response = client.get(f"{PREFIX}/list?page=3&per_page=5")
+
+        assert response.status_code == 200
+        svc.get_paginated_by_user_id.assert_called_once_with(1, 3, 5)
 
     def test_list_not_found(self, client, auth_user):
         auth_user(1)
         svc = Mock(name="order_service")
-        svc.get_by_user_id.side_effect = NotFoundException(
+        svc.get_paginated_by_user_id.side_effect = NotFoundException(
             "No orders found with user_id 999", code="ORDER_NOT_FOUND"
         )
 

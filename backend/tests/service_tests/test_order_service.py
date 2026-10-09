@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from types import SimpleNamespace
 
 import pytest
 
@@ -26,15 +27,31 @@ from app.schemas.order import OrderCreate, OrderItemCreate, OrderUpdate
 
 
 @pytest.fixture(autouse=True)
-def _grant_coupon_ownership(user_coupon_repo):
+def _grant_coupon_ownership(user_coupon_repo, coupon_repo):
     """Por padrão, concede a posse do cupom ao usuário do pedido.
 
     O ``OrderService`` passou a exigir que o cupom esteja atribuído ao usuário
     (vínculo N:N). Para os testes que já existiam e focam em totais/estoque,
     simulamos o vínculo presente; o teste dedicado abaixo cobre a rejeição
     quando ele não existe.
+
+    Também espelha ``get_by_id_for_update`` em ``get_by_id``: o checkout agora
+    trava a linha do cupom (``FOR UPDATE``) para consumir ``used_count`` de
+    forma atômica, mas nos testes o cupom é o mesmo objeto.
     """
-    user_coupon_repo.get_by_user_and_coupon.return_value = object()
+    user_coupon_repo.get_by_user_and_coupon.return_value = SimpleNamespace(
+        used_at=None
+    )
+    # O checkout usa a variante com ``FOR UPDATE``. Espelha no mesmo valor para
+    # que os testes controlem a posse por um único ponto.
+    user_coupon_repo.get_by_user_and_coupon_for_update.side_effect = (
+        lambda uid, cid: user_coupon_repo.get_by_user_and_coupon.return_value
+    )
+    # Espelha ``get_by_id_for_update`` em ``get_by_id``: nos testes o cupom é o
+    # mesmo objeto, então ambos leem o ``return_value`` configurado no teste.
+    coupon_repo.get_by_id_for_update.side_effect = lambda cid: (
+        coupon_repo.get_by_id.return_value
+    )
 
 
 def make_user(**kwargs):
@@ -104,6 +121,7 @@ def make_coupon(**kwargs):
         discount_value=10.0,
         valid_until=datetime.now() + timedelta(days=1),
         is_active=True,
+        used_count=0,
     )
     fields.update(kwargs)
     return Coupon(**fields)
@@ -125,19 +143,34 @@ def order_create_payload(**kwargs):
 
 
 class TestGetByUserID:
-    def test_success(self, order_service, user_repo):
+    def test_success(self, order_service, user_repo, order_repo):
         user = make_user()
         orders = [make_order()]
-        user.orders = orders
         user_repo.get_by_id.return_value = user
+        # O service usa `get_by_user_id_eager` (evita N+1 na serialização).
+        order_repo.get_by_user_id_eager.return_value = orders
 
         assert order_service.get_by_user_id(1) == orders
+        order_repo.get_by_user_id_eager.assert_called_once_with(1)
 
     def test_user_not_found(self, order_service, user_repo):
         user_repo.get_by_id.return_value = None
 
         with pytest.raises(UserNotFoundException):
             order_service.get_by_user_id(1)
+
+    def test_paginado_usa_repo_paginado(
+        self, order_service, user_repo, order_repo
+    ):
+        user_repo.get_by_id.return_value = make_user()
+        order_repo.paginate_by_user_id.return_value = ([make_order()], 1)
+
+        pagina = order_service.get_paginated_by_user_id(1, page=1, per_page=10)
+
+        assert pagina["meta"]["total"] == 1
+        assert pagina["meta"]["per_page"] == 10
+        assert len(pagina["data"]) == 1
+        order_repo.paginate_by_user_id.assert_called_once_with(1, 1, 10)
 
 
 class TestCreate:
@@ -340,8 +373,94 @@ class TestCreate:
         with pytest.raises(InvalidCouponException):
             order_service.create(1, order_create_payload(coupon_id=1))
 
+    def test_coupon_no_limite_de_usos_e_rejeitado(
+        self,
+        order_service,
+        address_repo,
+        product_repo,
+        order_item_repo,
+        order_repo,
+        coupon_repo,
+    ):
+        """`max_uses` agora é respeitado: antes era gravado e nunca lido."""
+        self._setup(address_repo, product_repo, order_item_repo, order_repo)
+        coupon_repo.get_by_id.return_value = make_coupon(
+            max_uses=2, used_count=2
+        )
+
+        with pytest.raises(InvalidCouponException):
+            order_service.create(1, order_create_payload(coupon_id=1))
+
+    def test_coupon_dentro_do_limite_e_consumido(
+        self,
+        order_service,
+        address_repo,
+        product_repo,
+        order_item_repo,
+        order_repo,
+        coupon_repo,
+    ):
+        """Um uso válido incrementa `used_count` em 1."""
+        self._setup(address_repo, product_repo, order_item_repo, order_repo)
+        coupon = make_coupon(max_uses=5, used_count=1)
+        coupon_repo.get_by_id.return_value = coupon
+
+        order_service.create(1, order_create_payload(coupon_id=1))
+
+        assert coupon.used_count == 2
+
+    def test_checkout_usa_lock_no_cupom(
+        self,
+        order_service,
+        address_repo,
+        product_repo,
+        order_item_repo,
+        order_repo,
+        coupon_repo,
+    ):
+        """O checkout trava a linha do cupom (evita corrida em max_uses)."""
+        self._setup(address_repo, product_repo, order_item_repo, order_repo)
+        coupon_repo.get_by_id.return_value = make_coupon()
+        coupon_repo.get_by_id_for_update.reset_mock()
+
+        order_service.create(1, order_create_payload(coupon_id=1))
+
+        coupon_repo.get_by_id_for_update.assert_called_once_with(1)
+
+    def test_sem_cupom_nao_consome_nem_trava(
+        self,
+        order_service,
+        address_repo,
+        product_repo,
+        order_item_repo,
+        order_repo,
+        coupon_repo,
+    ):
+        self._setup(address_repo, product_repo, order_item_repo, order_repo)
+
+        order_service.create(1, order_create_payload())
+
+        coupon_repo.get_by_id_for_update.assert_not_called()
+
 
 class TestUpdate:
+    def test_nao_queima_uso_do_cupom_em_edicao_simples(
+        self, order_service, order_repo
+    ):
+        """Editar `notes` não consome uso nem revalida o cupom.
+
+        Antes a validação rodava sempre com `order.coupon_id`, então editar um
+        pedido cujo cupom expirou desde a compra falhava; e um update simples
+        poderia queimar uma unidade do cupom.
+        """
+        order = make_order(coupon_id=None)
+        order_repo.get_by_id.return_value = order
+        order_repo.get_with_items.return_value = [make_order_item()]
+
+        order_service.update(1, 1, OrderUpdate(notes="ok"))
+
+        assert order.notes == "ok"
+
     def test_success(self, order_service, order_repo):
         order = make_order()
         order_repo.get_by_id.return_value = order
@@ -543,6 +662,129 @@ class TestBaixaDeEstoque:
         assert produto.stock_qty == 6
         product_repo.restock.assert_called_once_with(produto, 1)
         product_repo.decrement_stock.assert_called_once_with(produto, 5)
+
+
+class TestDevolucaoDeUsoDoCupom:
+    """Cancelar/excluir um pedido devolve a unidade consumida do cupom.
+
+    Espelha a reposição de estoque: sem isso, cancelar um pedido "gastava"
+    para sempre um uso, esgotando `max_uses` sem venda correspondente.
+    """
+
+    def test_cancelar_devolve_uso(
+        self, order_service, order_repo, coupon_repo, product_repo
+    ):
+        order = make_order(status=OrderStatus.PENDING, coupon_id=7)
+        order_repo.get_by_id.return_value = order
+        order_repo.get_with_items.return_value = [make_order_item(quantity=1)]
+        product_repo.get_by_id.return_value = make_product(stock_qty=5)
+
+        cupom = make_coupon(id=7, used_count=3)
+        coupon_repo.get_by_id.return_value = cupom
+
+        order_service.update(1, 1, OrderUpdate(status=OrderStatus.CANCELLED))
+
+        assert cupom.used_count == 2
+
+    def test_nao_devolve_abaixo_de_zero(
+        self, order_service, order_repo, coupon_repo, product_repo
+    ):
+        order = make_order(status=OrderStatus.PENDING, coupon_id=7)
+        order_repo.get_by_id.return_value = order
+        order_repo.get_with_items.return_value = [make_order_item(quantity=1)]
+        product_repo.get_by_id.return_value = make_product(stock_qty=5)
+
+        cupom = make_coupon(id=7, used_count=0)
+        coupon_repo.get_by_id.return_value = cupom
+
+        order_service.update(1, 1, OrderUpdate(status=OrderStatus.CANCELLED))
+
+        assert cupom.used_count == 0
+
+    def test_pedido_sem_cupom_nao_toca_em_cupom(
+        self, order_service, order_repo, coupon_repo, product_repo
+    ):
+        order = make_order(status=OrderStatus.PENDING, coupon_id=None)
+        order_repo.get_by_id.return_value = order
+        order_repo.get_with_items.return_value = [make_order_item(quantity=1)]
+        product_repo.get_by_id.return_value = make_product(stock_qty=5)
+
+        order_service.update(1, 1, OrderUpdate(status=OrderStatus.CANCELLED))
+
+        coupon_repo.get_by_id_for_update.assert_not_called()
+
+    def test_delete_devolve_uso(self, order_service, order_repo, coupon_repo):
+        order = make_order(coupon_id=7)
+        order_repo.get_by_id.return_value = order
+
+        cupom = make_coupon(id=7, used_count=2)
+        coupon_repo.get_by_id.return_value = cupom
+
+        order_service.delete(1, 1)
+
+        assert cupom.used_count == 1
+        order_repo.delete.assert_called_once_with(order)
+
+
+class TestUsoUnicoPorCliente:
+    """Cupom com `single_use_per_user` só pode ser usado uma vez por cliente."""
+
+    def test_primeiro_uso_marca_used_at(
+        self, order_service, address_repo, product_repo, order_item_repo,
+        order_repo, coupon_repo, user_coupon_repo,
+    ):
+        address_repo.get_by_id.return_value = make_address()
+        product_repo.get_by_id.return_value = make_product()
+        order_item_repo.create_order_item.return_value = make_order_item()
+        order_repo.create.return_value = make_order()
+
+        coupon_repo.get_by_id.return_value = make_coupon(
+            single_use_per_user=True
+        )
+        vinculo = SimpleNamespace(used_at=None)
+        user_coupon_repo.get_by_user_and_coupon.return_value = vinculo
+
+        order_service.create(1, order_create_payload(coupon_id=1))
+
+        assert vinculo.used_at is not None
+
+    def test_segundo_uso_e_rejeitado(
+        self, order_service, address_repo, product_repo, order_item_repo,
+        order_repo, coupon_repo, user_coupon_repo,
+    ):
+        address_repo.get_by_id.return_value = make_address()
+        product_repo.get_by_id.return_value = make_product()
+        order_item_repo.create_order_item.return_value = make_order_item()
+
+        coupon_repo.get_by_id.return_value = make_coupon(
+            single_use_per_user=True
+        )
+        user_coupon_repo.get_by_user_and_coupon.return_value = SimpleNamespace(
+            used_at=datetime.now()
+        )
+
+        with pytest.raises(InvalidCouponException):
+            order_service.create(1, order_create_payload(coupon_id=1))
+
+    def test_cupom_normal_permite_reuso(
+        self, order_service, address_repo, product_repo, order_item_repo,
+        order_repo, coupon_repo, user_coupon_repo,
+    ):
+        """Sem a flag, `used_at` preenchido não bloqueia (regra desligada)."""
+        address_repo.get_by_id.return_value = make_address()
+        product_repo.get_by_id.return_value = make_product()
+        order_item_repo.create_order_item.return_value = make_order_item()
+        order_repo.create.return_value = make_order()
+
+        coupon_repo.get_by_id.return_value = make_coupon(
+            single_use_per_user=False
+        )
+        user_coupon_repo.get_by_user_and_coupon.return_value = SimpleNamespace(
+            used_at=datetime.now()
+        )
+
+        # Não levanta: a regra de uso único está desligada.
+        order_service.create(1, order_create_payload(coupon_id=1))
 
 
 class TestLimpezaDoCarrinho:

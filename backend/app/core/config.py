@@ -54,6 +54,27 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: str
     CELERY_BROKER_URL: str
     CELERY_RESULT_BACKEND: str
+    # Rate limiting (slowapi) — proteção básica contra abuso por IP.
+    # Desligue via RATE_LIMIT_ENABLED=false em ambientes sem necessidade
+    # (ex.: suíte de testes), pois o front E2E faz muitas chamadas.
+    RATE_LIMIT_ENABLED: bool = True
+    # Limite padrão aplicado a TODAS as rotas sem limite explícito.
+    # Rotas sensíveis (auth, newsletter, webhook...) sobrescrevem com limites
+    # próprios via @limiter.limit("...").
+    RATE_LIMIT_DEFAULT: str = "200/minute"
+    # "memory://" é por-processo (adequado para dev). Em produção com vários
+    # workers do Uvicorn use o Redis (já é dependência via Celery), ex.:
+    # RATE_LIMIT_STORAGE_URI="redis://localhost:6379/2"
+    RATE_LIMIT_STORAGE_URI: str = "memory://"
+    # Define se os headers X-RateLimit-* são injetados nas respostas. Mantenha
+    # False: no slowapi, com headers ligados todo endpoint decorado precisaria
+    # declarar um parâmetro `response: Response` (senão vira 500).
+    RATE_LIMIT_HEADERS_ENABLED: bool = False
+    # Atrás de nginx/Caddy (produção), request.client.host é sempre o IP do
+    # proxy — todos os usuários cairiam no mesmo bucket. True usa o primeiro
+    # IP do header X-Forwarded-For. Se o Uvicorn for exposto direto à internet
+    # SEM proxy, o header forjado permitiria burlar o limite: use False.
+    RATE_LIMIT_TRUST_XFF: bool = True
     # Diretório onde os comprovantes PDF dos pedidos são salvos.
     COMPROVANTES_DIR: str = "comprovantes"
 

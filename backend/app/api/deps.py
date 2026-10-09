@@ -5,10 +5,11 @@ from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError
 from sqlalchemy.orm import Session
 
+from app.api.exceptions import InsufficientPermissionException
 from app.core.config import get_settings
 from app.core.security import decode_token
 from app.db.database import SessionLocal
-from app.models.user import User
+from app.models.user import User, UserRole
 
 settings = get_settings()
 
@@ -68,4 +69,22 @@ async def get_current_user(
     db.expunge(user)
     db.rollback()
 
+    return user
+
+
+async def get_current_admin(
+    user: Annotated[User, Depends(get_current_user)],
+) -> User:
+    """Exige que o usuário autenticado seja administrador.
+
+    401 quando não há token válido (via ``get_current_user``); 403 quando o
+    usuário está autenticado mas não tem o papel ``admin``. Usada como
+    dependência de router nas áreas administrativas, de cupons e de vínculos
+    usuário-cupom.
+    """
+    if user.role != UserRole.ADMIN:
+        # Usa a exceção de domínio para responder no envelope padronizado
+        # `{"error": {"code": "INSUFFICIENT_PERMISSION", ...}}`, igual às
+        # checagens de admin dentro dos services.
+        raise InsufficientPermissionException()
     return user

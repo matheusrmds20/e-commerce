@@ -1,9 +1,10 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db
+from app.api.limiter import limiter
 from app.models.user import User
 from app.schemas.shipping import (
     ShippingApplyRequest,
@@ -29,7 +30,13 @@ def get_shipping_service(db: DbSession) -> ShippingService:
     response_model=ShippingQuoteResponse,
     summary="Cota o frete do carrinho do usuário por CEP (sem criar pedido)",
 )
-def quote_shipping(data: ShippingQuoteRequest, user: UserDb, db: DbSession):
+@limiter.limit("30/minute")
+def quote_shipping(
+    request: Request,
+    data: ShippingQuoteRequest,
+    user: UserDb,
+    db: DbSession,
+):
     """Calcula as opções de frete a partir do carrinho do usuário autenticado
     e do CEP informado. Não cria pedido nem baixa estoque."""
     return get_shipping_service(db).quote(user.id, data.postal_code)

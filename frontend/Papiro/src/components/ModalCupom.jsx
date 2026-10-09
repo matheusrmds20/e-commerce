@@ -34,6 +34,7 @@ const FORM_VAZIO = {
   max_discount: '',
   valid_until: '',
   max_uses: '',
+  single_use_per_user: false,
   is_active: true,
 }
 
@@ -54,6 +55,7 @@ function formInicial(cupom) {
     max_discount: cupom.max_discount != null ? String(cupom.max_discount) : '',
     valid_until: isoParaInput(cupom.valid_until),
     max_uses: cupom.max_uses != null ? String(cupom.max_uses) : '',
+    single_use_per_user: Boolean(cupom.single_use_per_user),
     is_active: Boolean(cupom.is_active),
   }
 }
@@ -153,6 +155,7 @@ export default function ModalCupom({
       // toISOString() converte para UTC (o que o backend espera).
       valid_until: new Date(form.valid_until).toISOString(),
       max_uses: numeroOpcional(form.max_uses),
+      single_use_per_user: Boolean(form.single_use_per_user),
       is_active: Boolean(form.is_active),
     }
 
@@ -336,6 +339,23 @@ export default function ModalCupom({
               />
             </div>
           </div>
+
+          <label className="flex items-center gap-3 pt-1 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={form.single_use_per_user}
+              onChange={(e) =>
+                setForm((prev) => ({
+                  ...prev,
+                  single_use_per_user: e.target.checked,
+                }))
+              }
+              className="h-4 w-4 accent-forest"
+            />
+            <span className="text-sm text-coffee-soft">
+              Uso único por cliente (cada pessoa só pode usar uma vez)
+            </span>
+          </label>
 
           <label className="flex items-center gap-3 pt-1 cursor-pointer select-none">
             <input

@@ -16,6 +16,12 @@ class UserCoupon(Base):
 
     A restrição única (user_id, coupon_id) impede atribuir o mesmo cupom duas
     vezes ao mesmo usuário — o service trata isso como conflito.
+
+    `used_at` marca quando o usuário efetivamente usou o cupom num pedido.
+    Permite modelar cupom de **uso único por cliente** (o padrão de cupom
+    pessoal: "R$20 off, válido uma vez") sem depender do limite global
+    `Coupon.max_uses`, que é compartilhado entre todos os usuários. Fica em
+    NULL enquanto não usado.
     """
 
     __tablename__ = "user_coupons"
@@ -27,6 +33,7 @@ class UserCoupon(Base):
     id = Column(Integer, primary_key=True, autoincrement=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     coupon_id = Column(Integer, ForeignKey("coupons.id"), nullable=False, index=True)
+    used_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, nullable=False, default=datetime.now)
     updated_at = Column(DateTime, nullable=False, default=datetime.now)
 

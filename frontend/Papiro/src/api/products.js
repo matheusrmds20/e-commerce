@@ -34,11 +34,14 @@ async function listarOuVazio(fn) {
 }
 
 export const productService = {
-  /** Lista todos os produtos (vazio quando o catálogo não tem itens). */
-  async listar() {
+  /**
+   * Lista todos os produtos (paginado). Desembrulha `.data` do envelope
+   * `{ data, meta }` para manter o contrato de Array.
+   */
+  async listar(params = {}) {
     return listarOuVazio(async () => {
-      const { data } = await api.get('/products/list')
-      return data
+      const { data } = await api.get('/products/list', { params })
+      return data?.data ?? data
     })
   },
 

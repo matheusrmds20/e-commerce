@@ -4,6 +4,7 @@ from app.api.exceptions import (
     AddressNotFoundException,
     ConflictException,
 )
+from app.db.transaction import transacao
 from app.models.address import Address
 from app.models.order import Order
 from app.repositories.address_repo import AddressRepository
@@ -53,7 +54,10 @@ class AddressService:
         return adress
 
     def set_default(self, user_id: int, address_id: int) -> dict:
-        address = self.repo.set_default(user_id, address_id)
+        # `transacao` lida com o caso de já haver transação aberta (autobegin).
+        # O repositório não gerencia mais fronteira de transação.
+        with transacao(self.session):
+            address = self.repo.set_default(user_id, address_id)
 
         if address is None:
             raise AddressNotFoundException()

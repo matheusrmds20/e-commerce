@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main, Frontend]
+    branches: [main, Frontend, Backend]
   pull_request:
-    branches: [main, Frontend]
+    branches: [main, Frontend, Backend]
   workflow_dispatch:
 
 # Serializa execuções do mesmo branch SEM cancelar as que já estão rodando.
@@ -52,6 +52,9 @@ jobs:
       SMTP_FROM: "ci@example.com"
       CELERY_BROKER_URL: "redis://localhost:6379/0"
       CELERY_RESULT_BACKEND: "redis://localhost:6379/1"
+      # Rate limiting desligado no CI: a suíte HTTP chama as mesmas rotas
+      # repetidamente (ex.: login) e o limiter por-IP quebraria os testes.
+      RATE_LIMIT_ENABLED: "false"
 
     steps:
       - uses: actions/checkout@v4
@@ -154,6 +157,9 @@ jobs:
       SMTP_FROM: "ci@example.com"
       CELERY_BROKER_URL: "redis://localhost:6379/0"
       CELERY_RESULT_BACKEND: "redis://localhost:6379/1"
+      # Rate limiting desligado no E2E: o Playwright faz login/refresh e
+      # inscreve usuários repetidamente a partir do mesmo IP.
+      RATE_LIMIT_ENABLED: "false"
       E2E_DATABASE_URL: "postgresql+psycopg2://postgres:postgres@localhost:5432/bookcommerce_e2e"
       DATABASE_URL: "postgresql+psycopg2://postgres:postgres@localhost:5432/bookcommerce_e2e"
 

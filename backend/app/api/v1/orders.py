@@ -1,10 +1,11 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db
 from app.models.user import User
+from app.schemas.common import Page
 from app.schemas.order import (
     OrderCreate,
     OrderResponse,
@@ -16,6 +17,11 @@ order_router = APIRouter()
 
 DbSession = Annotated[Session, Depends(get_db)]
 UserDb = Annotated[User, Depends(get_current_user)]
+
+PageNumber = Annotated[int, Query(ge=1, description="Página (começa em 1)")]
+PerPage = Annotated[
+    int, Query(ge=1, le=100, description="Itens por página (max 100)")
+]
 
 
 def get_order_service(db: DbSession) -> OrderService:
@@ -36,11 +42,24 @@ def create_order(
 
 @order_router.get(
     "/list",
-    response_model=list[OrderResponse],
-    summary="Lista todos os pedidos do usuário autenticado",
+    response_model=Page[OrderResponse],
+    summary="Lista os pedidos do usuário autenticado (paginado)",
 )
-def list_orders(user: UserDb, db: DbSession) -> list:
-    return get_order_service(db).get_by_user_id(user.id)
+def list_orders(
+    user: UserDb,
+    db: DbSession,
+    page: PageNumber = 1,
+    per_page: PerPage = 20,
+) -> dict:
+    """Pedidos paginados no envelope ``{ data, meta }``.
+
+    Antes retornava a lista completa: uma conta antiga baixava o histórico
+    inteiro a cada carregamento. Agora o banco aplica ``offset``/``limit`` e o
+    ``meta.total`` reflete o total real.
+    """
+    return get_order_service(db).get_paginated_by_user_id(
+        user.id, page, per_page
+    )
 
 
 @order_router.patch(
@@ -85,6 +104,7 @@ async def send_order_confirmation_email(
 )
 async def get_task_status(
     task_id: str,
+    user: UserDb,
     db: DbSession,
 ):
 

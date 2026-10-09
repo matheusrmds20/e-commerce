@@ -73,13 +73,16 @@ export const paymentService = {
   },
 
   /**
-   * Lista TODOS os pagamentos do usuário autenticado em uma única chamada.
+   * Lista os pagamentos do usuário autenticado em uma única chamada.
    * Usado pela aba "Pagamentos" da Minha Conta (evita 1 request por pedido).
+   *
+   * O endpoint agora é paginado e devolve `{ data, meta }`.
+   * @param {{ page?: number, per_page?: number }} [params]
    * @returns {Promise<Array>}
    */
-  async historico() {
-    const { data } = await api.get('/payments/history')
-    return data
+  async historico(params = {}) {
+    const { data } = await api.get('/payments/history', { params })
+    return data?.data ?? data
   },
 }
 

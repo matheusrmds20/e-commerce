@@ -11,6 +11,8 @@ from app.models.order import OrderStatus
 from app.repositories.address_repo import AddressRepository
 from app.repositories.cart_repo import CartRepository
 from app.repositories.order_repo import OrderRepository
+from app.services.pricing import quantize as centavos
+from app.services.pricing import to_decimal
 
 settings = get_settings()
 
@@ -173,12 +175,16 @@ class ShippingService:
         with self.session.begin():
             order = self._get_owned_order(order_id, user_id)
 
-            # Recalcula `total = subtotal - desconto + frete`.
-            order.shipping_cost = float(price)
-            order.total = (
-                float(order.subtotal)
-                - float(order.discount_amount)
-                + float(order.shipping_cost)
+            # Recalcula `total = subtotal - desconto + frete` com o helper
+            # único (Decimal, arredondado a centavos). Antes a soma era feita
+            # direto em float nos atributos do pedido.
+            order.shipping_cost = round(float(price), 2)
+            order.total = float(
+                centavos(
+                    to_decimal(order.subtotal)
+                    - to_decimal(order.discount_amount)
+                    + to_decimal(order.shipping_cost)
+                )
             )
             order.updated_at = datetime.now()
 

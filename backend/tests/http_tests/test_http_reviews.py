@@ -134,16 +134,30 @@ class TestCreateReview:
 
 
 class TestListMyReviews:
+    @staticmethod
+    def _pagina(items):
+        return {
+            "data": items,
+            "meta": {
+                "page": 1,
+                "per_page": 20,
+                "total": len(items),
+                "total_pages": 1 if items else 0,
+            },
+        }
+
     def test_list_success(self, client, auth_user):
         auth_user(1)
         svc = Mock(name="review_service")
-        svc.get_by_user_id.return_value = [review_payload(), review_payload(id=2, rating=4)]
+        svc.get_paginated_by_user_id.return_value = self._pagina(
+            [review_payload(), review_payload(id=2, rating=4)]
+        )
 
         with patch("app.api.v1.reviews.get_review_service", return_value=svc):
             response = client.get(f"{PREFIX}/list")
 
         assert response.status_code == 200
-        assert len(response.json()) == 2
+        assert len(response.json()["data"]) == 2
 
     def test_list_requires_auth(self, client):
         response = client.get(f"{PREFIX}/list")
@@ -152,7 +166,7 @@ class TestListMyReviews:
     def test_list_other_user_forbidden(self, client, auth_user):
         auth_user(2)
         svc = Mock(name="review_service")
-        svc.get_by_user_id.side_effect = ReviewForbiddenException()
+        svc.get_paginated_by_user_id.side_effect = ReviewForbiddenException()
 
         with patch("app.api.v1.reviews.get_review_service", return_value=svc):
             response = client.get(f"{PREFIX}/list?user_id=1")
@@ -162,28 +176,32 @@ class TestListMyReviews:
     def test_list_other_user_as_admin(self, client, auth_user):
         auth_user(99, role="admin")
         svc = Mock(name="review_service")
-        svc.get_by_user_id.return_value = [review_payload()]
+        svc.get_paginated_by_user_id.return_value = self._pagina([review_payload()])
 
         with patch("app.api.v1.reviews.get_review_service", return_value=svc):
             response = client.get(f"{PREFIX}/list?user_id=1")
 
         assert response.status_code == 200
-        assert len(response.json()) == 1
+        assert len(response.json()["data"]) == 1
 
 
 class TestGetReviewsByProduct:
     def test_get_by_product_success(self, client):
         svc = Mock(name="review_service")
-        svc.get_by_product_id.return_value = [review_payload()]
+        svc.get_paginated_by_product_id.return_value = {
+            "data": [review_payload()],
+            "meta": {"page": 1, "per_page": 20, "total": 1, "total_pages": 1},
+        }
 
         with patch("app.api.v1.reviews.get_review_service", return_value=svc):
             response = client.get(f"{PREFIX}/product/1")
 
         assert response.status_code == 200
+        assert len(response.json()["data"]) == 1
 
     def test_get_by_product_not_found(self, client):
         svc = Mock(name="review_service")
-        svc.get_by_product_id.side_effect = ProductNotFoundException()
+        svc.get_paginated_by_product_id.side_effect = ProductNotFoundException()
 
         with patch("app.api.v1.reviews.get_review_service", return_value=svc):
             response = client.get(f"{PREFIX}/product/999")

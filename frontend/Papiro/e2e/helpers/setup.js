@@ -88,7 +88,9 @@ export async function criarPedidoViaApi(request, token, { address_id, items }) {
 export async function primeiroProdutoViaApi(request) {
   const resp = await request.get(`${API_URL}/products/list`)
   expect(resp.ok(), `listar produtos falhou: ${resp.status()}`).toBeTruthy()
-  const lista = await resp.json()
+  const body = await resp.json()
+  // `/products/list` responde no envelope paginado `{ data, meta }`.
+  const lista = Array.isArray(body) ? body : body.data
   expect(lista.length).toBeGreaterThan(0)
   return lista[0].id
 }

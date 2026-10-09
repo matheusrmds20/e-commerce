@@ -25,10 +25,16 @@ export const orderService = {
     return data
   },
 
-  /** Lista todos os pedidos do usuário autenticado. */
-  async listar() {
-    const { data } = await api.get('/orders/list')
-    return data
+  /**
+   * Lista os pedidos do usuário autenticado.
+   *
+   * O endpoint agora é paginado e devolve o envelope `{ data, meta }`.
+   * Desembrulha `.data` para manter o contrato de Array consumido pelas telas.
+   * @param {{ page?: number, perPage?: number }} [params]
+   */
+  async listar(params = {}) {
+    const { data } = await api.get('/orders/list', { params })
+    return data?.data ?? data
   },
 
   /**

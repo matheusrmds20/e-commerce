@@ -523,7 +523,7 @@ export default function Admin({ onVoltarParaLoja }) {
         vinculosIniciais
           .filter((v) => !selecionados.has(v.user_id))
           .map((v) =>
-            couponService.removerVinculo(v.id, v.user_id).catch(() => null),
+            couponService.removerVinculo(v.id).catch(() => null),
           ),
       )
     }
@@ -1668,7 +1668,9 @@ export default function Admin({ onVoltarParaLoja }) {
                                 : '—'}
                             </td>
                             <td className="py-4 px-6 text-xs">
-                              {cupom.max_uses != null ? `${cupom.max_uses}` : 'Ilimitado'}
+                              {cupom.max_uses != null
+                                ? `${cupom.used_count ?? 0}/${cupom.max_uses}`
+                                : `${cupom.used_count ?? 0}/Ilimitado`}
                             </td>
                             <td className="py-4 px-6">
                               <span

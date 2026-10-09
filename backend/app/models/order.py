@@ -22,21 +22,22 @@ class Order(Base):
     __tablename__ = "orders"
 
     id = Column(Integer, primary_key=True, autoincrement=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    address_id = Column(Integer, ForeignKey("addresses.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    address_id = Column(Integer, ForeignKey("addresses.id"), nullable=False, index=True)
     coupon_id = Column(Integer, ForeignKey("coupons.id"), nullable=True)
     notes = Column(String(500), nullable=True)
     status = Column(
         Enum(OrderStatus, values_callable=lambda x: [e.value for e in x]),
         default=OrderStatus.PENDING,
         nullable=False,
+        index=True,
     )
     subtotal = Column(Float, nullable=False)
     discount_amount = Column(Float, nullable=False)
     shipping_cost = Column(Float, nullable=False)
     total = Column(Float, nullable=False)
     receipt_path = Column(String(500), nullable=True)
-    created_at = Column(DateTime, nullable=False, default=datetime.now)
+    created_at = Column(DateTime, nullable=False, default=datetime.now, index=True)
     updated_at = Column(DateTime, nullable=False, default=datetime.now)
 
 

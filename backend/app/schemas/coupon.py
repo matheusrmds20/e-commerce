@@ -13,7 +13,10 @@ class CouponCreate(BaseModel):
     min_purchase: float | None = Field(None, description="Valor mínimo de compra")
     max_discount: float | None = Field(None, description="Valor máximo de desconto")
     valid_until: datetime = Field(..., description="Validade do cupom")
-    max_uses: int | None = Field(None, description="Quantidade máxima de usos")
+    max_uses: int | None = Field(None, description="Quantidade máxima de usos (global)")
+    single_use_per_user: bool = Field(
+        False, description="Cada usuário só pode usar o cupom uma vez"
+    )
     is_active: bool = Field(True, description="Ativo")
 
     @field_validator("discount_value")
@@ -33,6 +36,7 @@ class CouponUpdate(BaseModel):
     max_discount: int | None = None
     valid_until: datetime | None = None
     max_uses: int | None = None
+    single_use_per_user: bool | None = None
     is_active: bool | None = None
 
 
@@ -46,6 +50,9 @@ class CouponResponse(BaseModel):
     max_discount: int | None
     valid_until: datetime
     max_uses: int | None
+    # Quantas vezes o cupom já foi aplicado (contador consumido no checkout).
+    used_count: int = 0
+    single_use_per_user: bool = False
     is_active: bool
     created_at: datetime
     updated_at: datetime
