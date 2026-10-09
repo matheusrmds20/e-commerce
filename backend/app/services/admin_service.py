@@ -11,7 +11,6 @@ from app.models.order import Order, OrderStatus
 from app.models.order_item import OrderItem
 from app.models.product import Product
 from app.models.user import User
-from app.services.order_state_machine import assert_admin_transition
 from app.schemas.admin import (
     AdminOrderResponse,
     AdminOrderUser,
@@ -20,6 +19,7 @@ from app.schemas.admin import (
     LowStockProduct,
     WeeklySale,
 )
+from app.services.order_state_machine import assert_admin_transition
 
 
 class AdminService:

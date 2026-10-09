@@ -28,7 +28,6 @@ permitida.
 from app.api.exceptions import InvalidStateTransitionException
 from app.models.order import OrderStatus
 
-
 # Estados "abertos": o pedido ainda pode ser cancelado pelo cliente/reaberto.
 _ESTADOS_ABERTOS: frozenset[OrderStatus] = frozenset(
     {OrderStatus.PENDING, OrderStatus.PROCESSING}

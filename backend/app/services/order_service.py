@@ -24,8 +24,8 @@ from app.repositories.order_repo import OrderRepository
 from app.repositories.product_repo import ProductRepository
 from app.repositories.user_coupon_repo import UserCouponRepository
 from app.repositories.user_repo import UserRepository
-from app.services.pricing import calcular_totais
 from app.services.order_state_machine import assert_client_transition
+from app.services.pricing import calcular_totais
 from app.utils.email import build_order_details, send_order_confirmation_email
 
 
