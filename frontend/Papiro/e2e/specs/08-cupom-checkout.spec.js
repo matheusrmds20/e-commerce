@@ -53,7 +53,7 @@ test.describe('Cupom / Checkout (MP mockado)', () => {
     await criarEnderecoViaApi(request, token)
 
     // Item na sacola pela UI.
-    await page.getByTestId('nav-acervo').click()
+    await page.goto('/acervo')
     const card = page.getByTestId(/^book-card-/).first()
     await expect(card).toBeVisible({ timeout: 15_000 })
     await card.locator('img').click()
@@ -63,7 +63,7 @@ test.describe('Cupom / Checkout (MP mockado)', () => {
     await page.getByTestId('btn-add-carrinho').click()
 
     // Checkout: endereço do setup aparece e é selecionado.
-    await page.getByTestId('nav-checkout').click()
+    await page.goto('/checkout')
     await expect(page.getByLabel(/Rua do Teste E2E/)).toBeVisible({
       timeout: 15_000,
     })

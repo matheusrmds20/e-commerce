@@ -1,22 +1,10 @@
 import { useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import BookCard from './BookCard'
 import { ArrowRightIcon } from './Icons'
 import { formatarPreco } from '../api/adapters'
 
-/**
- * LivrosDestaque — Seção de Livros em Destaque com filtros por categoria.
- *
- * Dados:
- * - `livros`: os itens exibidos na grade. Vêm da curadoria (`is_featured`) ou,
- *   quando a curadoria está vazia, do fallback montado em `home.js`.
- * - `categoriaIds`: catálogo completo, usado só para decidir **quais filtros de
- *   categoria aparecem**. Sem ele, um destaque de uma categoria sem outros
- *   livros criaria um filtro que não leva a lugar nenhum.
- * - `categorias`: nomes/ids das categorias.
- *
- * Quando a lista exibida veio da curadoria, cada card ganha o selo
- * "Curadoria" — assim a flag do backend fica visível na interface.
- */
+
 const LIMITE_DESTAQUES = 8
 
 export default function LivrosDestaque({
@@ -24,13 +12,9 @@ export default function LivrosDestaque({
   categoriaIds = [],
   categorias = [],
   carregando = false,
-  onAbrirLivro,
-  onExplorarAcervo,
 }) {
+  const navigate = useNavigate()
   const [categoriaAtiva, setCategoriaAtiva] = useState('Todos')
-
-  // Se os itens exibidos têm a flag de curadoria, mostramos o selo.
-  const daCuradoria = livros.some((l) => l.destaque)
 
   // Só categorias com ao menos um livro NO CATÁLOGO viram filtro — o filtro
   // precisa apontar para resultados que existem de fato.
@@ -39,7 +23,11 @@ export default function LivrosDestaque({
       (categoriaIds.length ? categoriaIds : livros).map((l) => l.categoriaId),
     )
     const nomes = categorias
-      .filter((c) => idsComLivros.has(c.id))
+      .filter(
+        (c) =>
+          idsComLivros.has(c.id) &&
+          c.titulo?.trim().toLocaleLowerCase('pt-BR') !== 'frete teste',
+      )
       .map((c) => c.titulo)
     return ['Todos', ...nomes]
   }, [livros, categoriaIds, categorias])
@@ -128,8 +116,7 @@ export default function LivrosDestaque({
                 }
                 image={book.imagem}
                 tint="bg-coffee"
-                badge={daCuradoria && book.destaque ? 'Curadoria' : null}
-                onAbrir={onAbrirLivro}
+                onAbrir={(id) => navigate(`/livro/${id}`)}
               />
             ))}
         </div>
@@ -164,7 +151,7 @@ export default function LivrosDestaque({
           <div className="mt-14 text-center">
             <button
               type="button"
-              onClick={() => onExplorarAcervo?.()}
+              onClick={() => navigate('/acervo')}
               className="group inline-flex items-center gap-3 rounded-sm border border-forest bg-forest px-8 py-4 font-body text-xs font-semibold uppercase tracking-[0.22em] text-cream-soft shadow-md transition-all duration-300 hover:bg-forest-soft hover:shadow-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest"
             >
               <span>Explorar todo o acervo</span>

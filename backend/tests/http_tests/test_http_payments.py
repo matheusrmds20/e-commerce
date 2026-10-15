@@ -1,22 +1,13 @@
-"""Testes HTTP da rota /api/v1/payments.
 
-Sucesso: 201 na criação de pagamento e de checkout; 200 nas buscas e no
-webhook.
-Erros: validação 422; assinatura de webhook inválida 401; falha do service
-(ValueError) vira 500 — ver RELATORIO_TESTES_HTTP.md.
-
-AUTENTICAÇÃO: as rotas de criação/consulta exigem Bearer token
-(``Depends(get_current_user)``). O webhook NÃO exige token: quem chama é o
-Mercado Pago, e a autenticidade é garantida pela assinatura (``x-signature``).
-
-NOTA: o PaymentService real lança ``ValueError`` em vez das exceções de
-domínio — em produção esses erros viram 500 (o handler genérico não converte
-ValueError). Os testes abaixo refletem o comportamento atual.
-"""
 from unittest.mock import Mock, patch
 
 import pytest
 from helpers import assert_validation_error, payment_payload
+
+from app.api.exceptions import (
+    BadRequestException,
+    IntegrationUnavailableError,
+)
 
 PREFIX = "/api/v1/payments"
 
@@ -31,7 +22,7 @@ CREATE_OK = {
 
 @pytest.fixture
 def auth_user():
-    """Usuário autenticado injetado no lugar de ``get_current_user``."""
+
     from app.api.deps import get_current_user
     from app.main import app
 
@@ -52,7 +43,7 @@ def auth_user():
 
 @pytest.fixture
 def patch_payment_service(patch_service):
-    """Instala um Mock no factory ``get_payment_service`` da rota de payments."""
+
 
     def _instalar(service: Mock):
         return patch_service("payments", "get_payment_service", service)
@@ -99,13 +90,10 @@ class TestCreatePayment:
         assert body["provider"] == "mercadopago"
         assert body["status"] == "pending"
         assert body["order_id"] == 1
-        # SEGURANÇA: a rota repassa o id do usuário do token ao service, que
-        # valida a posse do pedido e deriva o valor.
         service.create.assert_called_once()
         assert service.create.call_args.args[1] == 1
 
     def test_create_response_matches_schema(self, client, auth_user, patch_payment_service):
-        """Todos os campos do PaymentResponse devem estar presentes."""
         auth_user(1)
         service = Mock(name="payment_service")
         service.create.return_value = payment_payload(provider_payment_id="MP-1")
@@ -152,11 +140,9 @@ class TestGetPayment:
 
         assert response.status_code == 200
         assert response.json()["id"] == 7
-        # SEGURANÇA: o user_id do token é enviado ao service (checagem de dono).
         service.get_by_id.assert_called_once_with(7, 1)
 
     def test_get_by_id_not_found_is_500(self, client, auth_user, patch_payment_service):
-        """O service lança ValueError; sem handler dedicado, vira 500."""
         auth_user(1)
         service = Mock(name="payment_service")
         service.get_by_id.side_effect = ValueError("No payment found with id 99")
@@ -174,7 +160,6 @@ class TestGetPayment:
 
 
 class TestGetHistory:
-    """GET /payments/history devolve o histórico paginado em 1 request."""
 
     @staticmethod
     def _pagina(items):
@@ -235,8 +220,6 @@ class TestGetPaymentsByOrder:
         body = response.json()
         assert len(body) == 2
         assert [p["id"] for p in body] == [1, 2]
-        # A rota repassa (user, order_id) para o service. `user` é o objeto
-        # autenticado injetado pelo override de `get_current_user`.
         args, _ = service.get_by_order_id.call_args
         chamado_user, chamado_order_id = args
         assert chamado_order_id == 1
@@ -289,7 +272,7 @@ class TestCreateCheckout:
     def test_checkout_passes_order_and_authenticated_user(
         self, client, auth_user, patch_payment_service
     ):
-        """A rota deve repassar (order_id, user.id) do token — nunca da query."""
+
         auth_user(42)
         service = Mock(name="payment_service")
         service.create_checkout.return_value = {
@@ -320,11 +303,6 @@ class TestCreateCheckout:
 
 @pytest.fixture
 def validar_assinatura():
-    """Controla a flag ``VALIDATE_WEBHOOK_SIGNATURE`` da rota de webhook.
-
-    Como ``settings`` é importado no módulo da rota, o patch precisa ser no
-    objeto ``app.api.v1.payments.settings``.
-    """
 
     def _definir(valor: bool):
         return patch(
@@ -335,16 +313,12 @@ def validar_assinatura():
 
 
 class TestWebhook:
-    """O webhook não exige token; a autenticidade vem da assinatura.
 
-    O endpoint processa SOMENTE o formato Webhook novo (?data.id=...&type=...).
-    Notificações IPN clássicas (?id=...&topic=...) são ignoradas.
-    """
 
     def test_webhook_assinatura_invalida_retorna_401(
         self, client, validar_assinatura
     ):
-        """Com validação ligada, assinatura inválida vira 401."""
+
         import mercadopago.webhook as mpw
 
         erro = mpw.InvalidWebhookSignatureError(
@@ -397,7 +371,7 @@ class TestWebhook:
     def test_webhook_sucesso_formato_novo(
         self, client, patch_payment_service, validar_assinatura
     ):
-        """Formato novo: ?data.id=...&type=topic_merchant_order_wh."""
+
         service = Mock(name="payment_service")
 
         with (
@@ -419,7 +393,7 @@ class TestWebhook:
     def test_webhook_formato_ipn_classico_e_ignorado(
         self, client, patch_payment_service
     ):
-        """IPN clássico (?id=...&topic=...) é ignorado: 200 e não processa."""
+
         service = Mock(name="payment_service")
 
         with patch_payment_service(service):
@@ -435,7 +409,7 @@ class TestWebhook:
     def test_webhook_tipo_nao_pagamento_e_ignorado(
         self, client, patch_payment_service, validar_assinatura
     ):
-        """Tipos que não são payment/merchant_order (ex.: mp-connect) → ignored."""
+
         service = Mock(name="payment_service")
 
         with (
@@ -455,10 +429,14 @@ class TestWebhook:
         assert response.json()["status"] == "ignored"
         service.process_webhook.assert_not_called()
 
-    def test_webhook_erro_no_service_retorna_200(
+    def test_webhook_erro_inesperado_pede_reenvio(
         self, client, patch_payment_service, validar_assinatura
     ):
-        """Falha no processamento vira 200 com status=error (evita retry do MP)."""
+        """D23b: erro inesperado devolve 5xx para o provedor reenviar.
+
+        Antes o handler engolia qualquer exceção e respondia 200 (o provedor
+        considerava entregue e não reenviava). Agora 5xx força o reenvio.
+        """
         service = Mock(name="payment_service")
         service.process_webhook.side_effect = ValueError(
             "Payment not found for order 1"
@@ -477,13 +455,62 @@ class TestWebhook:
                 json={"type": "payment", "data": {"id": "MP-1"}},
             )
 
-        assert response.status_code == 200
-        assert response.json()["status"] == "error"
+        assert response.status_code == 500
+
+    def test_webhook_dependencia_indisponivel_pede_reenvio(
+        self, client, patch_payment_service, validar_assinatura
+    ):
+        """D23b: falha transitória do provedor devolve 503 para reenvio."""
+
+        service = Mock(name="payment_service")
+        service.process_webhook.side_effect = IntegrationUnavailableError(
+            "mercado_pago", "timeout"
+        )
+
+        with (
+            validar_assinatura(True),
+            patch(
+                "app.api.v1.payments.WebhookSignatureValidator.validate",
+                return_value=None,
+            ),
+            patch_payment_service(service),
+        ):
+            response = client.post(
+                f"{PREFIX}/webhook/?data.id=MP-1&type=payment",
+                json={"type": "payment", "data": {"id": "MP-1"}},
+            )
+
+        assert response.status_code == 503
+
+    def test_webhook_erro_de_negocio_retorna_4xx(
+        self, client, patch_payment_service, validar_assinatura
+    ):
+        """D23b: erro de negócio definitivo é 4xx — o provedor não deve reenviar."""
+
+        service = Mock(name="payment_service")
+        service.process_webhook.side_effect = BadRequestException(
+            "Merchant order sem payments", code="EMPTY_MERCHANT_ORDER"
+        )
+
+        with (
+            validar_assinatura(True),
+            patch(
+                "app.api.v1.payments.WebhookSignatureValidator.validate",
+                return_value=None,
+            ),
+            patch_payment_service(service),
+        ):
+            response = client.post(
+                f"{PREFIX}/webhook/?data.id=MP-1&type=payment",
+                json={"type": "payment", "data": {"id": "MP-1"}},
+            )
+
+        assert response.status_code == 400
 
     def test_webhook_passes_signature_headers_to_validator(
         self, client, validar_assinatura
     ):
-        """Os headers x-signature/x-request-id devem chegar ao validador."""
+
         with (
             validar_assinatura(True),
             patch(

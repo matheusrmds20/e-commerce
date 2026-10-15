@@ -17,7 +17,7 @@ REFRESH_TOKEN_EXPIRE_DAYS = settings.REFRESH_TOKEN_EXPIRE_DAYS
 password_hash = PasswordHash.recommended()
 
 
-# Nome do cookie httpOnly onde o refresh token é entregue ao frontend.
+
 REFRESH_COOKIE_NAME = "papiro_refresh"
 
 
@@ -35,10 +35,9 @@ def _create_jwt(data: dict, expires_delta: timedelta, token_type: str) -> str:
     now = datetime.now(UTC)
     to_encode.update(
         {
-            # `jti` identifica cada token individualmente — base da futura
-            # blacklist (redis) quando implementada.
+
             "jti": str(uuid4()),
-            "type": token_type,  # "access" | "refresh"
+            "type": token_type,
             "iat": now,
             "exp": now + expires_delta,
         }
@@ -59,11 +58,7 @@ def create_refresh_token(data: dict, expires_delta: timedelta = None):
 
 
 def decode_token(token: str) -> dict:
-    """Decodifica e valida um JWT (assinatura + exp). Levanta jose.JWTError.
 
-    Retorna o payload. A checagem de `type` (access vs refresh) fica a cargo
-    do chamador, para que cada fluxo exija o tipo correto.
-    """
     options = {"verify_signature": True, "verify_exp": True}
     return jwt.decode(
         token,

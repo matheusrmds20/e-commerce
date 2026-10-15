@@ -37,7 +37,7 @@ test.describe('Review', () => {
     })
 
     // Abre o detalhe do produto.
-    await page.getByTestId('nav-acervo').click()
+    await page.goto('/acervo')
     const card = page.getByTestId(`book-card-${productId}`)
     await expect(card).toBeVisible({ timeout: 15_000 })
     await card.locator('img').click()

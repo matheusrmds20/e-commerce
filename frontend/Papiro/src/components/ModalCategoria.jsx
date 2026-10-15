@@ -1,19 +1,7 @@
 import { useState } from 'react'
 import { CloseIcon } from './Icons'
 
-/**
- * Modal de criação/edição de categorias (Painel Admin).
- *
- * Contrato com o backend (`CategoryCreate` / `CategoryUpdate`):
- *   { name, slug, description?, image_url?, is_active, parent_id? }
- *
- * Em criação, se o slug ficar vazio ele é gerado a partir do nome (mesma
- * estratégia de slug do cadastro de livros no Admin). O modal é "burro":
- * recebe `categoriaParaEditar` (null = criação), devolve tudo via
- * `onSalvar(payload, categoriaId)` e deixa o Admin atualizar a lista.
- */
 
-/** Gera um slug simples a partir de um texto (minúsculas, hífens). */
 function gerarSlug(texto) {
   return texto
     .normalize('NFD')

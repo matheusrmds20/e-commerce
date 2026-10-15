@@ -1,31 +1,7 @@
 import api from './client'
 import { toApiError } from './client'
 
-/**
- * Endpoints de cupons de desconto.
- *
- * Contrato do backend (FastAPI):
- *   POST   /coupons/create        -> cria (201). Corpo: CouponCreate.
- *   GET    /coupons/list          -> CouponResponse[]
- *   PATCH  /coupons/update/{id}   -> atualiza. Corpo: CouponUpdate.
- *   DELETE /coupons/delete/{id}   -> exclui. Retorna CouponResponse.
- *
- * Observação: `CouponService.get_all` lança ValueError quando não há cupons e
- * o handler global converte em HTTP 400. Em contexto de listagem isso é
- * "lista vazia", não erro — `listarOuVazio` encapsula essa regra (mesmo padrão
- * de `products.js`).
- *
- * `CouponCreate` aceita:
- *   { code, product_id?, discount_type, discount_value, min_purchase?,
- *     max_discount?, valid_until, max_uses?, is_active }
- * `discount_type` ∈ 'percentage' | 'fixed'. `valid_until` em ISO 8601.
- */
 
-/**
- * Executa uma listagem e devolve `[]` quando o backend responde "nada
- * encontrado". Qualquer outra falha (rede, 500) é propagada.
- * @param {() => Promise<Array>} fn
- */
 async function listarOuVazio(fn) {
   try {
     return (await fn()) ?? []
@@ -38,7 +14,7 @@ async function listarOuVazio(fn) {
 }
 
 export const couponService = {
-  /** Lista todos os cupons (vazio quando não há nenhum cadastrado). */
+
   async listar() {
     return listarOuVazio(async () => {
       const { data } = await api.get('/coupons/list')
@@ -46,29 +22,18 @@ export const couponService = {
     })
   },
 
-  /**
-   * Cria um cupom.
-   * @param {object} cupom CouponCreate
-   */
+
   async criar(cupom) {
     const { data } = await api.post('/coupons/create', cupom)
     return data
   },
 
-  /**
-   * Atualiza um cupom existente.
-   * @param {number} couponId
-   * @param {object} cupom CouponUpdate (campos parciais)
-   */
   async atualizar(couponId, cupom) {
     const { data } = await api.patch(`/coupons/update/${couponId}`, cupom)
     return data
   },
 
-  /**
-   * Exclui um cupom.
-   * @param {number} couponId
-   */
+
   async excluir(couponId) {
     const { data } = await api.delete(`/coupons/delete/${couponId}`)
     return data
@@ -78,10 +43,7 @@ export const couponService = {
   // Vínculo usuário ↔ cupom (ownership)
   // ---------------------------------------------------------------------
 
-  /**
-   * Lista os cupons ATRIBUÍDOS ao usuário autenticado (para o checkout).
-   * Backend: `GET /user-coupons/my` -> CouponResponse[].
-   */
+
   async meusCupons() {
     return listarOuVazio(async () => {
       const { data } = await api.get('/user-coupons/my')
@@ -89,11 +51,7 @@ export const couponService = {
     })
   },
 
-  /**
-   * Lista os vínculos de um cupom com usuários.
-   * Backend: `GET /user-coupons/coupon/{couponId}` -> UserCouponResponse[].
-   * Cada item tem `{ id, user_id, coupon_id }`; o `id` é o vínculo.
-   */
+
   async vinculosDoCupom(couponId) {
     return listarOuVazio(async () => {
       const { data } = await api.get(`/user-coupons/coupon/${couponId}`)
@@ -101,16 +59,7 @@ export const couponService = {
     })
   },
 
-  /**
-   * Atribui (resgata) um cupom a um usuário. Uso ADMINISTRATIVO.
-   * Backend: `POST /user-coupons/admin/assign` -> UserCouponResponse (201).
-   *
-   * A rota administrativa aceita `user_id` explícito; a rota de cliente
-   * (`/user-coupons/create`) sempre vincula ao usuário do token e por isso
-   * não é usada aqui (o painel precisa conceder cupons a terceiros).
-   * @param {number} userId
-   * @param {number} couponId
-   */
+
   async atribuir(userId, couponId) {
     const { data } = await api.post('/user-coupons/admin/assign', {
       user_id: userId,
@@ -119,13 +68,7 @@ export const couponService = {
     return data
   },
 
-  /**
-   * Remove o vínculo de um cupom com um usuário (admin ou dono).
-   * Backend: `DELETE /user-coupons/delete/{id}` -> UserCouponResponse.
-   * A posse é resolvida no servidor a partir do token, então o `user_id` não
-   * é mais enviado (antes era usado como prova de posse — IDOR).
-   * @param {number} vinculoId id do vínculo (não do cupom)
-   */
+
   async removerVinculo(vinculoId) {
     const { data } = await api.delete(`/user-coupons/delete/${vinculoId}`)
     return data

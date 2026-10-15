@@ -1,19 +1,4 @@
-"""Testes HTTP da rota /api/v1/wishlists.
 
-Sucesso: 201/200 com payloads válidos (criação, listagem do próprio usuário,
-busca por id, listagem geral [admin], busca por produto, update e delete).
-Erros: validação 422, usuário/produto/item inexistente 404, item duplicado 409,
-item de outro usuário 403 e ausência de token 401.
-
-SEGURANÇA: o dono da wishlist vem do TOKEN (``Depends(get_current_user)``), não
-mais da query ``user_id``. Isso fecha o IDOR que permitia ler/alterar a
-wishlist de outra pessoa passando um id arbitrário. Um cliente comum só acessa
-a própria wishlist; administradores podem operar sobre qualquer usuário.
-
-NOTA: o ``WishlistService`` real sinaliza falhas com ``ValueError``; a rota as
-traduz para 403 (não-dono) / 409 (duplicado) / 404 (não encontrado) em
-``_traduzir_value_error``.
-"""
 from unittest.mock import Mock, patch
 
 import pytest
@@ -35,11 +20,7 @@ CREATE_OK = {"product_id": 1}
 
 @pytest.fixture
 def auth_user():
-    """Usuário autenticado injetado no lugar de ``get_current_user``.
 
-    Mesmo padrão de test_http_users.py: sobrescreve a dependência e devolve um
-    objeto simples com ``id``/``role``.
-    """
     from app.api.deps import get_current_user
     from app.main import app
 

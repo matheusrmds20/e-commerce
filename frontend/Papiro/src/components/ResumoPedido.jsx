@@ -1,7 +1,4 @@
-/**
- * ResumoPedido — coluna esquerda do checkout: itens, totais e total geral.
- * `desconto` é o valor estimado do cupom aplicado (0 quando não há cupom).
- */
+
 export default function ResumoPedido({
   itens,
   subtotal,

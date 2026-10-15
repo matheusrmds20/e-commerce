@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/auth-context'
 import addressService from '../api/addresses'
 import orderService from '../api/orders'
@@ -109,7 +110,8 @@ const ABAS = [
   { id: 'pagamentos', rotulo: 'Pagamentos', icone: IconeCartoes },
 ]
 
-export default function MinhaConta({ onIrParaLogin }) {
+export default function MinhaConta() {
+  const navigate = useNavigate()
   const { usuario, autenticado } = useAuth()
   const [aba, setAba] = useState('pedidos')
 
@@ -125,7 +127,7 @@ export default function MinhaConta({ onIrParaLogin }) {
         </p>
         <button
           type="button"
-          onClick={() => onIrParaLogin?.()}
+          onClick={() => navigate('/login')}
           className="mt-8 rounded-sm bg-gold px-10 py-4 font-body text-xs font-semibold uppercase tracking-[0.28em] text-cream-soft shadow-md transition-all duration-300 hover:bg-caramel"
         >
           Entrar

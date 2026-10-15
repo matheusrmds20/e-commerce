@@ -1,16 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import Field from '../components/Field'
 import TextLink from '../components/TextLink'
 import Quill from '../components/Quill'
 import { useAuth } from '../context/auth-context'
 import authService from '../api/auth'
 
-/**
- * Registro — tela de criação de conta.
- * Valida os campos localmente, chama POST /auth/register e, em seguida,
- * faz login automático para o usuário já entrar com a sessão ativa.
- */
-export default function Registro({ onConcluir, onVoltarLogin }) {
+
+export default function Registro() {
+  const navigate = useNavigate()
   const { login } = useAuth()
   const [mostrarSenha, setMostrarSenha] = useState(false)
   const [mostrarConfirmacao, setMostrarConfirmacao] = useState(false)
@@ -78,7 +76,7 @@ export default function Registro({ onConcluir, onVoltarLogin }) {
       await login({ email: form.email, password: form.password })
       // Pequena pausa para o leitor ver a confirmação antes de sair da tela.
       setSucesso(true)
-      timerRef.current = setTimeout(() => onConcluir?.(), 900)
+      timerRef.current = setTimeout(() => navigate('/'), 900)
     } catch (error) {
       setErro(error)
       setEnviando(false)
@@ -236,7 +234,7 @@ export default function Registro({ onConcluir, onVoltarLogin }) {
               href="#"
               onClick={(e) => {
                 e.preventDefault()
-                onVoltarLogin?.()
+                navigate('/login')
               }}
               className="ml-1 font-semibold"
             >

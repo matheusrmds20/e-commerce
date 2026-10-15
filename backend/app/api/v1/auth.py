@@ -29,17 +29,7 @@ def get_auth_service(db: DbSession) -> AuthService:
     return AuthService(db)
 
 def _set_refresh_cookie(response: Response, request: Request, token: str) -> None:
-    """Grava o refresh token em cookie httpOnly.
 
-    - `Path=/api/v1/auth` limita o envio às rotas de autenticação — deve bater
-      com o prefixo REAL das rotas (app.include_router(router, prefix="/api/v1")
-      + router.include_router(auth_router, prefix="/auth")), ou o navegador
-      jamais enviaria o cookie.
-    - `Secure` aplicado só quando a request chega por HTTPS — em dev local
-      (http://localhost) fica desligado para o cookie funcionar no navegador.
-    - `SameSite=Lax` protege contra CSRF cross-site mantendo a sessão ao
-      navegar via link externo ("lembrar-me").
-    """
     response.set_cookie(
         key=REFRESH_COOKIE_NAME,
         value=token,
@@ -68,12 +58,7 @@ def _expire_refresh_cookie(response: Response, request: Request) -> None:
 )
 @limiter.limit("10/minute")
 def register(request: Request, data: RegisterRequest, db: DbSession) -> AuthResponse:
-    """Publico e sujeito a brute force: limite por IP.
 
-    ``request`` (obrigatório para o slowapi) é declarado antes de ``data``
-    apenas para o FastAPI injetar por nome — a ordem dos params não muda o
-    comportamento.
-    """
     return get_auth_service(db).register(data)
 
 

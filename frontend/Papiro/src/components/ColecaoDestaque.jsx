@@ -33,12 +33,7 @@ const BOOKS = [
   },
 ]
 
-/**
- * ColecaoDestaque — vitrine "Leituras à Lareira".
- * A faixa de imagem usa o mesmo container da grade de capas, então as duas
- * se alinham nas laterais em vez de a faixa sangrar até a borda. O respiro
- * do topo é mínimo para a faixa quase encostar no hero.
- */
+
 export default function ColecaoDestaque({ onAbrirLivro }) {
   return (
     <section id="colecao" className="bg-cream-soft">

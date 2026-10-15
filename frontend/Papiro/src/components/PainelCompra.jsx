@@ -1,11 +1,6 @@
 import { HeartIcon } from './Icons'
 
-/**
- * PainelCompra — preço, CTA e adicionar aos desejos.
- *
- * `preco`/`precoAntigo` já chegam formatados em BRL. O CTA `onAdicionar`
- * adiciona o produto real à sacola; `stockQty` controla o estado esgotado.
- */
+
 export default function PainelCompra({
   preco,
   precoAntigo,

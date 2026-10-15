@@ -28,27 +28,15 @@ from app.schemas.order import OrderCreate, OrderItemCreate, OrderUpdate
 
 @pytest.fixture(autouse=True)
 def _grant_coupon_ownership(user_coupon_repo, coupon_repo):
-    """Por padrão, concede a posse do cupom ao usuário do pedido.
 
-    O ``OrderService`` passou a exigir que o cupom esteja atribuído ao usuário
-    (vínculo N:N). Para os testes que já existiam e focam em totais/estoque,
-    simulamos o vínculo presente; o teste dedicado abaixo cobre a rejeição
-    quando ele não existe.
-
-    Também espelha ``get_by_id_for_update`` em ``get_by_id``: o checkout agora
-    trava a linha do cupom (``FOR UPDATE``) para consumir ``used_count`` de
-    forma atômica, mas nos testes o cupom é o mesmo objeto.
-    """
     user_coupon_repo.get_by_user_and_coupon.return_value = SimpleNamespace(
         used_at=None
     )
-    # O checkout usa a variante com ``FOR UPDATE``. Espelha no mesmo valor para
-    # que os testes controlem a posse por um único ponto.
+
     user_coupon_repo.get_by_user_and_coupon_for_update.side_effect = (
         lambda uid, cid: user_coupon_repo.get_by_user_and_coupon.return_value
     )
-    # Espelha ``get_by_id_for_update`` em ``get_by_id``: nos testes o cupom é o
-    # mesmo objeto, então ambos leem o ``return_value`` configurado no teste.
+
     coupon_repo.get_by_id_for_update.side_effect = lambda cid: (
         coupon_repo.get_by_id.return_value
     )
@@ -447,12 +435,7 @@ class TestUpdate:
     def test_nao_queima_uso_do_cupom_em_edicao_simples(
         self, order_service, order_repo
     ):
-        """Editar `notes` não consome uso nem revalida o cupom.
 
-        Antes a validação rodava sempre com `order.coupon_id`, então editar um
-        pedido cujo cupom expirou desde a compra falhava; e um update simples
-        poderia queimar uma unidade do cupom.
-        """
         order = make_order(coupon_id=None)
         order_repo.get_by_id.return_value = order
         order_repo.get_with_items.return_value = [make_order_item()]
@@ -538,12 +521,7 @@ class TestDelete:
 
 
 class TestBaixaDeEstoque:
-    """Baixa de estoque no checkout e reposição no cancelamento.
-
-    Regras cobertas: passo 17 da seção 8.1 (decrementa estoque) e R38
-    (ao cancelar, estoque é reposto).
-    """
-
+  
     def _setup(
         self, address_repo, product_repo, order_item_repo, order_repo, produto
     ):
@@ -569,7 +547,7 @@ class TestBaixaDeEstoque:
     def test_create_sem_estoque_nao_baixa(
         self, order_service, address_repo, product_repo, order_item_repo, order_repo
     ):
-        """Estoque insuficiente interrompe ANTES de qualquer baixa."""
+  
         produto = make_product(stock_qty=1)
         self._setup(
             address_repo, product_repo, order_item_repo, order_repo, produto
@@ -584,11 +562,7 @@ class TestBaixaDeEstoque:
     def test_create_produto_repetido_soma_a_quantidade(
         self, order_service, address_repo, product_repo, order_item_repo, order_repo
     ):
-        """Duas linhas do MESMO produto não podem furar a validação.
 
-        Estoque 3, duas linhas de 2 unidades: cada uma passa isoladamente
-        (2 <= 3), mas o total é 4. Deve falhar.
-        """
         produto = make_product(stock_qty=3)
         self._setup(
             address_repo, product_repo, order_item_repo, order_repo, produto
@@ -610,7 +584,7 @@ class TestBaixaDeEstoque:
     def test_cancelar_repõe_estoque(
         self, order_service, order_repo, product_repo, order_item_repo
     ):
-        """R38: cancelar o pedido devolve as unidades ao estoque."""
+
         order = make_order(status=OrderStatus.PENDING)
         order_repo.get_by_id.return_value = order
         order_repo.get_with_items.return_value = [make_order_item(quantity=2)]
@@ -627,7 +601,7 @@ class TestBaixaDeEstoque:
     def test_cancelar_duas_vezes_nao_repõe_de_novo(
         self, order_service, order_repo, product_repo
     ):
-        """Já cancelado não pode repor de novo (senão o estoque infla)."""
+
         order = make_order(status=OrderStatus.CANCELLED)
         order_repo.get_by_id.return_value = order
         order_repo.get_with_items.return_value = [make_order_item(quantity=2)]
@@ -635,7 +609,7 @@ class TestBaixaDeEstoque:
         produto = make_product(stock_qty=8)
         product_repo.get_by_id.return_value = produto
 
-        # Transição cancelado → processing é bloqueada antes de tocar estoque.
+
         with pytest.raises(BadRequestException):
             order_service.update(1, 1, OrderUpdate(status=OrderStatus.PROCESSING))
 
@@ -645,7 +619,7 @@ class TestBaixaDeEstoque:
     def test_editar_itens_reconcilia_estoque(
         self, order_service, order_repo, product_repo, order_item_repo
     ):
-        """Trocar 1 unidade por 5 devolve 1 e baixa 5 — não baixa 5 duas vezes."""
+
         order = make_order()
         order_repo.get_by_id.return_value = order
         order_repo.get_with_items.return_value = [make_order_item(quantity=1)]
@@ -658,18 +632,14 @@ class TestBaixaDeEstoque:
             1, 1, OrderUpdate(items=[OrderItemCreate(product_id=1, quantity=5)])
         )
 
-        # 10 + 1 (devolvido) - 5 (novo) = 6
+
         assert produto.stock_qty == 6
         product_repo.restock.assert_called_once_with(produto, 1)
         product_repo.decrement_stock.assert_called_once_with(produto, 5)
 
 
 class TestDevolucaoDeUsoDoCupom:
-    """Cancelar/excluir um pedido devolve a unidade consumida do cupom.
 
-    Espelha a reposição de estoque: sem isso, cancelar um pedido "gastava"
-    para sempre um uso, esgotando `max_uses` sem venda correspondente.
-    """
 
     def test_cancelar_devolve_uso(
         self, order_service, order_repo, coupon_repo, product_repo
@@ -727,7 +697,7 @@ class TestDevolucaoDeUsoDoCupom:
 
 
 class TestUsoUnicoPorCliente:
-    """Cupom com `single_use_per_user` só pode ser usado uma vez por cliente."""
+
 
     def test_primeiro_uso_marca_used_at(
         self, order_service, address_repo, product_repo, order_item_repo,
@@ -770,7 +740,7 @@ class TestUsoUnicoPorCliente:
         self, order_service, address_repo, product_repo, order_item_repo,
         order_repo, coupon_repo, user_coupon_repo,
     ):
-        """Sem a flag, `used_at` preenchido não bloqueia (regra desligada)."""
+
         address_repo.get_by_id.return_value = make_address()
         product_repo.get_by_id.return_value = make_product()
         order_item_repo.create_order_item.return_value = make_order_item()
@@ -788,10 +758,7 @@ class TestUsoUnicoPorCliente:
 
 
 class TestLimpezaDoCarrinho:
-    """Passo 18 do fluxo de checkout (seção 8.1): a sacola é esvaziada.
 
-    Sem isso os itens permanecem e uma nova compra repetiria o mesmo pedido.
-    """
 
     def _setup(
         self, address_repo, product_repo, order_item_repo, order_repo, user_repo, cart
@@ -836,7 +803,7 @@ class TestLimpezaDoCarrinho:
         user_repo,
         cart_repo,
     ):
-        """Checkout sem sacola persistida é válido e não deve explodir."""
+  
         self._setup(
             address_repo,
             product_repo,
@@ -880,7 +847,7 @@ class TestLimpezaDoCarrinho:
         user_repo,
         cart_repo,
     ):
-        """Estoque insuficiente aborta antes da limpeza — a sacola é preservada."""
+  
         cart = Cart(id=99, user_id=1)
         self._setup(
             address_repo,
@@ -899,7 +866,7 @@ class TestLimpezaDoCarrinho:
 
 
 class TestCartRepositoryClear:
-    """O `clear` do repositório precisa deletar por cart_id."""
+  
 
     def test_clear_deleta_por_cart_id(self):
         from unittest.mock import MagicMock
@@ -917,7 +884,7 @@ class TestCartRepositoryClear:
 
 
 class TestProductRepositoryEstoque:
-    """O repositório deve baixar/repor e nunca deixar estoque negativo."""
+   
 
     def test_decrement_stock_reduz(self):
         from unittest.mock import MagicMock

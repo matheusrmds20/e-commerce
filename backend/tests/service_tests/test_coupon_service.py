@@ -59,7 +59,7 @@ def test_get_list_success(coupon_service, coupon_repo, method, repo_method, look
     ],
 )
 def test_get_list_empty(coupon_service, coupon_repo, method, repo_method, lookup):
-    """Lista vazia agora é resposta válida ([]), em vez de erro."""
+
     getattr(coupon_repo, repo_method).return_value = []
 
     if lookup is None:

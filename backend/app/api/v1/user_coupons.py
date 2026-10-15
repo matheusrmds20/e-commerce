@@ -38,7 +38,7 @@ def get_user_coupon_service(db: DbSession) -> UserCouponService:
 def list_my_coupons(
     user: UserDb, db: DbSession
 ) -> list[CouponResponse]:
-    """Usado pelo checkout: devolve os cupons que *possuem* o usuário logado."""
+
     return get_user_coupon_service(db).list_coupons_by_user(user.id)
 
 
@@ -51,12 +51,7 @@ def list_my_coupons(
 def create_user_coupon(
     data: UserCouponCreate, user: UserDb, db: DbSession
 ) -> UserCouponResponse:
-    """Vincula um cupom ao usuário do token.
 
-    O `user_id` do corpo é ignorado de propósito: o alvo é sempre o usuário
-    autenticado. Atribuir cupons a terceiros é operação administrativa e passa
-    por `UserCouponService.create_for_user`.
-    """
     return get_user_coupon_service(db).create_for_user(user.id, data.coupon_id)
 
 
@@ -69,12 +64,7 @@ def create_user_coupon(
 def admin_assign_user_coupon(
     data: UserCouponCreate, admin: AdminDb, db: DbSession
 ) -> UserCouponResponse:
-    """Atribuição em lote do painel admin: alvo explícito no corpo.
 
-    Rota administrativa separada de ``POST /create`` (que sempre vincula ao
-    usuário do token), para que o painel possa conceder cupons a terceiros sem
-    reabrir o IDOR de atribuição arbitrária por clientes.
-    """
     return get_user_coupon_service(db).admin_assign(
         data.user_id, data.coupon_id
     )

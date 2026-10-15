@@ -1,29 +1,4 @@
-"""Seed de demonstração do Papiro.
 
-Popula categorias e livros para a Home e o Acervo terem conteúdo real em
-ambiente de desenvolvimento, sem depender de dados inseridos à mão.
-
-Como rodar (a partir de `backend/`):
-
-    python -m scripts.seed            # insere o que faltar (idempotente)
-    python -m scripts.seed --reset    # apaga produtos/categorias e recria
-
-Decisões de conteúdo (e por quê):
-
-- **Títulos e autores são reais.** Nome de obra e nome de autor são fatos e não
-  são objeto de proteção autoral — toda livraria, biblioteca ou catálogo os
-  cita. O que NÃO fazemos:
-- **Descrições e sinopses são escritas por nós**, não copiadas de contracapa,
-  site de editora ou resenha. Texto de terceiros é obra protegida.
-- **Capas são imagens de stock (Unsplash)**, não as capas oficiais das edições.
-  A arte da capa pertence ao ilustrador/editora; usar a oficial seria
-  reprodução de obra de terceiros.
-- Priorizamos **obras em domínio público** e clássicos brasileiros, o que
-  combina com o posicionamento editorial do Papiro.
-
-O script é idempotente: rodar duas vezes não duplica registros. A chave natural
-é o `slug` de cada produto/categoria.
-"""
 
 from __future__ import annotations
 
@@ -31,45 +6,34 @@ import argparse
 import sys
 from pathlib import Path
 
-# O console do Windows costuma usar cp1252, que não cobre acentos nem símbolos
-# como "✓". Sem isto, o script executa o seed mas quebra no `print` final.
-# `reconfigure` existe a partir do Python 3.7 e é no-op em streams sem suporte.
-try:  # pragma: no cover - depende do terminal
+
+try:  
     sys.stdout.reconfigure(encoding="utf-8")
     sys.stderr.reconfigure(encoding="utf-8")
 except (AttributeError, ValueError):  # pragma: no cover
     pass
 
-# Permite rodar tanto `python -m scripts.seed` (a partir de backend/) quanto
-# `python backend/scripts/seed.py` (a partir da raiz do repositório).
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-# Importa todos os models para que o registry do SQLAlchemy resolva os
-# `relationship()` (Product -> Coupon, Order, CartItem, ...). Sem isso a
-# primeira query estoura InvalidRequestError.
-import app.models.address  # noqa: F401,E402
-import app.models.cart  # noqa: F401,E402
-import app.models.cart_item  # noqa: F401,E402
-import app.models.category  # noqa: F401,E402
-import app.models.coupon  # noqa: F401,E402
-import app.models.newsletter  # noqa: F401,E402
-import app.models.order  # noqa: F401,E402
-import app.models.order_item  # noqa: F401,E402
-import app.models.payment  # noqa: F401,E402
-import app.models.product  # noqa: F401,E402
-import app.models.review  # noqa: F401,E402
-import app.models.user  # noqa: F401,E402
-import app.models.user_coupon  # noqa: F401,E402
-import app.models.wishlist  # noqa: F401,E402
-from app.db.database import SessionLocal  # noqa: E402
-from app.models.category import Category  # noqa: E402
-from app.models.product import Product  # noqa: E402
 
-# --------------------------------------------------------------------------
-# Imagens de stock (Unsplash — licença livre para uso).
-# Reaproveitamos as mesmas URLs que os componentes do front já usam, para o
-# visual ficar coerente entre Home, Acervo e Detalhe.
-# --------------------------------------------------------------------------
+import app.models.address  
+import app.models.cart
+import app.models.cart_item  
+import app.models.category  
+import app.models.coupon  
+import app.models.newsletter  
+import app.models.order  
+import app.models.order_item  
+import app.models.payment  
+import app.models.product  
+import app.models.review  
+import app.models.user  
+import app.models.user_coupon  
+import app.models.wishlist  
+from app.db.database import SessionLocal  
+from app.models.category import Category  
+from app.models.product import Product  
+
 IMG = {
     "biblioteca": "https://images.unsplash.com/photo-1507842217343-583bb7270b66?auto=format&fit=crop&w=800&q=80",
     "livro_aberto": "https://images.unsplash.com/photo-1457369804613-52c61a468e7d?auto=format&fit=crop&w=800&q=80",
@@ -106,11 +70,7 @@ CATEGORIAS = [
     },
 ]
 
-# --------------------------------------------------------------------------
-# Catálogo. `descricao` e `sinopse` são texto nosso (ver nota no topo do
-# arquivo). `destaque`/`mais_vendido` alimentam as vitrines da Home.
-# Preços são fictícios, apenas para a demonstração fazer sentido.
-# --------------------------------------------------------------------------
+
 LIVROS = [
     # ---------------- Ficção ----------------
     {
@@ -507,6 +467,15 @@ LIVROS = [
 ]
 
 
+for livro in LIVROS:
+    paginas = livro.get("pages") or 200
+    livro["image"] = f"/capas/{livro['slug']}.jpg"
+    livro["weight_kg"] = round(max(0.18, paginas * 0.002), 2)
+    livro["height_cm"] = 23.0
+    livro["width_cm"] = 16.0
+    livro["length_cm"] = round(max(1.0, paginas / 100), 1)
+
+
 def seed(reset: bool = False) -> None:
     """Cria categorias e produtos. Idempotente por `slug`."""
     db = SessionLocal()
@@ -535,40 +504,51 @@ def seed(reset: bool = False) -> None:
 
         # --- Produtos ---
         inseridos = 0
+        atualizados = 0
         for item in LIVROS:
-            if db.query(Product).filter(Product.slug == item["slug"]).first():
+            dados_produto = {
+                "category_id": ids_por_slug[item["categoria"]],
+                "title": item["title"],
+                "slug": item["slug"],
+                "description": item["description"],
+                "author": item["author"],
+                "isbn": item.get("isbn"),
+                "publisher": item.get("publisher"),
+                "publication_year": item.get("publication_year"),
+                "pages": item.get("pages"),
+                "language": item.get("language"),
+                "synopsis": item.get("sinopse"),
+                "price": item["price"],
+                "discount_pct": item.get("discount_pct"),
+                "stock_qty": item["stock_qty"],
+                "weight_kg": item["weight_kg"],
+                "height_cm": item["height_cm"],
+                "width_cm": item["width_cm"],
+                "length_cm": item["length_cm"],
+                "image_url": item["image"],
+                "is_active": True,
+                "is_featured": item.get("destaque", False),
+                "is_bestseller": item.get("mais_vendido", False),
+            }
+            existente = db.query(Product).filter(Product.slug == item["slug"]).first()
+            if existente:
+                for campo, valor in dados_produto.items():
+                    setattr(existente, campo, valor)
+                atualizados += 1
                 continue
 
-            db.add(
-                Product(
-                    category_id=ids_por_slug[item["categoria"]],
-                    title=item["title"],
-                    slug=item["slug"],
-                    description=item["description"],
-                    author=item["author"],
-                    publisher=item.get("publisher"),
-                    publication_year=item.get("publication_year"),
-                    pages=item.get("pages"),
-                    language=item.get("language"),
-                    synopsis=item.get("sinopse"),
-                    price=item["price"],
-                    discount_pct=item.get("discount_pct"),
-                    stock_qty=item["stock_qty"],
-                    image_url=item.get("image"),
-                    is_active=True,
-                    is_featured=item.get("destaque", False),
-                    is_bestseller=item.get("mais_vendido", False),
-                )
-            )
+            db.add(Product(**dados_produto))
             inseridos += 1
-
         db.commit()
 
         total_p = db.query(Product).count()
         total_c = db.query(Category).count()
         print(f"  categorias: {criadas} criadas (total {total_c})")
-        print(f"  produtos:   {inseridos} inseridos (total {total_p})")
-        if not inseridos and not criadas:
+        print(
+            f"  produtos:   {inseridos} inseridos, {atualizados} atualizados "
+            f"(total {total_p})"
+        )
+        if not inseridos and not atualizados and not criadas:
             print("  (nada a fazer - o seed ja havia sido aplicado)")
     except Exception:
         db.rollback()

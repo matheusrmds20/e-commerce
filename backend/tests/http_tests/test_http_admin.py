@@ -1,16 +1,3 @@
-"""Testes HTTP da rota /api/v1/admin (área administrativa).
-
-SEGURANÇA: é o teste de regressão do achado CRÍTICO — o router `/admin` não
-tinha NENHUMA autenticação, expondo faturamento, pedidos de todos os clientes
-(nome/e-mail), PII de usuários e permitindo alterar o status de qualquer
-pedido por um anônimo. Agora:
-
-  - 401 sem Bearer token;
-  - 403 com token de ``customer``;
-  - 200 com token de ``admin``.
-
-A checagem vive em ``app.api.deps.get_current_admin``, aplicada no router.
-"""
 from unittest.mock import Mock, patch
 
 import pytest
@@ -96,7 +83,7 @@ PUBLICAS = [
 
 
 class TestAdminRouterRequerAuth:
-    """Sem token, nenhuma rota administrativa responde (era o bug crítico)."""
+
 
     @pytest.mark.parametrize("method,url", PUBLICAS)
     def test_sem_token_retorna_401(self, client, method, url):
@@ -111,7 +98,7 @@ class TestAdminRouterRequerAuth:
 
 
 class TestAdminRouterRequerPapelAdmin:
-    """Token de cliente comum deve ser recusado com 403."""
+
 
     @pytest.mark.parametrize("method,url", PUBLICAS)
     def test_cliente_recebe_403(self, client, auth_user, method, url):

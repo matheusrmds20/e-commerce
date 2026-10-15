@@ -227,11 +227,7 @@ class TestDelete:
 
 
 class TestAdminPermission:
-    """create/update/delete exigem papel admin (mesma regra de categorias).
 
-    A checagem acontece antes de qualquer acesso ao repo, então um customer
-    não consegue nem sondar a existência de um produto via 404 vs 200.
-    """
 
     def test_create_customer_forbidden(self, product_service, product_repo):
         with pytest.raises(InsufficientPermissionException):
@@ -254,11 +250,7 @@ class TestAdminPermission:
         product_repo.delete.assert_not_called()
 
 class TestVitrine:
-    """Métodos de vitrine: get_featured e get_bestsellers.
 
-    Contrato diferente dos demais `get_by_*`: lista vazia NÃO é erro. A Home
-    deve receber [] para renderizar o estado vazio, em vez de estourar 400.
-    """
 
     @pytest.mark.parametrize(
         "method,repo_method",
@@ -306,7 +298,7 @@ class TestVitrine:
 
 
 class TestPaginacao:
-    """get_paginated: envelope { data, meta } com total_pages calculado."""
+
 
     def test_paginated_meta(self, product_service, product_repo):
         product_repo.paginate.return_value = ([make_product()], 45)
@@ -325,7 +317,7 @@ class TestPaginacao:
     def test_paginated_total_pages_arredonda_para_cima(
         self, product_service, product_repo
     ):
-        """41 itens com 20 por página = 3 páginas (não 2)."""
+
         product_repo.paginate.return_value = ([], 41)
 
         result = product_service.get_paginated(page=1, per_page=20)
@@ -335,7 +327,7 @@ class TestPaginacao:
     def test_paginated_exato_nao_cria_pagina_extra(
         self, product_service, product_repo
     ):
-        """40 itens com 20 por página = exatamente 2 páginas."""
+
         product_repo.paginate.return_value = ([], 40)
 
         result = product_service.get_paginated(page=1, per_page=20)
@@ -352,7 +344,7 @@ class TestPaginacao:
 
 
 class TestRecommendations:
-    """get_recommendations: lista vazia é resposta válida."""
+  
 
     def test_recommendations_success(self, product_service, product_repo):
         product_repo.get_recommendations.return_value = [make_product()]
@@ -371,7 +363,7 @@ class TestRecommendations:
 
 
 class TestPaginacaoComFiltro:
-    """get_paginated com category_id: filtra no banco e valida a categoria."""
+   
 
     def test_paginated_passa_category_id(
         self, product_service, product_repo, category_repo
@@ -386,7 +378,7 @@ class TestPaginacaoComFiltro:
     def test_paginated_passa_search(
         self, product_service, product_repo, category_repo
     ):
-        """O termo livre é repassado ao repo para filtrar no banco."""
+  
         product_repo.paginate.return_value = ([], 0)
 
         product_service.get_paginated(page=1, per_page=12, search="tolkien")
@@ -396,7 +388,7 @@ class TestPaginacaoComFiltro:
     def test_paginated_total_reflete_o_filtro(
         self, product_service, product_repo, category_repo
     ):
-        """`total` deve vir do filtro, senão total_pages anunciaria páginas extras."""
+   
         category_repo.get_by_id.return_value = make_category()
         # 13 itens NA CATEGORIA, com 12 por página = 2 páginas.
         product_repo.paginate.return_value = ([make_product()], 13)
@@ -425,12 +417,7 @@ class TestPaginacaoComFiltro:
 
 
 class TestDesconto:
-    """get_by_discount_pct: filtro mínimo (>=) e vazio não é erro.
 
-    Antes o service levantava ValueError quando não encontrava nada, e a rota
-    devolvia 500. Como a Home chama `/products/discount/1`, o carrossel de
-    promoções quebrava sempre que nenhum produto tinha desconto.
-    """
 
     def test_desconto_vazio_retorna_lista(self, product_service, product_repo):
         product_repo.get_by_discount_pct.return_value = []

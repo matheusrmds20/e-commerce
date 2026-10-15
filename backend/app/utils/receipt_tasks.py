@@ -1,16 +1,4 @@
-"""Tasks Celery de geração do comprovante PDF de pedido.
 
-A task roda no worker (fora do request), abrindo uma sessão própria com o banco
-(padrão ``SessionLocal``). Ela:
-
-1. Busca o pedido com as relações carregadas (usuário, endereço, itens);
-2. Monta o payload serializável;
-3. Gera o PDF via ``app.utils.pdf.generate_receipt``;
-4. Persiste o caminho do arquivo em ``orders.receipt_path``.
-
-Se qualquer etapa falhar, a task agenda um retry com backoff exponencial
-(mesmo padrão da task de e-mail).
-"""
 import logging
 
 from celery import shared_task
@@ -25,7 +13,6 @@ from app.utils.pdf import generate_receipt
 
 logger = logging.getLogger(__name__)
 
-# Nome do arquivo, ex.: comprovante_order_42.pdf
 FILENAME_TEMPLATE = "comprovante_order_{order_id}.pdf"
 
 
@@ -74,7 +61,7 @@ def generate_order_receipt(self, order_id: int) -> dict:
         directory = get_settings().COMPROVANTES_DIR
         full_path = generate_receipt(payload, f"{directory}/{filename}")
 
-        # Persiste o caminho relativo/absoluto do arquivo no pedido.
+
         order.receipt_path = str(full_path)
         db.commit()
 

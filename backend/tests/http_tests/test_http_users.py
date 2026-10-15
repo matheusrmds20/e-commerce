@@ -1,14 +1,4 @@
-"""Testes HTTP da rota /api/v1/users.
 
-Sucesso: 201/200 com payloads válidos.
-Erros: validação 422, e-mail duplicado 409, usuário inexistente 404,
-senha atual incorreta 400 e permissão 401/403 (create e get_by_email são
-restritos a administradores).
-
-NOTA (schema): ``POST /create`` é restrito a admin e aceita
-``AdminUserCreate | CustomerUserCreate``. Como ``AdminUserCreate`` tem
-``role`` default ``ADMIN``, um admin que omite ``role`` cria outro ADMIN.
-"""
 from unittest.mock import Mock, patch
 
 import pytest
@@ -32,11 +22,7 @@ CREATE_OK = {
 
 @pytest.fixture
 def auth_user():
-    """Usuário autenticado injetado no lugar de ``get_current_user``.
 
-    Rotas de update/change_password/delete exigem token; ``user_id/{id}``
-    exige, além do token, papel de admin.
-    """
     from app.api.deps import get_current_user
     from app.main import app
 
@@ -82,10 +68,7 @@ class TestCreateUser:
         assert response.json()["role"] == "admin"
 
     def test_create_without_role_defaults_to_admin(self, client, auth_user):
-        """Admin que omite ``role`` cria outro ADMIN (default do schema).
 
-        Comportamento seguro agora que só administradores alcançam a rota.
-        """
         auth_user(user_id=1, role="admin")
         svc = Mock(name="user_service")
         svc.create.return_value = user_payload(role="admin")

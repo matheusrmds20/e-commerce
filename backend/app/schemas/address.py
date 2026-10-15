@@ -4,12 +4,6 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class AddressCreate(BaseModel):
-    """Payload de criação de endereço.
-
-    O ``user_id`` NÃO vem mais no corpo: o dono é sempre o usuário do token
-    (``Depends(get_current_user)``), o que fecha a brecha de criar endereço
-    em nome de outra pessoa.
-    """
 
     street: str = Field(..., min_length=1, max_length=255, description="Logradouro")
     number: str = Field(..., min_length=1, max_length=20, description="Número")

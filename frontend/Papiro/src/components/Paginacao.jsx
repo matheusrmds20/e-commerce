@@ -1,28 +1,9 @@
 import { ArrowLeftIcon, ArrowRightIcon } from './Icons'
 
-/**
- * Paginacao — controle de páginas do acervo.
- *
- * Recebe os metadados do envelope `PageMeta` do backend
- * (`page`, `per_page`, `total`, `total_pages`) e emite a página escolhida.
- *
- * Por que a lista de páginas é calculada aqui e não pedida ao backend: o
- * envelope já traz `total_pages`, então a navegação inteira é derivada de uma
- * única resposta — sem chamada extra de contagem.
- *
- * A janela de páginas é deslizante (até 5 números) com elipses nas pontas,
- * para o controle não estourar a largura quando o catálogo crescer.
- */
 
-/** Quantos números de página mostrar na janela, no máximo. */
 const TAMANHO_JANELA = 5
 
-/**
- * Monta a janela de páginas: 1 … [4 5 6 7 8] … 20
- * @param {number} atual
- * @param {number} total
- * @returns {Array<number|'…'>}
- */
+
 function janelaDePaginas(atual, total) {
   if (total <= TAMANHO_JANELA + 2) {
     return Array.from({ length: total }, (_, i) => i + 1)

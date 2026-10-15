@@ -1,9 +1,3 @@
-"""Helpers dos testes HTTP: payloads de resposta e assertions.
-
-Módulo regular (não conftest) para ser importado diretamente pelos testes.
-As exceções de domínio devem ser importadas de ``app.api.exceptions`` e
-``UserRole`` de ``app.models.user``.
-"""
 
 CREATED_AT = "2024-01-01T12:00:00"
 UPDATED_AT = "2024-01-02T12:00:00"
@@ -60,7 +54,6 @@ def user_payload(**overrides):
 
 
 def auth_user_payload(**overrides):
-    """Payload compatível com AuthResponse (sem email_verified/updated_at)."""
     payload = {
         "id": 1,
         "email": "user@example.com",
@@ -208,7 +201,7 @@ def review_payload(**overrides):
 
 
 def payment_payload(**overrides):
-    """Payload compatível com PaymentResponse."""
+
     payload = {
         "id": 1,
         "order_id": 1,
@@ -225,7 +218,7 @@ def payment_payload(**overrides):
 
 
 def shipping_offer_payload(**overrides):
-    """Payload compatível com ShippingOffer."""
+
     payload = {
         "service_id": "1",
         "name": "PAC",
@@ -239,7 +232,7 @@ def shipping_offer_payload(**overrides):
 
 
 def shipping_calculate_response(**overrides):
-    """Payload compatível com ShippingCalculateResponse."""
+
     payload = {
         "order_id": 1,
         "offers": [shipping_offer_payload()],
@@ -251,7 +244,7 @@ def shipping_calculate_response(**overrides):
 
 
 def shipping_apply_response(**overrides):
-    """Payload compatível com ShippingApplyResponse."""
+
     payload = {
         "order_id": 1,
         "applied": True,

@@ -358,6 +358,51 @@ class DuplicateProductException(ConflictException):
 
 
 # ---------------------------------------------------------------------------
+# Integrações externas (D23)
+# ---------------------------------------------------------------------------
+
+
+class IntegrationError(BookCommerceException):
+    """Falha genérica de um provedor externo.
+
+    Fronteira de gateway (D23): nenhuma exceção de biblioteca/SDK deve chegar
+    ao service. O gateway traduz para uma destas subclasses.
+    """
+
+    def __init__(
+        self,
+        provider: str,
+        message: str,
+        code: str = "INTEGRATION_ERROR",
+        status_code: int = status.HTTP_502_BAD_GATEWAY,
+    ) -> None:
+        super().__init__(f"[{provider}] {message}", code, status_code)
+
+
+class IntegrationUnavailableError(IntegrationError):
+    """Timeout, erro de conexão ou 5xx do provedor (502/503).
+
+    Transitório: o provedor pode se recuperar. Em webhook, a resposta é 5xx
+    para o provedor reenviar (D23b).
+    """
+
+    def __init__(self, provider: str, message: str) -> None:
+        super().__init__(provider, message, code="INTEGRATION_UNAVAILABLE")
+
+
+class IntegrationRejectedError(IntegrationError):
+    """O provedor rejeitou a requisição: payload inválido ou credencial (4xx)."""
+
+    def __init__(self, provider: str, message: str) -> None:
+        super().__init__(
+            provider,
+            message,
+            code="INTEGRATION_REJECTED",
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+        )
+
+
+# ---------------------------------------------------------------------------
 # Frete (Melhor Envio)
 # ---------------------------------------------------------------------------
 
@@ -379,10 +424,19 @@ class ShippingIncompleteProductException(BadRequestException):
 
 
 class ShippingCalculationException(BadRequestException):
-    """Falha ao consultar a cotação no Melhor Envio."""
+    """Falha ao consultar a cotação no Melhor Envio (D23a: erro visível)."""
 
     def __init__(self, message: str = "Não foi possível calcular o frete.") -> None:
         super().__init__(message, code="SHIPPING_CALCULATION_ERROR")
+
+
+class ShippingUnavailableException(IntegrationUnavailableError):
+    """Provedor de frete indisponível (timeout/5xx) — cliente vê o erro (D23a)."""
+
+    def __init__(self, provider: str = "melhor_envio", message: str = "timeout") -> None:
+        super().__init__(provider, message)
+        self.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+        self.message = "O serviço de frete está indisponível no momento. Tente novamente."
 
 
 class ShippingApplyException(BadRequestException):
@@ -413,8 +467,7 @@ def rate_limit_exceeded_handler(
         request.client.host if request.client else "?",
     )
     try:
-        # exc.limit.limit é o RateLimitItem (limits): get_expiry retorna a
-        # duração da janela em segundos (ex.: 60 para "10/minute").
+
         retry_after = str(max(1, int(exc.limit.limit.get_expiry())))
     except (AttributeError, TypeError, ValueError):
         retry_after = "60"
@@ -433,8 +486,7 @@ def rate_limit_exceeded_handler(
 def register_exception_handlers(app: FastAPI) -> None:
     """Registra todos os handlers de exceção no app FastAPI."""
 
-    # 429 - rate limiting (slowapi). Registrado aqui para que os testes HTTP,
-    # que chamam register_exception_handlers(app), validem o mesmo contrato.
+
     app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
 
     @app.exception_handler(BookCommerceException)

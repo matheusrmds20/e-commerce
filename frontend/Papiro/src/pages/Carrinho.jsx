@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import ItemCarrinho from '../components/ItemCarrinho'
 import ResumoCarrinho from '../components/ResumoCarrinho'
 import CartaoRecomendado from '../components/CartaoRecomendado'
@@ -6,13 +7,9 @@ import { useCart } from '../context/cart-context'
 import { useAuth } from '../context/auth-context'
 import { calcularTotais, formatarPreco } from '../api/adapters'
 
-/**
- * Carrinho — sacola conectada à API.
- *
- * O estado vive no CartContext (a Navbar usa o mesmo para o badge).
- * Visitantes são avisados de que a sacola só persiste após o login.
- */
-export default function Carrinho({ onCheckout, onIrParaLogin }) {
+
+export default function Carrinho() {
+  const navigate = useNavigate()
   const {
     itens,
     carregando,
@@ -75,7 +72,7 @@ export default function Carrinho({ onCheckout, onIrParaLogin }) {
             </p>
             <button
               type="button"
-              onClick={onIrParaLogin}
+              onClick={() => navigate('/login')}
               className="font-body text-[0.8rem] font-semibold uppercase tracking-[0.16em] text-gold transition-colors duration-300 hover:text-caramel-dark"
             >
               Entrar para salvar
@@ -143,7 +140,6 @@ export default function Carrinho({ onCheckout, onIrParaLogin }) {
               subtotal={subtotal}
               total={total}
               formatarPreco={formatarPreco}
-              onCheckout={onCheckout}
             />
           </div>
         )}

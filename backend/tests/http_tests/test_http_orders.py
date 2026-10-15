@@ -1,19 +1,4 @@
-"""Testes HTTP da rota /api/v1/orders.
 
-Sucesso: 201/200 com payloads válidos (criação, listagem, busca, itens,
-update e delete).
-Erros: validação 422, pedido/endereço/produto inexistente 404, pedido de
-outro usuário 403, estoque insuficiente 409 e cupom inválido 400.
-
-AUTENTICAÇÃO: todas as rotas exigem Bearer token e derivam o ``user_id`` do
-usuário autenticado (``Depends(get_current_user)``). O ``user_id`` NÃO é mais
-aceito como query param — fechou o IDOR de ler/criar pedido em nome de outra
-pessoa. Ver test_http_cart.py para o padrão.
-
-NOTA: o OrderService real sinaliza falhas com ``ValueError``; as rotas o
-traduzem para 400/403/404/409 (ver ``_traduzir_value_error`` em
-``app/api/v1/orders.py``).
-"""
 from unittest.mock import Mock, patch
 
 import pytest
@@ -39,7 +24,7 @@ CREATE_OK = {
 
 @pytest.fixture
 def auth_user():
-    """Usuário autenticado injetado no lugar de ``get_current_user``."""
+
     from app.api.deps import get_current_user
     from app.main import app
 
@@ -59,7 +44,7 @@ def auth_user():
 
 
 class TestAuthRequired:
-    """Sem token, nenhuma rota de pedido deve responder."""
+
 
     def test_create_requires_auth(self, client):
         response = client.post(f"{PREFIX}/create", json=CREATE_OK)
@@ -78,11 +63,7 @@ class TestAuthRequired:
         assert response.status_code == 401
 
     def test_user_id_query_is_ignored(self, client, auth_user):
-        """Passar user_id na query não muda quem é o dono (anti-IDOR).
-
-        O token do usuário 1 autentica; o ``user_id=999`` da query é ignorado
-        e o service recebe 1.
-        """
+  
         auth_user(1)
         svc = Mock(name="order_service")
         svc.get_paginated_by_user_id.return_value = {
@@ -116,7 +97,7 @@ class TestCreateOrder:
         assert len(body["order_items"]) == 1
 
     def test_create_uses_token_user_id(self, client, auth_user):
-        """O ``user_id`` passado ao service é o do token, não de query."""
+
         auth_user(7)
         svc = Mock(name="order_service")
         svc.create.return_value = order_payload(user_id=7)
@@ -177,7 +158,7 @@ class TestCreateOrder:
         assert_error(response, 400, "INVALID_COUPON")
 
     def test_create_coupon_not_assigned(self, client, auth_user):
-        """Cupom válido, mas não vinculado ao usuário: 403 com código dedicado."""
+
         auth_user(1)
         svc = Mock(name="order_service")
         svc.create.side_effect = CouponNotAssignedException()
@@ -249,7 +230,6 @@ class TestListOrders:
 
         assert response.status_code == 200
         body = response.json()
-        # Envelope paginado: { data, meta }.
         assert len(body["data"]) == 2
         assert body["meta"]["total"] == 2
         svc.get_paginated_by_user_id.assert_called_once_with(1, 1, 20)

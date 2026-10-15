@@ -1,16 +1,4 @@
-/**
- * SeletorFrete — opções de frete (Melhor Envio) no checkout.
- *
- * Recebe as ofertas cotadas pelo backend (`POST /shipping/calculate`) e deixa
- * o usuário escolher a transportadora/prazo/valor desejados.
- *
- * Estados:
- * - `carregando`: mostra placeholder de carregamento.
- * - `ofertaSelecionadaId`: id da oferta escolhida (radio).
- * - `isReal=false`: o backend caiu no fallback (frete não calculado de verdade);
- *   exibe aviso e não mostra ofertas.
- * - sem ofertas: não exibe o seletor (frete tratado como 0/por conta do admin).
- */
+
 export default function SeletorFrete({
   ofertas = [],
   ofertaSelecionadaId,

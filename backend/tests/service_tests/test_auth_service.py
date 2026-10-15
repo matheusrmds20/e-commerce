@@ -107,7 +107,7 @@ class TestMe:
 
 class TestRefresh:
     def test_refresh_success_rotates(self, auth_service, user_repo):
-        """Refresh válido emite um par NOVO (novo access e novo refresh)."""
+
         with patch("app.services.auth_service.decode_token", return_value={"sub": "1", "type": "refresh"}):
             user_repo.get_by_id.return_value = make_user()
             result = auth_service.refresh("old-refresh-token")
@@ -130,7 +130,7 @@ class TestRefresh:
                 auth_service.refresh("old-refresh-token")
 
     def test_refresh_expired_token(self, auth_service, user_repo):
-        """Refresh expirado → TokenExpiredException (distinto de token inválido)."""
+
         from jose import ExpiredSignatureError
 
         with patch(

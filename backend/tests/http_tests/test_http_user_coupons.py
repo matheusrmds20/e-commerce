@@ -1,16 +1,4 @@
-"""Testes HTTP da rota /api/v1/user-coupons.
 
-SEGURANÇA (regressão dos achados críticos):
-  - `POST /create` era ANÔNIMO e aceitava `user_id` do corpo, permitindo a
-    qualquer pessoa atribuir qualquer cupom (ex.: 100% off) à própria conta.
-    Agora exige token e ignora o `user_id` do corpo — sempre vincula ao usuário
-    autenticado.
-  - `GET /list`, `/all`, `/user/{id}`, `/coupon/{id}` eram anônimos e liam os
-    vínculos de qualquer usuário. Agora exigem administrador.
-  - `GET /get/{id}` e `DELETE /delete/{id}` aceitavam `user_id` da query (valor
-    do cliente) como prova de posse. Agora a posse vem do token, com admin
-    podendo operar sobre qualquer vínculo.
-"""
 from unittest.mock import Mock, patch
 
 import pytest
@@ -56,7 +44,7 @@ def coupon_payload(**overrides):
 
 @pytest.fixture
 def auth_user():
-    """Usuário autenticado injetado no lugar de ``get_current_user``."""
+
     from app.api.deps import get_current_user
     from app.main import app
 
@@ -97,7 +85,7 @@ class TestCreateUserCoupon:
 
 
 class TestAdminAssign:
-    """Rota administrativa de atribuição a terceiros."""
+
 
     def test_admin_atribui_a_terceiro(self, client, auth_user):
         auth_user(1, role="admin")
@@ -152,7 +140,7 @@ class TestListMyCoupons:
 
 
 class TestRotasAdmin:
-    """Listagens globais exigem administrador."""
+  
 
     def test_list_sem_token_401(self, client):
         response = client.get(f"{PREFIX}/list?user_id=1")
@@ -204,7 +192,6 @@ class TestGetUserCoupon:
             response = client.get(f"{PREFIX}/get/1")
 
         assert response.status_code == 200
-        # A posse é resolvida pelo service a partir do usuário do token.
         assert svc.get_for_user.call_args.args[0] == 1
         assert svc.get_for_user.call_args.args[1].id == 1
 

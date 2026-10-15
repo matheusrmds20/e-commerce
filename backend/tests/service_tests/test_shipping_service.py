@@ -4,8 +4,12 @@ import pytest
 
 from app.api.exceptions import (
     ForbiddenException,
+    IntegrationRejectedError,
+    IntegrationUnavailableError,
     OrderNotFoundException,
     ShippingCalculationException,
+    ShippingNotConfiguredException,
+    ShippingUnavailableException,
 )
 from app.models.order import Order, OrderStatus
 from app.services import shipping_service as mod
@@ -57,10 +61,10 @@ def make_product(**kwargs):
     return type("_Product", (), fields)()
 
 
-# Ajusta o módulo de settings para controlar a config de frete.
+
 @pytest.fixture(autouse=True)
 def _patch_settings():
-    """Por padrão, sem token/CEP (fallback). Cada teste ajusta conforme precisa."""
+
     with patch.object(
         mod.settings,
         "MELHOR_ENVIO_API_TOKEN",
@@ -86,19 +90,20 @@ class TestOwnedOrder:
 
 
 class TestCalculate:
-    def test_not_configured_returns_fallback(self, shipping_service, order_repo, address_repo):
+    def test_not_configured_raises(
+        self, shipping_service, order_repo, address_repo
+    ):
+        """D23a: frete não configurado é erro visível, não fallback."""
         order_repo.get_by_id.return_value = make_order()
         address_repo.get_by_id.return_value = make_address()
 
-        res = shipping_service.calculate(1, 1)
+        with pytest.raises(ShippingNotConfiguredException):
+            shipping_service.calculate(1, 1)
 
-        assert res["is_real"] is False
-        assert res["offers"] == []
-        assert "não configurado" in res["fallback_reason"]
-
-    def test_product_without_dimensions_returns_fallback(
+    def test_product_without_dimensions_raises(
         self, shipping_service, order_repo, address_repo
     ):
+        """D23a: produto sem dimensões é erro visível, não fallback."""
         order_repo.get_by_id.return_value = make_order()
         address_repo.get_by_id.return_value = make_address()
         with patch.object(
@@ -107,10 +112,8 @@ class TestCalculate:
             shipping_service.order_repo.get_with_items_products.return_value = [
                 make_item(product=make_product(weight_kg=None))
             ]
-            res = shipping_service.calculate(1, 1)
-
-        assert res["is_real"] is False
-        assert "peso/dimensões" in res["fallback_reason"]
+            with pytest.raises(ShippingCalculationException, match="peso/dimensões"):
+                shipping_service.calculate(1, 1)
 
     def test_calculate_returns_best_offer(
         self, shipping_service, order_repo, address_repo, shipping_gateway
@@ -135,7 +138,25 @@ class TestCalculate:
         assert res["offers"][1]["price"] == 12.0
         shipping_gateway.calculate_shipping.assert_called_once()
 
-    def test_calculate_gateway_error_raises(
+    def test_calculate_gateway_unavailable_raises_503(
+        self, shipping_service, order_repo, address_repo, shipping_gateway
+    ):
+        """D23/D23a: falha transitória do provedor vira erro de domínio visível."""
+        order_repo.get_by_id.return_value = make_order()
+        address_repo.get_by_id.return_value = make_address()
+        shipping_service.order_repo.get_with_items_products.return_value = [
+            make_item(product=make_product())
+        ]
+        shipping_gateway.calculate_shipping.side_effect = IntegrationUnavailableError(
+            "melhor_envio", "timeout"
+        )
+        with patch.object(
+            mod.settings, "MELHOR_ENVIO_API_TOKEN", "tok"
+        ), patch.object(mod.settings, "MELHOR_ENVIO_ORIGIN_ZIP", "01001000"):
+            with pytest.raises(ShippingUnavailableException):
+                shipping_service.calculate(1, 1)
+
+    def test_calculate_gateway_rejected_raises(
         self, shipping_service, order_repo, address_repo, shipping_gateway
     ):
         order_repo.get_by_id.return_value = make_order()
@@ -143,11 +164,29 @@ class TestCalculate:
         shipping_service.order_repo.get_with_items_products.return_value = [
             make_item(product=make_product())
         ]
-        shipping_gateway.calculate_shipping.side_effect = RuntimeError("boom")
+        shipping_gateway.calculate_shipping.side_effect = IntegrationRejectedError(
+            "melhor_envio", "400 bad request"
+        )
         with patch.object(
             mod.settings, "MELHOR_ENVIO_API_TOKEN", "tok"
         ), patch.object(mod.settings, "MELHOR_ENVIO_ORIGIN_ZIP", "01001000"):
             with pytest.raises(ShippingCalculationException):
+                shipping_service.calculate(1, 1)
+
+    def test_calculate_empty_offers_raises(
+        self, shipping_service, order_repo, address_repo, shipping_gateway
+    ):
+        """D23a: nenhuma oferta é erro visível, não fallback silencioso."""
+        order_repo.get_by_id.return_value = make_order()
+        address_repo.get_by_id.return_value = make_address()
+        shipping_service.order_repo.get_with_items_products.return_value = [
+            make_item(product=make_product())
+        ]
+        shipping_gateway.calculate_shipping.return_value = []
+        with patch.object(
+            mod.settings, "MELHOR_ENVIO_API_TOKEN", "tok"
+        ), patch.object(mod.settings, "MELHOR_ENVIO_ORIGIN_ZIP", "01001000"):
+            with pytest.raises(ShippingCalculationException, match="[Nn]enhuma oferta"):
                 shipping_service.calculate(1, 1)
 
 
@@ -159,7 +198,6 @@ class TestApplyToOrder:
         res = shipping_service.apply_to_order(1, 1, price=12.5)
 
         assert res["shipping_cost"] == 12.5
-        # total = subtotal - desconto + frete = 100 - 10 + 12.5 = 102.5
         assert res["total"] == 102.5
         assert res["status"] == "pending"
 

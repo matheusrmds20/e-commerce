@@ -1,10 +1,7 @@
 import Quantidade from './Quantidade'
 import { CloseIcon } from './Icons'
 
-/**
- * ItemCarrinho — uma linha da sacola.
- * No desktop é uma grade alinhada ao cabeçalho; no mobile empilha.
- */
+
 export default function ItemCarrinho({
   item,
   onQuantidade,

@@ -1,21 +1,3 @@
-"""Testes HTTP da rota /api/v1/products.
-
-Sucesso: 201/200 com payloads válidos (criação, listagem, buscas, filtros,
-atualização e exclusão).
-Erros: validação 422, produto/categoria inexistente 404, conflito 409 e
-permissão 403.
-
-SEGURANÇA: create/update/delete exigem Bearer token de **administrador**
-(401 sem token, 403 sem permissão). Leitura (list/get/paginated/category/
-discount/active/vitrine) continua pública — o catálogo precisa ser navegável
-sem login. A busca por termo livre vive em `GET /paginated?search=`; os
-endpoints de match exato (title/slug/isbn/publisher/year/language/stock)
-foram removidos.
-
-NOTA: o roteador traduz os ``ValueError`` do service (403 sem permissão,
-409 duplicado, 404 inexistente). Exceções de domínio levantadas pelos mocks
-também exercitam o contrato — ver RELATORIO_TESTES_HTTP.md.
-"""
 from unittest.mock import Mock, patch
 
 import pytest
@@ -44,10 +26,7 @@ CREATE_OK = {
 
 @pytest.fixture
 def auth_user():
-    """Usuário autenticado injetado no lugar de ``get_current_user``.
 
-    Mesmo padrão de test_http_categories.py / test_http_reviews.py.
-    """
     from app.api.deps import get_current_user
     from app.main import app
 
@@ -80,7 +59,7 @@ class TestCreateProduct:
         assert body["stock_qty"] == 25
 
     def test_create_requires_auth(self, client):
-        """Sem Bearer token a rota nem chega ao service."""
+
         response = client.post(f"{PREFIX}/create", json=CREATE_OK)
         assert response.status_code == 401
 
@@ -336,11 +315,7 @@ class TestDeleteProduct:
 
 
 class TestFeaturedProducts:
-    """Rota /products/featured — vitrine de destaques da Home.
 
-    Regra de contrato: lista vazia é 200 com [] (ausência de curadoria não é
-    erro), diferente das demais listagens que devolvem 400/500 quando vazias.
-    """
 
     def test_featured_success(self, client):
         svc = Mock(name="product_service")
@@ -384,7 +359,7 @@ class TestFeaturedProducts:
 
 
 class TestBestsellerProducts:
-    """Rota /products/bestsellers — vitrine de mais vendidos da Home."""
+
 
     def test_bestsellers_success(self, client):
         svc = Mock(name="product_service")
@@ -423,7 +398,6 @@ class TestBestsellerProducts:
 
 
 class TestPaginatedProducts:
-    """Rota /products/paginated — envelope { data, meta } (PageMeta)."""
 
     def test_paginated_success(self, client):
         svc = Mock(name="product_service")
@@ -467,7 +441,6 @@ class TestPaginatedProducts:
         svc.get_paginated.assert_called_once_with(3, 5, None, search=None)
 
     def test_paginated_with_category_filter(self, client):
-        """`category_id` deve chegar ao serviço para filtrar antes de paginar."""
         svc = Mock(name="product_service")
         svc.get_paginated.return_value = {
             "data": [],
@@ -481,7 +454,7 @@ class TestPaginatedProducts:
         svc.get_paginated.assert_called_once_with(1, 20, 7, search=None)
 
     def test_paginated_with_search(self, client):
-        """`?search=` chega ao serviço como termo livre (título/autor/ISBN)."""
+
         svc = Mock(name="product_service")
         svc.get_paginated.return_value = {
             "data": [],
@@ -495,14 +468,14 @@ class TestPaginatedProducts:
         svc.get_paginated.assert_called_once_with(1, 20, None, search="tolkien")
 
     def test_paginated_search_too_long(self, client):
-        """Termo acima de 100 caracteres é rejeitado na validação."""
+
         assert_validation_error(client.get(f"{PREFIX}/paginated?search=" + "a" * 101))
 
     def test_paginated_invalid_category_id(self, client):
         assert_validation_error(client.get(f"{PREFIX}/paginated?category_id=0"))
 
     def test_paginated_category_not_found(self, client):
-        """Categoria inexistente é 404 (erro do cliente), não lista vazia."""
+
         svc = Mock(name="product_service")
         svc.get_paginated.side_effect = CategoryNotFoundException()
 
@@ -512,7 +485,7 @@ class TestPaginatedProducts:
         assert_error(response, 404, "CATEGORY_NOT_FOUND")
 
     def test_paginated_empty_is_200(self, client):
-        """Catálogo vazio: 200 com data [] e meta zerado, não erro."""
+
         svc = Mock(name="product_service")
         svc.get_paginated.return_value = {
             "data": [],
@@ -546,7 +519,7 @@ class TestRecommendations:
         assert len(response.json()) == 1
 
     def test_recommendations_parses_exclude(self, client):
-        """`exclude=1,2,3` deve virar [1, 2, 3] para o serviço."""
+
         svc = Mock(name="product_service")
         svc.get_recommendations.return_value = []
 
@@ -557,7 +530,6 @@ class TestRecommendations:
         svc.get_recommendations.assert_called_once_with([1, 2, 3], 4)
 
     def test_recommendations_ignores_garbage_in_exclude(self, client):
-        """Ids inválidos não podem derrubar a chamada."""
         svc = Mock(name="product_service")
         svc.get_recommendations.return_value = []
 

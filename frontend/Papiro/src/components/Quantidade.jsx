@@ -1,6 +1,4 @@
-/**
- * Quantidade — controle de − / valor / + em bloco único com bordas finas.
- */
+
 export default function Quantidade({ valor, onChange, min = 1, max = 99 }) {
   const ajustar = (delta) => {
     const proximo = Math.min(max, Math.max(min, valor + delta))

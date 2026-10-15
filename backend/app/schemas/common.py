@@ -17,28 +17,14 @@ class PageMeta(BaseModel):
 
 
 class Page(BaseModel, Generic[T]):
-    """Envelope de paginação padrão.
 
-    Exemplo de resposta:
-    ```json
-    {
-        "data": [...],
-        "meta": {
-            "page": 1,
-            "per_page": 20,
-            "total": 150,
-            "total_pages": 8
-        }
-    }
-    ```
-    """
 
     data: list[T]
     meta: PageMeta
 
 
 class PaginationParams(BaseModel):
-    """Parâmetros de paginação usados como query string."""
+
 
     page: int = Field(1, ge=1, description="Número da página (começa em 1)")
     per_page: int = Field(20, ge=1, le=100, description="Itens por página (max 100)")
@@ -46,7 +32,7 @@ class PaginationParams(BaseModel):
 
 
 class DependencyHealth(BaseModel):
-    """Status de uma dependência checada pelo health check."""
+
 
     name: str = Field(..., description="Nome da dependência (ex.: database")
     status: str = Field(..., description="Status da dependência (ok | error")
@@ -56,13 +42,6 @@ class DependencyHealth(BaseModel):
 
 
 class HealthResponse(BaseModel):
-    """Resposta do endpoint de health check.
-
-    - ``status``: "ok" se a API e todas as dependências responderem; "error"
-      caso contrário.
-    - ``app``/``version``: identidade da aplicação.
-    - ``dependencies``: resultado individual de cada dependência (ex.: banco).
-    """
 
     status: str
     app: str
@@ -74,11 +53,7 @@ class HealthResponse(BaseModel):
 
 
 def montar_pagina(data: list, page: int, per_page: int, total: int) -> dict:
-    """Monta o envelope ``Page[T]`` a partir de itens + total.
 
-    Centraliza o cálculo de ``total_pages`` (antes duplicado em cada service)
-    para que todas as listagens paginadas respondam no mesmo formato.
-    """
     total_pages = (total + per_page - 1) // per_page if per_page else 0
     return {
         "data": data,

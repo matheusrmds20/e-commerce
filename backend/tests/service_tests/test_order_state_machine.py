@@ -1,11 +1,4 @@
-"""Testes da máquina de estados de ``orders.status``.
 
-Cobre as regras de negócio acordadas:
-  1. O admin transita livremente pelo fluxo normal, mas não reabre pedido
-     fechado (cancelado/reembolsado).
-  2. O cliente só pode cancelar, e apenas de um estado em aberto
-     (PENDING/PROCESSING).
-"""
 
 import pytest
 
@@ -61,7 +54,7 @@ class TestClientTransition:
         assert_client_transition(OrderStatus.PROCESSING, OrderStatus.CANCELLED)
 
     def test_nao_pode_cancelar_de_shipped(self):
-        """Depois de enviado, o cliente não cancela (US/atendimento sim)."""
+
         with pytest.raises(InvalidStateTransitionException):
             assert_client_transition(OrderStatus.SHIPPED, OrderStatus.CANCELLED)
 
@@ -72,7 +65,7 @@ class TestClientTransition:
             assert_client_transition(OrderStatus.COMPLETED, OrderStatus.CANCELLED)
 
     def test_nao_pode_mudar_para_outro_status(self):
-        """O cliente não seta status que não seja cancelamento (R3)."""
+
         for destino in (
             OrderStatus.PROCESSING,
             OrderStatus.SHIPPED,

@@ -1,14 +1,4 @@
-/**
- * Adaptadores entre o formato do backend (snake_case, inglês) e o formato que
- * os componentes visuais do Papiro consomem (português).
- *
- * Motivo: `ProductResponse` traz `title`, `price`, `image_url`, `author`; os
- * componentes (`ItemCarrinho`, `CartaoRecomendado`) esperam `titulo`, `preco`,
- * `imagem`, `autor`. Manter a tradução aqui evita espalhar `product.title ??
- * product.titulo` por todo o JSX.
- */
 
-/** Preço final considerando desconto percentual. */
 export function precoFinal(produto) {
   const base = produto?.price ?? produto?.preco ?? 0
   const desconto = produto?.discount_pct ?? 0
@@ -16,15 +6,12 @@ export function precoFinal(produto) {
   return Number((base * (1 - desconto / 100)).toFixed(2))
 }
 
-/**
- * Converte um item do carrinho da API para o shape dos componentes.
- * @param {object} item CartItemResponse: { id, product_id, quantity, product }
- */
+
 export function itemCarrinhoParaView(item) {
   const produto = item.product ?? {}
 
   return {
-    // `id` do item é o que identifica a linha na API (não o product_id).
+
     id: item.id,
     productId: item.product_id,
     quantidade: item.quantity,
@@ -37,18 +24,16 @@ export function itemCarrinhoParaView(item) {
   }
 }
 
-/** Converte uma lista de itens do carrinho. */
+
 export function itensParaView(itens) {
   return (itens ?? []).map(itemCarrinhoParaView)
 }
 
-/**
- * Converte um produto do catálogo para o shape do card de recomendação.
- * @param {object} produto ProductResponse
- */
+
+
 export function produtoParaRecomendacao(produto) {
   return {
-    // Nas recomendações o id É o product_id (vai direto para /items/add).
+
     id: produto.id,
     titulo: produto.title ?? '',
     autor: produto.author ?? '',
@@ -57,10 +42,7 @@ export function produtoParaRecomendacao(produto) {
   }
 }
 
-/**
- * Converte um produto do catálogo no shape da página de detalhe.
- * @param {object} produto ProductResponse
- */
+
 export function produtoParaDetalhe(produto) {
   const preco = precoFinal(produto)
   const precoAntigo = produto.discount_pct > 0 ? produto.price : null
@@ -92,11 +74,7 @@ export function produtoParaDetalhe(produto) {
   }
 }
 
-/**
- * Converte uma avaliação da API no shape consumido pela lista de avaliações.
- * @param {object} review ReviewResponse
- * @param {object} [usuario] Usuário autenticado (para marcar autoria própria)
- */
+
 export function avaliacaoParaView(review, usuario = null) {
   return {
     id: review.id,
@@ -105,8 +83,6 @@ export function avaliacaoParaView(review, usuario = null) {
     nota: review.rating ?? 0,
     texto: review.comment ?? '',
     criadoEm: review.created_at,
-    // O backend não devolve o nome do autor; usamos o usuário logado quando a
-    // avaliação é dele. Avaliações de terceiros aparecem como "Leitor Papiro".
     nome:
       usuario && review.user_id === usuario.id
         ? (usuario.full_name ?? 'Você')
@@ -115,10 +91,7 @@ export function avaliacaoParaView(review, usuario = null) {
   }
 }
 
-/**
- * Média das notas de uma lista de avaliações.
- * @param {Array<{rating?: number, nota?: number}>} avaliacoes
- */
+
 export function mediaAvaliacoes(avaliacoes) {
   const notas = (avaliacoes ?? [])
     .map((a) => a.rating ?? a.nota ?? 0)
@@ -129,18 +102,14 @@ export function mediaAvaliacoes(avaliacoes) {
   )
 }
 
-/** Formata em Real brasileiro. */
+
 export const formatarPreco = (valor) =>
   Number(valor ?? 0).toLocaleString('pt-BR', {
     style: 'currency',
     currency: 'BRL',
   })
 
-/**
- * Totais do carrinho.
- * Não há mais cálculo de frete por aqui — o frete real é cotado no checkout
- * (Melhor Envio) e exibido apenas lá. Aqui retornamos o subtotal como total.
- */
+
 export function calcularTotais(itens) {
   const subtotal = itens.reduce(
     (acc, item) => acc + item.preco * item.quantidade,

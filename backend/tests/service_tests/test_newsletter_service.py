@@ -1,8 +1,4 @@
-"""Testes do NewsletterService.
 
-Cobre subscribe (novo e-mail, duplicado, normalização), unsubscribe
-(inexistente e existente) e list_all (restrição a administradores).
-"""
 from datetime import datetime
 
 import pytest
@@ -99,7 +95,7 @@ class TestListAll:
         newsletter_repo.get_all.assert_not_called()
 
     def test_list_all_empty(self, newsletter_service, newsletter_repo):
-        """Lista vazia é resposta válida ([]), em vez de erro."""
+
         newsletter_repo.get_all.return_value = []
 
         assert newsletter_service.list_all(make_admin()) == []

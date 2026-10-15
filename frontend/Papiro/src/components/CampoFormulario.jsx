@@ -1,10 +1,4 @@
-/**
- * CampoFormulario — input de checkout: rótulo acessível + caixa com hairline.
- * Suporta estado de erro (borda caramelo + mensagem) para quando entrar o Zod.
- *
- * Se você passar `children`, eles substituem o <input> padrão — nesse caso
- * repasse value/onChange no seu próprio input; os props extras não descem.
- */
+
 export default function CampoFormulario({
   id,
   label,

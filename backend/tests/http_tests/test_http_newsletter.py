@@ -1,15 +1,4 @@
-"""Testes HTTP da rota /api/v1/newsletter.
 
-Sucesso: 201/200 com payloads válidos (subscribe público, unsubscribe
-público, listagem de inscritos [admin]).
-Erros: validação 422 (e-mail inválido), e-mail duplicado 409,
-inscrito inexistente 404 e listagem sem permissão 403.
-
-NOTA: subscribe/unsubscribe são PÚBLICOS (sem token). A listagem exige
-token e papel de administrador (``get_current_user``), mesmo padrão de
-test_http_users.py: sobrescreve a dependência e devolve um objeto com
-``id``/``role``.
-"""
 from unittest.mock import Mock
 
 import pytest
@@ -29,7 +18,7 @@ SUBSCRIBE_OK = {"email": "reader@example.com"}
 
 @pytest.fixture
 def auth_user():
-    """Usuário autenticado injetado no lugar de ``get_current_user``."""
+
     from app.api.deps import get_current_user
     from app.main import app
 

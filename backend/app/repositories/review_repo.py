@@ -20,11 +20,7 @@ class ReviewRepository(BaseRepository[Review]):
     def paginate_by_product_id(
         self, product_id: int, page: int, per_page: int
     ) -> tuple[list[Review], int]:
-        """Avaliações de um produto com paginação no banco.
 
-        Ordena por ``created_at`` desc (mais recentes primeiro) com desempate
-        por ``id`` para a ordem ser estável entre páginas.
-        """
         query = self.session.query(Review).filter(Review.product_id == product_id)
         total = query.count()
         items = (
@@ -38,7 +34,7 @@ class ReviewRepository(BaseRepository[Review]):
     def paginate_by_user_id(
         self, user_id: int, page: int, per_page: int
     ) -> tuple[list[Review], int]:
-        """Avaliações de um usuário com paginação no banco."""
+
         query = self.session.query(Review).filter(Review.user_id == user_id)
         total = query.count()
         items = (

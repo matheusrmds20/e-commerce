@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 import paymentService, {
   ROTULO_STATUS,
   STATUS_PAGAMENTO,
@@ -9,22 +10,14 @@ import { LockIcon } from './Icons'
 const INTERVALO_POLLING_MS = 4000
 const MAX_TENTATIVAS = 15 // ~1 minuto
 
-/**
- * PaginaRetornoPagamento — tela de retorno do Mercado Pago.
- *
- * O backend redireciona para cá com `back_urls`:
- *   /payment/success | /payment/failure | /payment/pending
- * e o Mercado Pago acrescenta `?payment_id=...&status=...` (quando disponível).
- *
- * Como o status real só é atualizado pelo WEBHOOK no backend, aqui:
- * - no retorno `pending`, consultamos `GET /payments/order/{order_id}` em
- *   intervalos até o pagamento sair de `pending` (ou estourar as tentativas);
- * - nos retornos `success`/`failure`, fazemos uma consulta única para confirmar.
- *
- * O `order_id` vem da query (`external_reference`/`order_id`) ou, em último
- * caso, do `sessionStorage` gravado pelo Checkout antes do redirect.
- */
-export default function PaginaRetornoPagamento({ resultado: resultadoUrl, onVoltarParaLoja }) {
+
+export default function PaginaRetornoPagamento() {
+  const navigate = useNavigate()
+  const { status: statusRota } = useParams()
+  const resultadoUrl = ['success', 'failure', 'pending'].includes(statusRota)
+    ? statusRota
+    : 'pending'
+
   const [carregando, setCarregando] = useState(true)
   const [pagamento, setPagamento] = useState(null)
   const [erro, setErro] = useState(null)
@@ -230,7 +223,7 @@ export default function PaginaRetornoPagamento({ resultado: resultadoUrl, onVolt
           <div className="mt-10 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
             <button
               type="button"
-              onClick={onVoltarParaLoja}
+              onClick={() => navigate('/', { replace: true })}
               className="w-full rounded-sm bg-forest px-8 py-3.5 font-body text-xs font-semibold uppercase tracking-[0.2em] text-cream-soft shadow-md transition-colors duration-300 hover:bg-forest-soft sm:w-auto"
             >
               Voltar para a loja

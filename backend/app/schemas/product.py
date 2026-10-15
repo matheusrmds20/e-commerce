@@ -74,8 +74,6 @@ class ProductResponse(BaseModel):
     price: float
     image_url: str | None
     is_active: bool
-    # Defaults para manter o contrato retrocompatível: payloads que ainda não
-    # enviam as flags de curadoria continuam válidos (produto sem destaque).
     is_featured: bool = False
     is_bestseller: bool = False
     author: str

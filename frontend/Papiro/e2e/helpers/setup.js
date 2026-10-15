@@ -1,25 +1,9 @@
 import { expect } from '@playwright/test'
 
-/**
- * Helpers de SETUP/TEARDOWN via API (o front Vite em localhost:5173 + backend
- * E2E em localhost:8000 — ver E2E_PLANO.md).
- *
- * Cobrem cenários que a UI não consegue preparar sozinha (ex.: usuário que
- * "comprou" um livro para liberar o form de review). Sempre com o token do
- * usuário logado na página (autorização real, não injeção).
- */
+
 export const API_URL = 'http://localhost:8000/api/v1'
 
-/**
- * Faz login via API e retorna o access token para as chamadas de setup.
- *
- * Com a migração segura (PLANO 7.3) o access token vive SÓ em memória do
- * front (não há mais `papiro.token` no localStorage), então o setup não pode
- * lê-lo da página. Chamamos `POST /auth/login` (form-urlencoded) direto na
- * API e usamos o access token retornado nos headers das chamadas de setup.
- *
- * @returns {Promise<string>} access_token JWT (válido 15 min).
- */
+
 export async function fazerLoginViaApi(request, { email, password }) {
   const resp = await request.post(`${API_URL}/auth/login`, {
     form: { username: email, password },

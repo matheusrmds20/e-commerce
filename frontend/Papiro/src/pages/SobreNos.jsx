@@ -1,12 +1,10 @@
+import { useNavigate } from 'react-router-dom'
 import Migalhas from '../components/Migalhas'
 import Quill from '../components/Quill'
 
-/**
- * SobreNos — Página editorial com a história, manifesto e propósito da Papiro.
- *
- * Filosofia: "Conforto alinhado à personalidade".
- */
-export default function SobreNos({ onExplorarAcervo, onVoltarHome }) {
+
+export default function SobreNos() {
+  const navigate = useNavigate()
   const pilares = [
     {
       numero: '01',
@@ -38,7 +36,7 @@ export default function SobreNos({ onExplorarAcervo, onVoltarHome }) {
         <div className="mx-auto max-w-[1400px] px-5 py-10 sm:px-8 sm:py-14">
           <Migalhas
             itens={[
-              { rotulo: 'Início', onClick: onVoltarHome },
+              { rotulo: 'Início', onClick: () => navigate('/') },
               { rotulo: 'Sobre Nós' },
             ]}
           />
@@ -155,26 +153,24 @@ export default function SobreNos({ onExplorarAcervo, onVoltarHome }) {
         </div>
 
         {/* Banner CTA */}
-        {onExplorarAcervo && (
-          <div className="mt-20 rounded-sm border border-line bg-forest p-8 text-center text-cream-soft sm:p-14">
-            <h2 className="font-display text-2xl text-cream sm:text-3xl">
-              Pronto para encontrar sua próxima leitura?
-            </h2>
-            <p className="mx-auto mt-3 max-w-xl font-body text-sm font-light text-cream/80 sm:text-base">
-              Explore nossos livros selecionados a dedo e monte uma biblioteca
-              que reflita verdadeiramente o seu aconchego e personalidade.
-            </p>
-            <div className="mt-8 flex flex-wrap justify-center gap-4">
-              <button
-                type="button"
-                onClick={onExplorarAcervo}
-                className="rounded-sm bg-gold px-8 py-3.5 font-body text-xs font-semibold uppercase tracking-[0.2em] text-forest transition-colors duration-300 hover:bg-gold-light shadow-sm"
-              >
-                Explorar o Acervo
-              </button>
-            </div>
+        <div className="mt-20 rounded-sm border border-line bg-forest p-8 text-center text-cream-soft sm:p-14">
+          <h2 className="font-display text-2xl text-cream sm:text-3xl">
+            Pronto para encontrar sua próxima leitura?
+          </h2>
+          <p className="mx-auto mt-3 max-w-xl font-body text-sm font-light text-cream/80 sm:text-base">
+            Explore nossos livros selecionados a dedo e monte uma biblioteca
+            que reflita verdadeiramente o seu aconchego e personalidade.
+          </p>
+          <div className="mt-8 flex flex-wrap justify-center gap-4">
+            <button
+              type="button"
+              onClick={() => navigate('/acervo')}
+              className="rounded-sm bg-gold px-8 py-3.5 font-body text-xs font-semibold uppercase tracking-[0.2em] text-forest transition-colors duration-300 hover:bg-gold-light shadow-sm"
+            >
+              Explorar o Acervo
+            </button>
           </div>
-        )}
+        </div>
       </section>
     </main>
   )

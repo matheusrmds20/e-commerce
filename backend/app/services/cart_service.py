@@ -36,13 +36,7 @@ class CartService:
         return cart_item
 
     def _to_response(self, cart_item):
-        """Materializa um ``CartItemResponse`` a partir do ORM ainda vivo.
 
-        Usado nos fluxos que DELETAM o item antes de responder (remover, e
-        ``update_item`` com quantidade 0). Devolver o ORM deletado faria o
-        pydantic tentar lazy-load de ``product`` após o commit com a sessão
-        expirada e dispararia ``DetachedInstanceError``. Capturamos tudo agora.
-        """
         return CartItemResponse(
             id=cart_item.id,
             cart_id=cart_item.cart_id,
@@ -151,10 +145,6 @@ class CartService:
             if not cart_item:
                 raise CartItemNotFoundException()
 
-            # SEGURANÇA: o item precisa pertencer ao carrinho informado. Sem
-            # isso, `cart_id` (próprio) + `item_id` (de outra pessoa) burlava a
-            # checagem de posse do carrinho e permitia alterar/excluir itens
-            # alheios (IDOR).
             if cart_item.cart_id != cart_id:
                 raise CartItemNotFoundException()
 
@@ -197,7 +187,7 @@ class CartService:
             if not cart_item:
                 raise CartItemNotFoundException()
 
-            # SEGURANÇA: só remove item que pertence a ESTE carrinho (IDOR).
+
             if cart_item.cart_id != cart_id:
                 raise CartItemNotFoundException()
 

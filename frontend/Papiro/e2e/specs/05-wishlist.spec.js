@@ -14,7 +14,7 @@ test.describe('Wishlist', () => {
     await registrarPelaUi({ email: emailUnico('wishlist') })
 
     // Abre o detalhe do primeiro livro do acervo.
-    await page.getByTestId('nav-acervo').click()
+    await page.goto('/acervo')
     const card = page.getByTestId(/^book-card-/).first()
     await expect(card).toBeVisible({ timeout: 15_000 })
     const titulo = (await card.locator('h3').innerText()).trim()
@@ -27,7 +27,7 @@ test.describe('Wishlist', () => {
     await expect(btnWishlist).toHaveText(/Remover dos desejos/)
 
     // Consulta em Minha Conta → aba "Lista de desejos".
-    await page.getByTestId('nav-minhaconta').click()
+    await page.goto('/minhaconta')
     await page.getByRole('button', { name: 'Lista de desejos' }).first().click()
     await expect(page.locator('body')).toContainText(titulo, {
       timeout: 15_000,

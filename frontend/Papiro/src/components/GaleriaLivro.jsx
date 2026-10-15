@@ -1,9 +1,7 @@
 import { useState } from 'react'
 import { ZoomIcon } from './Icons'
 
-/**
- * GaleriaLivro — imagem principal sobre fundo creme + miniaturas.
- */
+
 export default function GaleriaLivro({ imagens, titulo }) {
   const [ativa, setAtiva] = useState(0)
   const [zoom, setZoom] = useState(false)

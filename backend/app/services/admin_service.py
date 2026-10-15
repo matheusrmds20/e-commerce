@@ -27,8 +27,7 @@ class AdminService:
         self.db = db
 
     def get_dashboard_stats(self) -> DashboardStatsResponse:
-        """Calcula métricas agregadas globais para a visão geral do administrador."""
-        # 1. Faturamento total e pedidos
+
         revenue_row = (
             self.db.query(
                 func.coalesce(func.sum(Order.total), 0.0).label("revenue"),
@@ -40,7 +39,6 @@ class AdminService:
         total_revenue = float(revenue_row.revenue) if revenue_row else 0.0
         total_orders = int(revenue_row.total_orders) if revenue_row else 0
 
-        # 2. Pedidos pendentes / em processamento
         pending_orders = (
             self.db.query(func.count(Order.id))
             .filter(
@@ -50,7 +48,7 @@ class AdminService:
             or 0
         )
 
-        # 3. Produtos e estoque total
+
         prod_stats = (
             self.db.query(
                 func.count(Product.id).label("total_products"),
@@ -62,10 +60,9 @@ class AdminService:
         total_products = int(prod_stats.total_products) if prod_stats else 0
         total_stock = int(prod_stats.total_stock) if prod_stats else 0
 
-        # 4. Ticket Médio
+
         average_ticket = round(total_revenue / total_orders, 2) if total_orders > 0 else 0.0
 
-        # 5. Obras com baixo estoque (<= 3 unidades)
         low_stock_records = (
             self.db.query(Product)
             .options(joinedload(Product.categories))
@@ -86,7 +83,6 @@ class AdminService:
             for p in low_stock_records
         ]
 
-        # 6. Fluxo semanal de vendas (últimas 4 semanas)
         now = datetime.now()
         weekly_sales: list[WeeklySale] = []
         for i in range(4, 0, -1):
@@ -191,7 +187,6 @@ class AdminService:
         return results
 
     def update_order_status(self, order_id: int, new_status: str) -> AdminOrderResponse:
-        """Atualiza o status de um pedido como administrador."""
         order = (
             self.db.query(Order)
             .options(
@@ -212,8 +207,7 @@ class AdminService:
                 target=new_status,
             ) from exc
 
-        # Máquina de estados: o admin transita livremente pelo fluxo, mas não
-        # pode reabrir um pedido fechado (cancelado/reembolsado).
+
         assert_admin_transition(current=order.status, target=status_enum)
 
         order.status = status_enum
@@ -253,7 +247,7 @@ class AdminService:
         )
 
     def list_users(self) -> list[AdminUserResponse]:
-        """Lista clientes e usuários cadastrados com contagem de pedidos."""
+        
         users = (
             self.db.query(User)
             .options(joinedload(User.orders))

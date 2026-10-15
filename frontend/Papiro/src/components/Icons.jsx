@@ -1,7 +1,4 @@
-/**
- * Ícones de linha — traço fino para combinar com o ar editorial do Papiro.
- * Todos herdam `currentColor` e aceitam className para tamanho.
- */
+
 const base = {
   fill: 'none',
   stroke: 'currentColor',

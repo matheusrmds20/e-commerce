@@ -1,7 +1,4 @@
-/**
- * CartaoRecomendado — cartão vertical das recomendações.
- * Capa emoldurada em creme, título, preço e botão "Adicionar à sacola".
- */
+
 export default function CartaoRecomendado({ item, formatarPreco, onAdicionar }) {
   return (
     <article className="group flex flex-col rounded-md border border-line bg-cream-soft p-4 transition-colors duration-500 ease-[var(--ease-cozy)] hover:border-line-strong">

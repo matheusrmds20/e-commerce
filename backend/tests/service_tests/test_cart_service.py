@@ -157,7 +157,7 @@ class TestAddItem:
         cart_repo.get_by_id.return_value = make_cart()
         prod = make_product(stock_qty=1, title="Livro")
         product_repo.get_by_id.return_value = prod
-        # Nada ainda na sacola — a validação compara o total pedido com o estoque.
+
         cart_item_repo.get_by_cart_and_product.return_value = None
 
         with pytest.raises(InsufficientStockException) as exc:
@@ -168,11 +168,7 @@ class TestAddItem:
     def test_insufficient_stock_considera_o_que_ja_esta_na_sacola(
         self, cart_service, cart_repo, product_repo, cart_item_repo
     ):
-        """Estoque 3, 2 já na sacola, adicionar 2 → total 4 > 3, deve falhar.
-
-        Sem somar o que já existe, `quantity` (2) caberia no estoque e o item
-        ficaria com 4 unidades de um produto que só tem 3.
-        """
+  
         cart_repo.get_by_id.return_value = make_cart()
         product_repo.get_by_id.return_value = make_product(stock_qty=3)
         cart_item_repo.get_by_cart_and_product.return_value = make_cart_item(
@@ -188,7 +184,7 @@ class TestAddItem:
 class TestUpdateItem:
     def test_success(self, cart_service, cart_repo, cart_item_repo, product_repo):
         cart_repo.get_by_id.return_value = make_cart()
-        # Estoque de sobra para o novo valor pedido.
+
         product_repo.get_by_id.return_value = make_product(stock_qty=100)
         item = make_cart_item()
         cart_item_repo.get_by_id.return_value = item
@@ -199,17 +195,14 @@ class TestUpdateItem:
         cart_item_repo.update_quantity.assert_called_once_with(item, 5)
 
     def test_zero_quantity_removes_item(self, cart_service, cart_repo, cart_item_repo):
-        """quantity <= 0 remove o item em vez de gravar 0 (consistente com o
-        comportamento do antigo decrease_item)."""
+
         cart_repo.get_by_id.return_value = make_cart()
         item = make_cart_item()
         cart_item_repo.get_by_id.return_value = item
 
         result = cart_service.update_item(1, 1, 1, 0)
 
-        # Item removido (qty=0): a resposta agora é um CartItemResponse
-        # materializado (não o ORM), para evitar DetachedInstanceError na
-        # serialização de um objeto recém-deletado.
+
         assert isinstance(result, CartItemResponse)
         assert result.id == item.id
         assert result.product_id == item.product_id
@@ -226,12 +219,7 @@ class TestUpdateItem:
     def test_item_de_outro_carrinho_e_rejeitado(
         self, cart_service, cart_repo, cart_item_repo
     ):
-        """SEGURANÇA (IDOR): item de OUTRO carrinho não pode ser alterado.
 
-        `cart_id` é do usuário (posse do carrinho passa), mas o `item_id`
-        aponta para o carrinho de outra pessoa — antes isso mutava o item
-        alheio.
-        """
         cart_repo.get_by_id.return_value = make_cart(id=1, user_id=1)
         cart_item_repo.get_by_id.return_value = make_cart_item(
             id=50, cart_id=999
@@ -252,8 +240,7 @@ class TestRemoveItem:
 
         result = cart_service.remove_item(1, 1, 1)
 
-        # A resposta agora é um CartItemResponse materializado (não o ORM),
-        # evitando DetachedInstanceError ao serializar o item deletado.
+
         assert isinstance(result, CartItemResponse)
         assert result.id == item.id
         assert result.product_id == item.product_id
@@ -269,7 +256,6 @@ class TestRemoveItem:
     def test_nao_remove_item_de_outro_carrinho(
         self, cart_service, cart_repo, cart_item_repo
     ):
-        """SEGURANÇA (IDOR): não exclui item que pertence a outro carrinho."""
         cart_repo.get_by_id.return_value = make_cart(id=1, user_id=1)
         cart_item_repo.get_by_id.return_value = make_cart_item(
             id=50, cart_id=999
@@ -300,13 +286,7 @@ class TestClear:
 
 
 class TestLockDeEstoque:
-    """Garante que a leitura do produto usa a versão com lock (FOR UPDATE).
 
-    Em produção, sem `FOR UPDATE`, dois `add_item` simultâneos leem o mesmo
-    `stock_qty` e ambos passam na validação (check-then-act race). Estes testes
-    travam o comportamento: o service deve chamar `get_by_id_for_update`, e não
-    a leitura simples.
-    """
 
     def test_add_item_usa_leitura_com_lock(
         self, cart_service, cart_repo, product_repo, cart_item_repo
@@ -353,7 +333,7 @@ class TestLockDeEstoque:
 
 
 class TestProductRepositoryLock:
-    """A query do repositório precisa emitir FOR UPDATE de verdade."""
+
 
     def test_get_by_id_for_update_emite_for_update(self):
         from unittest.mock import MagicMock
@@ -365,7 +345,7 @@ class TestProductRepositoryLock:
 
         repo.get_by_id_for_update(42)
 
-        # session.query(Product).filter(...).with_for_update().first()
+
         chain = session.query.return_value.filter.return_value
         assert chain.with_for_update.called, (
             "get_by_id_for_update deve chamar .with_for_update() — sem isso o "

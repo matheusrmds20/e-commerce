@@ -1,6 +1,4 @@
-/**
- * Migalhas — trilha de navegação "Início > ... > Título".
- */
+
 export default function Migalhas({ itens }) {
   return (
     <nav aria-label="Trilha de navegação">

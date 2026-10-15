@@ -31,13 +31,7 @@ class AddressRepository(BaseRepository[Address]):
 
 
     def set_default(self, user_id: int, address_id: int) -> Address:
-        """Define ``address_id`` como padrão do usuário.
 
-        NÃO abre transação própria (ver ``UserRepository.deactivate``): a
-        fronteira de transação pertence à camada de service. O service que
-        chama hoje (``AddressService.set_default``) envolve a operação no seu
-        próprio ``with session.begin()``.
-        """
         new_default = self.get_by_id(address_id)
 
         if new_default.user_id != user_id:

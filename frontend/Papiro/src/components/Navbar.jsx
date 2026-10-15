@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   BagIcon,
   CloseIcon,
@@ -6,23 +7,23 @@ import {
   UserIcon,
 } from './Icons'
 import { useAuth } from '../context/auth-context'
+import { useCart } from '../context/cart-context'
 
 /** Primeiro nome do usuário, para um cumprimento curto. */
 function primeiroNome(nomeCompleto) {
   return nomeCompleto?.trim().split(/\s+/)[0] ?? ''
 }
 
-/**
- * Navbar — barra clara e fixa, com o logotipo centralizado em serifada.
- * Some ao descer, reaparece ao subir (mantém o hero limpo).
- */
-export default function Navbar({ onNavegar, onBuscar, totalItens = 0, simples = false }) {
+
+export default function Navbar({ simples = false }) {
+  const navigate = useNavigate()
   const [searchOpen, setSearchOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
   const [contaOpen, setContaOpen] = useState(false)
   const [buscaInput, setBuscaInput] = useState('')
 
   const { usuario, autenticado, logout } = useAuth()
+  const { totalItens } = useCart()
   const contaRef = useRef(null)
   const searchInputRef = useRef(null)
 
@@ -55,14 +56,14 @@ export default function Navbar({ onNavegar, onBuscar, totalItens = 0, simples = 
   const handleSair = () => {
     logout()
     setContaOpen(false)
-    onNavegar?.('home')
+    navigate('/')
   }
 
   const handleConta = () => {
     if (autenticado) {
       setContaOpen((aberto) => !aberto)
     } else {
-      onNavegar?.('login')
+      navigate('/login')
     }
   }
 
@@ -82,19 +83,20 @@ export default function Navbar({ onNavegar, onBuscar, totalItens = 0, simples = 
       <nav className="mx-auto flex h-[74px] max-w-[1400px] items-center gap-4 px-5 sm:px-8">
         {/* Centro/Esquerda — logotipo */}
         <a
-          href="#"
+          href="/"
           onClick={(event) => {
             event.preventDefault()
-            onNavegar?.('home')
+            navigate('/')
           }}
           className="font-display text-[1.85rem] font-medium leading-none tracking-[-0.01em] text-coffee sm:text-[2.25rem]"
         >
           Papiro
         </a>
 
-        {/* Direita — ações */}
-        {!simples && (
+        {/* Direita — a sacola só fica disponível para usuários autenticados. */}
         <div className="ml-auto flex items-center gap-1">
+          {!simples && (
+            <>
           <button
             type="button"
             onClick={() => setSearchOpen((open) => !open)}
@@ -143,7 +145,7 @@ export default function Navbar({ onNavegar, onBuscar, totalItens = 0, simples = 
                   role="menuitem"
                   onClick={() => {
                     setContaOpen(false)
-                    onNavegar?.('minhaconta')
+                    navigate('/minhaconta')
                   }}
                   className="mt-1.5 w-full px-3 py-2.5 text-left font-body text-[0.82rem] font-medium tracking-wide text-coffee transition-colors duration-300 hover:bg-forest-soft/10 hover:text-gold"
                 >
@@ -156,7 +158,7 @@ export default function Navbar({ onNavegar, onBuscar, totalItens = 0, simples = 
                     role="menuitem"
                     onClick={() => {
                       setContaOpen(false)
-                      onNavegar?.('admin')
+                      navigate('/admin')
                     }}
                     className="w-full px-3 py-2.5 text-left font-body text-[0.82rem] font-medium tracking-wide text-coffee transition-colors duration-300 hover:bg-forest-soft/10 hover:text-gold flex items-center justify-between"
                   >
@@ -176,23 +178,26 @@ export default function Navbar({ onNavegar, onBuscar, totalItens = 0, simples = 
               </div>
             )}
           </div>
+            </>
+          )}
 
-          <button
-            type="button"
-            data-testid="navbar-sacola"
-            onClick={() => onNavegar?.('carrinho')}
-            aria-label="Sacola"
-            className="relative grid h-10 w-10 place-items-center text-coffee transition-colors duration-300 hover:text-gold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
-          >
-            <BagIcon />
-            {totalItens > 0 && (
-              <span className="absolute right-1.5 top-1.5 grid h-4 w-4 place-items-center rounded-full bg-gold font-body text-[0.6rem] font-medium text-cream-soft">
-                {totalItens}
-              </span>
-            )}
-          </button>
+          {autenticado && (
+            <button
+              type="button"
+              data-testid="navbar-sacola"
+              onClick={() => navigate('/carrinho')}
+              aria-label="Sacola"
+              className="relative grid h-10 w-10 place-items-center text-coffee transition-colors duration-300 hover:text-gold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
+            >
+              <BagIcon />
+              {totalItens > 0 && (
+                <span className="absolute right-1.5 top-1.5 grid h-4 w-4 place-items-center rounded-full bg-gold font-body text-[0.6rem] font-medium text-cream-soft">
+                  {totalItens}
+                </span>
+              )}
+            </button>
+          )}
         </div>
-        )}
       </nav>
 
       {/* Busca expansível */}
@@ -207,7 +212,7 @@ export default function Navbar({ onNavegar, onBuscar, totalItens = 0, simples = 
             e.preventDefault()
             const termo = buscaInput.trim()
             if (termo) {
-              onBuscar?.(termo)
+              navigate({ pathname: '/acervo', search: `?termo=${encodeURIComponent(termo)}` })
               setSearchOpen(false)
             }
           }}

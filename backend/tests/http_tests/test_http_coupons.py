@@ -1,15 +1,4 @@
-"""Testes HTTP da rota /api/v1/coupons.
 
-Sucesso: 201/200 com payloads válidos (criação, listagem e update/delete).
-Erros: validação 422, cupom/produto inexistente 404 e código duplicado 409.
-
-SEGURANÇA: cupons são catálogo administrativo. Todo o router exige Bearer token
-de **administrador** — 401 sem token, 403 com papel ``customer``. Antes o router
-era totalmente anônimo e permitia emitir cupons de desconto arbitrário.
-
-NOTA: o CouponService real lança ``ValueError`` em vez das exceções de domínio
-— em produção esses erros viram 500. Ver RELATORIO_TESTES_HTTP.md.
-"""
 from unittest.mock import Mock, patch
 
 import pytest
@@ -34,10 +23,7 @@ CREATE_OK = {
 
 @pytest.fixture
 def auth_user():
-    """Usuário autenticado injetado no lugar de ``get_current_user``.
 
-    Mesmo padrão de test_http_products.py / test_http_categories.py.
-    """
     from app.api.deps import get_current_user
     from app.main import app
 

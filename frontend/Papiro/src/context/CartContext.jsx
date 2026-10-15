@@ -1,21 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import cartService from '../api/cart'
 import productService from '../api/products'
 import { itensParaView, produtoParaRecomendacao } from '../api/adapters'
 import { useAuth } from './auth-context'
 import CartContext from './cart-context'
 
-/**
- * CartProvider — fonte única do carrinho.
- *
- * Estratégia:
- * - **Autenticado:** lê e escreve no backend. O `cart_id` é resolvido uma vez
- *   (cria o carrinho se ainda não existir).
- * - **Visitante:** mantém os itens apenas em memória. As rotas de carrinho
- *   exigem Bearer token, então não há como persistir sem login.
- *
- * Em ambos os casos a UI consome a mesma interface.
- */
+
 export function CartProvider({ children }) {
   const { usuario, autenticado } = useAuth()
 
@@ -24,32 +14,52 @@ export function CartProvider({ children }) {
   const [carregando, setCarregando] = useState(false)
   const [erro, setErro] = useState(null)
 
-  // Primitivos estáveis — `usuario?.id` dentro de useCallback impede o
-  // React Compiler de preservar a memoização (regra preserve-manual-memoization).
+
   const userId = autenticado ? (usuario?.id ?? null) : null
 
-  /** Garante um carrinho para o usuário e devolve o cart_id. */
+
+  const cartStateRef = useRef({ id: null, promise: null })
+
   const garantirCarrinho = useCallback(async () => {
+
+    if (cartStateRef.current.id) {
+      return cartStateRef.current.id
+    }
+
+    if (cartStateRef.current.promise) {
+      return cartStateRef.current.promise
+    }
+
+    const promise = (async () => {
+      try {
+        const carrinho = await cartService.obter()
+        cartStateRef.current.id = carrinho.id
+        return carrinho.id
+      } catch {
+ 
+        try {
+          const criado = await cartService.criar()
+          cartStateRef.current.id = criado.id
+          return criado.id
+        } catch {
+
+
+          const existente = await cartService.obter()
+          cartStateRef.current.id = existente.id
+          return existente.id
+        }
+      }
+    })()
+
+    cartStateRef.current.promise = promise
     try {
-      const carrinho = await cartService.obter()
-      setCartId(carrinho.id)
-      return carrinho.id
-    } catch {
-      // 404/400 → ainda não existe carrinho para este usuário.
-      const criado = await cartService.criar()
-      setCartId(criado.id)
-      return criado.id
+      return await promise
+    } finally {
+      cartStateRef.current.promise = null
     }
   }, [])
 
-  /**
-   * Recarrega o carrinho do servidor. Só faz sentido com sessão ativa.
-   *
-   * Nota: o `setCarregando(true)` vem depois do primeiro `await` de propósito.
-   * Setar estado de forma síncrona no corpo de um effect dispara cascading
-   * render (react-hooks/set-state-in-effect). Assim o effect só agenda a
-   * busca e o estado é atualizado quando a promise resolve.
-   */
+
   const recarregar = useCallback(async () => {
     if (!userId) return
 
@@ -69,9 +79,7 @@ export function CartProvider({ children }) {
     }
   }, [userId, garantirCarrinho])
 
-  // Reset síncrono durante o render quando a sessão termina.
-  // É o padrão recomendado pelo React para "ajustar estado quando algo muda"
-  // (evita o setState dentro de effect e o cascading render que ele gera).
+
   const [sessaoAnterior, setSessaoAnterior] = useState(userId)
   if (sessaoAnterior !== userId) {
     setSessaoAnterior(userId)
@@ -81,18 +89,21 @@ export function CartProvider({ children }) {
     }
   }
 
-  // Sincroniza o carrinho ao entrar na conta.
-  // `recarregar` é async e só toca estado após um await, mas a regra nova
-  // `react-hooks/set-state-in-effect` ainda rastreia o setState através da
-  // fronteira assíncrona. Este é um fetch de dados disparado por mudança de
-  // sessão — uso legítimo de effect.
+
+  useEffect(() => {
+    if (!userId) {
+      cartStateRef.current = { id: null, promise: null }
+    }
+  }, [userId])
+
+
   useEffect(() => {
     if (!userId) return
     // eslint-disable-next-line react-hooks/set-state-in-effect
     recarregar()
   }, [userId, recarregar])
 
-  /** Resolve o cart_id sob demanda. */
+
   const idDoCarrinho = useCallback(async () => {
     if (cartId) return cartId
     if (!userId) return null
@@ -101,6 +112,16 @@ export function CartProvider({ children }) {
 
   const adicionar = useCallback(
     async (produto, quantidade = 1) => {
+      // TEMP-DIAG
+      if (process.env.NODE_ENV !== 'production') {
+        console.log(
+          '[CART-DIAG] adicionar userId=' + userId +
+            ' autenticado=' + autenticado +
+            ' usuario.id=' + (usuario?.id) +
+            ' produto.id=' + produto?.id +
+            ' cartId=' + cartId,
+        )
+      }
       // Visitante: apenas estado local.
       if (!userId) {
         setItens((atual) => {
@@ -165,15 +186,7 @@ export function CartProvider({ children }) {
     await recarregar()
   }, [userId, idDoCarrinho, recarregar])
 
-  /**
-   * Recomendações do catálogo, excluindo o que já está na sacola.
-   *
-   * O filtro e o limite agora acontecem no servidor
-   * (`GET /products/recommendations?exclude=...&limit=...`). Antes, esta função
-   * baixava o catálogo INTEIRO e filtrava em memória — e como ela é recriada a
-   * cada mudança de `itens`, o catálogo era rebaixado toda vez que o usuário
-   * adicionava ou removia um produto.
-   */
+
   const recomendados = useCallback(async (limite = 4) => {
     const naSacola = itens.map((i) => i.productId)
     const produtos = await productService.recomendacoes(naSacola, limite)
