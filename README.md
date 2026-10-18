@@ -79,6 +79,7 @@ frete real e pagamento — com **API REST em FastAPI** e **SPA em React + Vite**
 | Estilo | **Tailwind CSS v4** (`@tailwindcss/vite`) |
 | HTTP | **axios** (interceptor de refresh automático) |
 | Formulários / validação | **react-hook-form** + **zod** |
+| Roteamento | **react-router-dom v7** (rotas lazy + guard de admin) |
 | Testes E2E | **Playwright** |
 | Lint | **ESLint** |
 
@@ -154,7 +155,10 @@ E-commerce v1/
 │   │   ├── components/           # componentes reutilizáveis
 │   │   ├── context/              # AuthContext e CartContext
 │   │   ├── pages/                # Home, Acervo, DetalheLivro, Checkout, Admin, …
-│   │   ├── App.jsx               # navegação entre páginas (sem router dedicado)
+│   │   ├── router/
+│   │   │   ├── Rotas.jsx         # rotas (react-router-dom v7) + lazy + guard de admin
+│   │   │   └── AppLayout.jsx     # moldura (Navbar + Footer) das páginas da loja
+│   │   ├── App.jsx               # BrowserRouter → Rotas
 │   │   └── main.jsx
 │   ├── e2e/                      # specs, fixtures e helpers do Playwright
 │   ├── playwright.config.js      # sobe backend E2E + Vite automaticamente
@@ -329,7 +333,7 @@ retorno de pagamento.
 ### CI
 
 O workflow [`.github/workflows/ci.yml`](.github/workflows/ci.yml) roda em push/PR
-para `main` e `Frontend`:
+para `main`, `Frontend` e `Backend` (e também via `workflow_dispatch` manual):
 
 1. **backend** — `ruff` + `pytest`
 2. **frontend** — `eslint` + `vite build`

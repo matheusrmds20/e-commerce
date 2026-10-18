@@ -79,6 +79,9 @@ backend/_auth_test.db
 # Exceções: docs públicos de arquitetura/deploy que devem ser versionados.
 !README.md
 !backend/README.md
+!backend/README_WEBHOOK_DECISION.md
+!frontend/README.md
+
 
 
 
