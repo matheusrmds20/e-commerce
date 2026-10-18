@@ -18,13 +18,7 @@ def _is_admin(user: User) -> bool:
 
 
 class UserCouponService:
-    """Gerencia o vínculo N:N entre usuários e cupons (ownership).
 
-    Regras:
-    - Só atribui cupons existentes e usuários existentes.
-    - Não permite o mesmo cupom duas vezes para o mesmo usuário.
-    - A remoção é escopada por usuário, como em wishlist.
-    """
 
     def __init__(self, db):
         self.repo = UserCouponRepository(db)
@@ -65,7 +59,7 @@ class UserCouponService:
         return self.repo.get_all()
 
     def list_coupons_by_user(self, user_id: int) -> list[Coupon]:
-        """Devolve os cupons (entidades) atribuídos a um usuário."""
+
         user = self.user_repo.get_by_id(user_id)
 
         if user is None:
@@ -74,11 +68,7 @@ class UserCouponService:
         return [link.coupons for link in self.repo.get_by_user_id(user_id)]
 
     def get_for_user(self, user_coupon_id: int, current_user: User) -> dict:
-        """Busca um vínculo garantindo que o dono (ou um admin) o acesse.
 
-        Fecha o IDOR que permitia ler o vínculo de qualquer usuário passando
-        qualquer `user_id` na query (o valor vinha do cliente).
-        """
         user_coupon = self.repo.get_by_id(user_coupon_id)
 
         if user_coupon is None:
@@ -92,7 +82,7 @@ class UserCouponService:
         return user_coupon
 
     def delete_for_user(self, user_coupon_id: int, current_user: User) -> dict:
-        """Remove um vínculo apenas se pertencer ao autenticado (ou se for admin)."""
+
         with self.session.begin():
 
             user_coupon = self.repo.get_by_id(user_coupon_id)
@@ -109,20 +99,11 @@ class UserCouponService:
             return user_coupon
 
     def create_for_user(self, user_id: int, coupon_id: int) -> dict:
-        """Atribui um cupom ao usuário autenticado (alvo vem do token).
 
-        Diferente de ``admin_assign``, que aceita um ``user_id`` arbitrário
-        (uso administrativo), aqui o alvo é sempre o próprio usuário.
-        """
         return self._create_link(user_id, coupon_id)
 
     def admin_assign(self, user_id: int, coupon_id: int) -> dict:
-        """Atribui um cupom a QUALQUER usuário (uso administrativo).
 
-        Chamado pela rota ``POST /user-coupons/admin/assign``, que exige
-        administrador. Mantém a atribuição em lote do painel admin sem expor
-        um endpoint que aceite ``user_id`` arbitrário de cliente.
-        """
         return self._create_link(user_id, coupon_id)
 
     def create(self, data) -> dict:

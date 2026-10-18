@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom'
 import { ArrowRightIcon } from './Icons'
 
 /** Imagens de fallback quando a categoria não tem `image_url` no backend. */
@@ -9,18 +10,12 @@ const IMAGENS_FALLBACK = [
   'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=800&q=80',
 ]
 
-/** Limite de coleções exibidas para manter a grade equilibrada. */
+
 const LIMITE_COLECOES = 5
 
-/**
- * ProximaLeitura — Seção "Encontre sua próxima leitura".
- *
- * As coleções são as categorias reais do backend (`CategoryResponse`), com a
- * contagem de livros derivada do catálogo (`total`). Categorias sem livros já
- * são filtradas em `carregarHome`, então aqui só cuidamos de imagem fallback e
- * do estado vazio.
- */
+
 export default function ProximaLeitura({ colecoes = [], carregando = false }) {
+  const navigate = useNavigate()
   const visiveis = colecoes.slice(0, LIMITE_COLECOES)
 
   return (
@@ -57,8 +52,11 @@ export default function ProximaLeitura({ colecoes = [], carregando = false }) {
               return (
                 <a
                   key={col.id}
-                  href={`#${col.slug || col.id}`}
-                  onClick={(e) => e.preventDefault()}
+                  href="/acervo"
+                  onClick={(e) => {
+                    e.preventDefault()
+                    navigate({ pathname: '/acervo', search: `?categoria=${col.id}` })
+                  }}
                   className="group relative flex min-h-[380px] flex-col justify-end overflow-hidden rounded-md border border-line bg-coffee p-6 transition-all duration-500 ease-[var(--ease-cozy)] hover:-translate-y-1 hover:border-gold hover:shadow-xl sm:min-h-[420px]"
                 >
                   {/* Foto de fundo */}

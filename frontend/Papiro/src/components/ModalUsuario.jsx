@@ -20,9 +20,7 @@ function formInicial(usuario) {
   }
 }
 
-/**
- * ModalUsuario — Criação e Edição de Usuários no Painel Administrativo.
- */
+
 export default function ModalUsuario({
   onClose,
   onSalvar,

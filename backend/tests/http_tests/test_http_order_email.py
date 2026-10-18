@@ -1,12 +1,4 @@
-"""Testes HTTP dos endpoints de e-mail de confirmação de pedido.
 
-Cobre:
-- ``POST /api/v1/orders/send-confirmation-email`` (disparo manual)
-- ``GET /api/v1/orders/send-confirmation-email/status/{task_id}`` (consulta)
-
-O ``OrderService`` é mockado na factory da rota (``get_order_service``);
-nenhum Redis/broker real é usado — ``use_scaler``.
-"""
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
@@ -16,7 +8,7 @@ PREFIX = "/api/v1/orders"
 
 @pytest.fixture
 def auth_user():
-    """Usuário autenticado injetado no lugar de ``get_current_user``."""
+
     from app.api.deps import get_current_user
     from app.main import app
 
@@ -57,14 +49,14 @@ class TestSendConfirmationEmail:
 
 class TestGetTaskStatus:
     def test_require_auth(self, client):
-        """SEGURANÇA: o status de tarefa não é mais público."""
+
         response = client.get(
             f"{PREFIX}/send-confirmation-email/status/task_abc"
         )
         assert response.status_code == 401
 
     def test_returns_status(self, client, auth_user):
-        """Endpoint exige Bearer token (a tarefa vaza dados do pedido)."""
+
         auth_user(1)
         svc = AsyncMock(name="order_service")
         svc.get_task_status.return_value = {

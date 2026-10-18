@@ -12,6 +12,10 @@ from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
 from app.api.deps import get_current_user, get_db
+from app.api.exceptions import (
+    BookCommerceException,
+    IntegrationUnavailableError,
+)
 from app.api.limiter import limiter
 from app.core.config import get_settings
 from app.models.user import User
@@ -84,11 +88,7 @@ def get_payments_history(
         int, Query(ge=1, le=100, description="Itens por página (max 100)")
     ] = 20,
 ) -> dict:
-    """Histórico de pagamentos paginado no envelope ``{ data, meta }``.
 
-    Mantém a vantagem original (1 request em vez de N) e agora limita o volume
-    devolvido, com contagem e ``offset`` feitos no banco.
-    """
     return get_payment_service(db).get_history_paginated(user.id, page, per_page)
 
 @payment_router.post(
@@ -126,10 +126,7 @@ async def process_webhook(
     x_request_id = request.headers.get("x-request-id")
     query = request.query_params
 
-    # Este endpoint processa apenas notificações no formato Webhook (novo):
-    #     ?data.id=...&type=payment | topic_merchant_order_wh
-    # Notificações IPN (clássico) usam ?id=...&topic=... e são ignoradas de
-    # propósito — a configuração no painel do Mercado Pago deve usar Webhooks.
+
     data_id = query.get("data.id")
     tipo = query.get("type", "")
 
@@ -140,12 +137,8 @@ async def process_webhook(
         )
         return {"status": "ignored"}
 
-    # Normaliza "topic_merchant_order_wh" -> "merchant_order".
     topic = tipo.replace("topic_", "").replace("_wh", "")
 
-    # Mais de uma aplicação do Mercado Pago pode enviar webhooks para a mesma
-    # URL, cada uma assinando com o seu próprio secret. Tentamos o secret
-    # principal e os extras (MERCADO_PAGO_WEBHOOK_SECRETS_EXTRA).
     secrets = [settings.MERCADO_PAGO_WEBHOOK_SECRET]
     secrets += [
         s.strip()
@@ -166,14 +159,6 @@ async def process_webhook(
             erro = exc
 
     if not assinatura_ok and not settings.VALIDATE_WEBHOOK_SIGNATURE:
-        # Validação de assinatura DESLIGADA por configuração (VALIDATE_WEBHOOK_SIGNATURE=false).
-        #
-        # Motivo: em ambiente de TESTE/sandbox, o Mercado Pago assina as
-        # notificações com um secret que NÃO é o exibido no painel da aplicação
-        # (o envelope é assinado no contexto da conta de teste, não da app),
-        # tornando impossível validar em sandbox com o secret do painel.
-        # Em produção, com credenciais de produção, a validação funciona e deve
-        # ser reativada (VALIDATE_WEBHOOK_SIGNATURE=true).
         logger.info(
             "Webhook aceito SEM validar assinatura (VALIDATE_WEBHOOK_SIGNATURE=false). "
             "reason=%s request_id=%s",
@@ -185,10 +170,6 @@ async def process_webhook(
     if not assinatura_ok:
         assert erro is not None
         err = erro
-        # Loga a razão exata (SIGNATURE_MISMATCH, MISSING_SIGNATURE_HEADER, etc.)
-        # para permitir distinguir secret errado de header ausente/malformado.
-        # Calcula a idade do ts: webhooks antigos demais indicam reenvios da
-        # fila de retry do MP assinados com um secret anterior.
         idade_s = None
         if err.timestamp and err.timestamp.isdigit():
             idade_s = int(time.time()) - int(err.timestamp)
@@ -217,10 +198,7 @@ async def process_webhook(
 
     data = await request.json()
 
-    # Notificações que não são de pagamento/pedido não devem ser processadas:
-    #  - mp-connect: vinculação de conta via OAuth
-    #  - claims / etc.: disputas, integrações, etc.
-    # Retornar 200 evita que o MP fique reenviando a notificação.
+
     tipos_de_pagamento = {
         "payment",
         "merchant_order",
@@ -239,27 +217,43 @@ async def process_webhook(
     if not payment_id:
         return {"status": "ignored"}
 
-    # O processamento real (chamada de rede ao Mercado Pago + atualização do
-    # pedido) é executado em um THREAD via ``run_in_threadpool``, NÃO no event
-    # loop. Este endpoint é `async def` e o SDK do Mercado Pago é síncrono/
-    # HTTP bloqueante: rodar direto aqui bloquearia o event loop único do
-    # uvicorn durante todo o request ao MP. ``run_in_threadpool`` move a
-    # chamada para um thread de worker do asyncio, mantendo o restante do
-    # servidor responsivo. (Trade-off leve em vez de um worker Celery dedicado
-    # — ver ADR em README; jobs pesados de e-mail/comprovante ainda usam
-    # Celery.)
+
     try:
         await run_in_threadpool(
             get_payment_service(db).process_webhook,
             str(payment_id),
             topic or None,
         )
-    except Exception:  # noqa: BLE001
-        # Registra o erro mas responde 200: o MP reenvia por 15 min em caso de
-        # 5xx, o que só repete a falha. O log permite investigar depois.
-        logger.exception(
-            "Falha ao processar webhook (id=%s, topic=%s)", payment_id, topic
+    except IntegrationUnavailableError as exc:
+        # D23b: falha transitória -> 5xx para o provedor reenviar.
+        logger.warning(
+            "Webhook indisponível, pedindo reenvio (id=%s, topic=%s): %s",
+            payment_id,
+            topic,
+            exc,
         )
-        return {"status": "error"}
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Dependência indisponível, reenvie a notificação.",
+        ) from exc
+    except BookCommerceException:
+        # D23b: erro de negócio definitivo -> o provedor não deve reenviar.
+        logger.exception(
+            "Webhook rejeitado por regra de negócio (id=%s, topic=%s)",
+            payment_id,
+            topic,
+        )
+        raise
+    except Exception as exc:
+        # D23b: erro inesperado -> 5xx para o provedor reenviar.
+        logger.exception(
+            "Falha inesperada ao processar webhook (id=%s, topic=%s)",
+            payment_id,
+            topic,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Falha ao processar a notificação, reenvie.",
+        ) from exc
 
     return {"status": "ok"}

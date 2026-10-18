@@ -1,7 +1,4 @@
-/**
- * Field — a serif-labelled input with a single hairline underline.
- * Keeps the airy, editorial rhythm of the reference layout.
- */
+
 export default function Field({ label, id, error, children }) {
   return (
     <div className="group">

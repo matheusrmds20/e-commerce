@@ -1,18 +1,3 @@
-"""Testes HTTP da rota /api/v1/addresses.
-
-Sucesso: 201/200 com payloads válidos (criação, listagem, busca por id/CEP,
-endereço padrão, update e delete).
-Erros: validação 422, endereço/usuário inexistente 404, endereço de outro
-usuário 403 e CEP duplicado 409.
-
-AUTENTICAÇÃO: todas as rotas exigem Bearer token e derivam o ``user_id`` do
-usuário autenticado (``Depends(get_current_user)``). O ``user_id`` NÃO é mais
-aceito como query param nem no corpo do ``AddressCreate`` — fechou o IDOR de
-criar/ler endereço em nome de outra pessoa. Ver test_http_cart.py para o padrão.
-
-NOTA: o AddressService real lança ``ValueError`` em vez das exceções de domínio.
-As rotas traduzem esse ``ValueError`` para 400/403/404/409.
-"""
 from unittest.mock import Mock, patch
 
 import pytest
@@ -38,7 +23,7 @@ CREATE_OK = {
 
 @pytest.fixture
 def auth_user():
-    """Usuário autenticado injetado no lugar de ``get_current_user``."""
+
     from app.api.deps import get_current_user
     from app.main import app
 
@@ -85,12 +70,6 @@ class TestAuthRequired:
         assert response.status_code == 401
 
     def test_user_id_query_is_ignored(self, client, auth_user):
-        """Passar user_id na query não muda quem é o dono (anti-IDOR).
-
-        A requisição autentica pelo token; o ``user_id`` da query é ignorado.
-        Aqui o token pertence ao usuário 1 e a query tenta o 999 — o service
-        deve receber 1.
-        """
         auth_user(1)
         svc = Mock(name="address_service")
         svc.get_by_user_id.return_value = [address_payload()]
@@ -118,7 +97,7 @@ class TestCreateAddress:
         assert body["user_id"] == 1
 
     def test_create_uses_token_user_id(self, client, auth_user):
-        """O ``user_id`` passado ao service é o do token, não de query/corpo."""
+
         auth_user(7)
         svc = Mock(name="address_service")
         svc.create.return_value = address_payload(user_id=7)
@@ -171,7 +150,7 @@ class TestCreateAddress:
         assert_validation_error(response)
 
     def test_create_user_id_in_body_is_ignored(self, client, auth_user):
-        """``user_id`` no corpo é apenas ignorado (não autentica nem quebra)."""
+
         auth_user(1)
         svc = Mock(name="address_service")
         svc.create.return_value = address_payload()

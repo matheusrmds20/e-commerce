@@ -87,11 +87,11 @@ class TestCreate:
         assert result.amount == 100.0
         assert result.status == "pending"
 
-        # O pagamento precisa ACABAR no session, senão o commit não persiste nada.
+
         payment_service.session.add.assert_called_once_with(result)
 
     def test_create_deriva_amount_do_pedido(self, payment_service, order_repo):
-        """SEGURANÇA: o valor cobrado vem do PEDIDO, nunca do cliente."""
+
         order_repo.get_by_id.return_value = make_order(user_id=1, total=250.0)
 
         result = payment_service.create(
@@ -112,7 +112,7 @@ class TestCreate:
     def test_create_pedido_de_outro_usuario_e_proibido(
         self, payment_service, order_repo
     ):
-        """SEGURANÇA (IDOR): não dá para registrar pagamento em pedido alheio."""
+
         order_repo.get_by_id.return_value = make_order(user_id=2)
 
         with pytest.raises(ForbiddenException):
@@ -143,7 +143,7 @@ class TestGetById:
     def test_get_by_id_de_outro_usuario_e_proibido(
         self, payment_service, payment_repo, order_repo
     ):
-        """SEGURANÇA (IDOR): um usuário não lê o pagamento de outro."""
+
         payment_repo.get_by_id.return_value = make_payment(order_id=1)
         order_repo.get_by_id.return_value = make_order(id=1, user_id=2)
 
@@ -170,7 +170,7 @@ class TestGetByOrderId:
         self, payment_service, payment_repo, user_repo, order_repo
     ):
         user = self._make_user()
-        # get_by_order_id valida usuário e pedido antes de listar os payments.
+
         user_repo.get_by_id.return_value = user
         order_repo.get_by_id.return_value = make_order(user_id=1)
         payments = [make_payment()]
@@ -181,7 +181,7 @@ class TestGetByOrderId:
     def test_get_by_order_id_empty(
         self, payment_service, payment_repo, user_repo, order_repo
     ):
-        """Pedido sem pagamentos devolve [] (estado normal), não erro."""
+
         user = self._make_user()
         user_repo.get_by_id.return_value = user
         order_repo.get_by_id.return_value = make_order(user_id=1)
@@ -197,7 +197,7 @@ class TestGetHistory:
         return user
 
     def test_get_history_success(self, payment_service, payment_repo, user_repo):
-        """Retorna todos os pagamentos do usuário em uma única consulta."""
+
         user = self._make_user()
         user_repo.get_by_id.return_value = user
         pagamentos = [make_payment(), make_payment(id=2)]
@@ -219,7 +219,7 @@ class TestGetHistory:
     def test_get_history_sem_pagamentos_retorna_lista_vazia(
         self, payment_service, payment_repo, user_repo
     ):
-        """Usuário sem pagamentos devolve [] (estado normal), não erro."""
+
         user = self._make_user()
         user_repo.get_by_id.return_value = user
         payment_repo.get_by_user_id.return_value = []
@@ -247,9 +247,6 @@ class TestCreateCheckout:
         assert result["payment_id"] == result["id"]
         assert result["checkout_url"] == "https://mp/checkout/PREF1"
         payment_service.session.add.assert_called_once()
-        # (1) `commit()` explícito libera a transação de leitura antes da
-        # chamada externa ao MP (FASE 2); (2) a persistência do novo Payment
-        # acontece em `with session.begin()`, que commita no exit.
         payment_service.session.commit.assert_called_once()
         payment_service.session.begin.assert_called()
 
@@ -283,8 +280,7 @@ class TestCreateCheckout:
     def test_create_checkout_inclui_frete_na_preferencia(
         self, payment_service, order_repo, payment_repo, payment_gateway
     ):
-        """Quando o pedido tem frete, ele entra como item da preferência para
-        o Mercado Pago cobrar o total (subtotal - desconto + frete)."""
+
         order_repo.get_by_id.return_value = make_order(
             subtotal=100.0, shipping_cost=27.5, total=127.5
         )
@@ -319,11 +315,7 @@ class TestCreateCheckout:
     def test_create_checkout_inclui_desconto_negativo(
         self, payment_service, order_repo, payment_repo, payment_gateway
     ):
-        """O desconto entra como item NEGATIVO, senão o cliente paga a mais.
 
-        Antes o desconto existia em `order.total` mas era omitido da
-        preferência, então o Mercado Pago cobrava o subtotal cheio.
-        """
         order_repo.get_by_id.return_value = make_order(
             subtotal=100.0, discount_amount=10.0, shipping_cost=0.0, total=90.0
         )
@@ -344,13 +336,13 @@ class TestCreateCheckout:
             "unit_price": -10.0,
             "currency_id": "BRL",
         } in items
-        # A soma dos itens bate com o total cobrado (90.0).
+
         assert round(sum(i["unit_price"] * i["quantity"] for i in items), 2) == 90.0
 
     def test_create_checkout_recusa_total_inconsistente(
         self, payment_service, order_repo, payment_repo, payment_gateway
     ):
-        """Defesa: se a soma dos itens divergir do total, não cobra."""
+
         order_repo.get_by_id.return_value = make_order(
             subtotal=100.0, discount_amount=0.0, shipping_cost=0.0, total=999.0
         )
@@ -365,7 +357,7 @@ class TestCreateCheckout:
     def test_create_checkout_usa_sandbox_init_point(
         self, payment_service, order_repo, payment_repo, payment_gateway
     ):
-        """O checkout usa o ``sandbox_init_point`` (ambiente de teste)."""
+
         self._setup_success(order_repo, payment_repo)
         payment_gateway.create_preference.return_value = {
             "id": "PREF1",
@@ -380,7 +372,7 @@ class TestCreateCheckout:
     def test_create_checkout_fallback_para_init_point(
         self, payment_service, order_repo, payment_repo, payment_gateway
     ):
-        """Sem ``sandbox_init_point``, cai no ``init_point``."""
+
         self._setup_success(order_repo, payment_repo)
         payment_gateway.create_preference.return_value = {
             "id": "PREF1",
@@ -394,7 +386,7 @@ class TestCreateCheckout:
     def test_create_checkout_nao_envia_auto_return(
         self, payment_service, order_repo, payment_repo, payment_gateway
     ):
-        """A preferência não inclui ``auto_return``."""
+
         self._setup_success(order_repo, payment_repo)
         payment_gateway.create_preference.return_value = {
             "id": "PREF1",
@@ -409,7 +401,7 @@ class TestCreateCheckout:
     def test_create_checkout_sem_urls_retorna_none(
         self, payment_service, order_repo, payment_repo, payment_gateway
     ):
-        """Sem nenhuma URL na resposta, ``checkout_url`` fica None."""
+
         self._setup_success(order_repo, payment_repo)
         payment_gateway.create_preference.return_value = {"id": "PREF1"}
 
@@ -481,27 +473,20 @@ class TestProcessWebhook:
         assert result.status == "approved"
         assert result.provider_payment_id == "MP-PAY-1"
         assert order_repo.get_by_id(1).status == OrderStatus.COMPLETED
-        # A transação é aberta com `session.begin()` como context manager, que
-        # faz o commit no exit (não há mais `session.commit()` manual).
+
         payment_service.session.begin.assert_called()
 
     def test_webhook_approved_dispara_email_automatico(
         self, payment_service, payment_repo, order_repo, payment_gateway
     ):
-        """Pagamento aprovado dispara o e-mail de confirmação em background.
 
-        Verifica que a task Celery ``send_order_confirmation_email.delay`` é
-        enfileirada com o e-mail do usuário e o payload serializável do pedido.
-        """
         from types import SimpleNamespace
         from unittest.mock import patch
 
         payment_repo.get_by_provider_payment_id_for_update.return_value = None
         payment_repo.get_by_order_id.return_value = [make_payment()]
 
-        # Usamos um objeto simples (não o modelo Order instrumentado) porque a
-        # relationship `order_items` do modelo SQLAlchemy não aceita atribuição
-        # direta de objetos não-instrumentados.
+
         order = SimpleNamespace(
             id=1,
             user_id=1,
@@ -539,8 +524,7 @@ class TestProcessWebhook:
     def test_webhook_approved_sem_usuario_nao_dispara_email(
         self, payment_service, payment_repo, order_repo, payment_gateway
     ):
-        """Sem e-mail de usuário, o webhook segue sem enfileirar a task
-        (fluxo desgradável, não quebra o processamento do pagamento)."""
+
         from types import SimpleNamespace
         from unittest.mock import patch
 
@@ -566,11 +550,7 @@ class TestProcessWebhook:
     def test_webhook_approved_dispara_geracao_comprovante(
         self, payment_service, payment_repo, order_repo, payment_gateway
     ):
-        """Pagamento aprovado enfileira a geração do comprovante PDF.
 
-        A task ``generate_order_receipt.delay`` é chamada com o id do pedido
-        quando o pagamento é aprovado, junto do disparo do e-mail.
-        """
         from types import SimpleNamespace
         from unittest.mock import patch
 
@@ -605,7 +585,7 @@ class TestProcessWebhook:
     def test_webhook_merchant_order_resolves_payment(
         self, payment_service, payment_repo, order_repo, payment_gateway
     ):
-        """Notificação de merchant_order: id é da order; o payment vem de dentro."""
+
         payment_repo.get_by_provider_payment_id_for_update.return_value = None
         payment_repo.get_by_order_id.return_value = [make_payment()]
         order_repo.get_by_id.return_value = make_order()
@@ -657,7 +637,7 @@ class TestProcessWebhook:
     def test_webhook_links_by_provider_payment_id(
         self, payment_service, payment_repo, order_repo, payment_gateway
     ):
-        """Se o pagamento já está vinculado, não cai no fallback por order_id."""
+
         payment_repo.get_by_provider_payment_id_for_update.return_value = make_payment()
         order_repo.get_by_id.return_value = make_order()
         self._gateway_returns(payment_gateway, "approved")
@@ -678,8 +658,7 @@ class TestProcessWebhook:
         result = payment_service.process_webhook("MP-PAY-1")
 
         assert result.status == "approved"
-        # Já aprovado: não deve reprocessar o pedido. (A transação de leitura
-        # ainda é aberta pelo `with`, mas nenhuma alteração é persistida.)
+
         payment_service.session.commit.assert_not_called()
         order_repo.get_by_id.assert_not_called()
 

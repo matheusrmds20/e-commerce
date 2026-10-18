@@ -31,7 +31,7 @@ test.describe('Endereço', () => {
     await registrarPelaUi({ email: emailUnico('endereco') })
 
     // Item na sacola para um fluxo real de checkout.
-    await page.getByTestId('nav-acervo').click()
+    await page.goto('/acervo')
     const card = page.getByTestId(/^book-card-/).first()
     await expect(card).toBeVisible({ timeout: 15_000 })
     await card.locator('img').click()
@@ -41,7 +41,7 @@ test.describe('Endereço', () => {
     await page.getByTestId('btn-add-carrinho').click()
 
     // Vai ao checkout e abre o modal de novo endereço.
-    await page.getByTestId('nav-checkout').click()
+    await page.goto('/checkout')
     await expect(page.getByTestId('btn-novo-endereco')).toBeVisible({
       timeout: 15_000,
     })
@@ -67,7 +67,7 @@ test.describe('Endereço', () => {
     await expect(page.locator('body')).toContainText('Jardim Botânico')
 
     // Listagem em Minha Conta → aba Endereços.
-    await page.getByTestId('nav-minhaconta').click()
+    await page.goto('/minhaconta')
     await page.getByRole('button', { name: 'Endereços' }).first().click()
     await expect(page.locator('body')).toContainText('Rua das Flores', {
       timeout: 15_000,

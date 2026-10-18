@@ -9,13 +9,7 @@ from app.repositories.category_repo import CategoryRepository
 
 
 class CategoryService:
-    """Regras de categorias.
 
-    SEGURANÇA: leitura (get_by_*/get_all) continua pública — o catálogo precisa
-    listar categorias sem login. Escrita (create/update/delete) passou a exigir
-    **administrador** (o usuário vem do token, resolvido pela rota). Antes
-    qualquer anônimo podia criar/excluir categorias.
-    """
 
     def __init__(self, db):
         self.repo = CategoryRepository(db)

@@ -1,12 +1,3 @@
-"""Testes HTTP da rota /api/v1/health.
-
-Cobre o health check da API e do banco de dados:
-- Sucesso: banco respondendo -> 200 com status "ok" e dependency database "ok".
-- Falha: banco indisponível -> 503 com status "error" e dependency "error".
-- Formato: campos do HealthResponse (app, version, dependencies).
-
-NOTA: /health é PÚBLICO (sem token) — ferramentas de infra não têm autenticação.
-"""
 from unittest.mock import Mock
 
 import pytest
@@ -26,7 +17,6 @@ def health_db(client):
 
 class TestHealth:
     def test_health_ok(self, client, health_db):
-        # Por padrão Mock não lança; ``SELECT 1`` considera-se bem-sucedido.
         resp = client.get(PREFIX)
 
         assert resp.status_code == 200

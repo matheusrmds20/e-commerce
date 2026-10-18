@@ -1,16 +1,4 @@
-"""Testes HTTP da rota /api/v1/categories.
 
-Sucesso: 201/200 com payloads válidos (criação, listagem, buscas, update, delete).
-Erros: validação 422, categoria inexistente 404 e conflito 409 (nome/slug
-duplicados).
-
-SEGURANÇA: create/update/delete exigem Bearer token de **administrador**
-(401 sem token, 403 sem permissão). Leitura (list/get/name/slug) continua
-pública — o catálogo precisa das categorias sem login.
-
-NOTA: o service lança ``BookCommerceException`` diretamente (403/409/404); os
-handlers globais geram a resposta. Sem ``_traduzir_value_error`` na rota.
-"""
 from unittest.mock import Mock, patch
 
 import pytest
@@ -30,10 +18,7 @@ CREATE_OK = {"name": "Tecnologia", "slug": "tecnologia"}
 
 @pytest.fixture
 def auth_user():
-    """Usuário autenticado injetado no lugar de ``get_current_user``.
 
-    Mesmo padrão de test_http_wishlist.py / test_http_reviews.py.
-    """
     from app.api.deps import get_current_user
     from app.main import app
 

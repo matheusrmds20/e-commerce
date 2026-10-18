@@ -5,6 +5,7 @@ from app.api.exceptions import (
     BadRequestException,
     ConflictException,
     ForbiddenException,
+    IntegrationRejectedError,
     OrderNotFoundException,
     PaymentNotFoundException,
     UserNotFoundException,
@@ -34,17 +35,7 @@ class PaymentService:
         self.session = db
 
     def create(self, data, user_id: int) -> Payment:
-        """Registra um pagamento para um pedido DO PRÓPRIO usuário.
 
-        SEGURANÇA: antes o `user_id` nem chegava aqui e `amount`/`status`/
-        `currency`/`provider_payment_id` vinham crus do cliente, permitindo
-        injetar um pagamento `approved` de valor arbitrário em qualquer pedido
-        (e ainda bloquear o checkout real via `PAYMENT_ALREADY_EXISTS`).
-        Agora: (1) o pedido precisa pertencer ao usuário; (2) o valor cobrado é
-        sempre o total do pedido; (3) o status inicial é sempre `pending`.
-        A promoção para `approved` só acontece pelo webhook assinado do
-        provedor (``process_webhook``).
-        """
         order = self.order_repo.get_by_id(data.order_id)
 
         if not order:
@@ -65,8 +56,7 @@ class PaymentService:
             status="pending",
         )
 
-        # Transação explícita: o `with` faz o commit no exit. Antes era um
-        # `commit()` solto, que deixava a fronteira de transação implícita.
+
         with transacao(self.session):
             self.session.add(payment)
 
@@ -76,12 +66,7 @@ class PaymentService:
 
 
     def get_by_id(self, id: int, user_id: int | None = None) -> Payment:
-        """Busca um pagamento pelo ID.
 
-        Quando `user_id` é informado, exige que o pagamento pertença a um
-        pedido do usuário — fecha o IDOR que devolvia o pagamento de qualquer
-        pessoa para qualquer usuário autenticado.
-        """
         payment = self.repo.get_by_id(id)
 
         if payment is None:
@@ -118,12 +103,7 @@ class PaymentService:
         return self.repo.get_by_order_id(order_id)
 
     def get_history(self, user_id: int) -> list[Payment]:
-        """Retorna o histórico de pagamentos do usuário em uma única query.
 
-        A aba "Pagamentos" da Minha Conta não precisa mais fazer 1 request por
-        pedido (antes um ``Promise.all`` de ``get_by_order_id`` por pedido).
-        Se o usuário não existe, levanta erro de autenticação.
-        """
         user = self.user_repo.get_by_id(user_id)
 
         if not user:
@@ -134,7 +114,7 @@ class PaymentService:
     def get_history_paginated(
         self, user_id: int, page: int = 1, per_page: int = 20
     ) -> dict:
-        """Histórico de pagamentos paginado no envelope ``Page[T]``."""
+
         from app.schemas.common import montar_pagina
 
         user = self.user_repo.get_by_id(user_id)
@@ -184,10 +164,7 @@ class PaymentService:
             for item in order_items
         ]
 
-        # Se o pedido tem desconto, entra como item de valor NEGATIVO para que
-        # o Mercado Pago cobre `subtotal - desconto (+ frete)`. Antes o
-        # desconto existia em `order.total` mas era omitido da preferência, e
-        # o cliente pagava o subtotal cheio (a mais que o próprio pedido).
+
         if order.discount_amount and order.discount_amount > 0:
             items.append(
                 {
@@ -199,9 +176,7 @@ class PaymentService:
                 }
             )
 
-        # Se o pedido tem frete, inclui-o como item da preferência para que o
-        # Mercado Pago cobre o total (subtotal - desconto + frete). Sem isso o
-        # MP soma apenas os produtos (subtotal) e o frete ficaria de fora.
+
         if order.shipping_cost and order.shipping_cost > 0:
             items.append(
                 {
@@ -231,16 +206,9 @@ class PaymentService:
         }
 
 
-
-
-        # Total do pedido capturado ANTES do commit: ao encerrar a transação de
-        # leitura, os atributos de `order` ficam expirados/recarregados no acesso.
         total_para_cobrar = order.total
 
-        # Coerência de centavos: a soma dos itens da preferência é o que o MP
-        # efetivamente cobra. Se divergir do total do pedido (arredondamento de
-        # float acumulado), o valor pago não bate com o registrado — melhor
-        # falhar alto do que cobrar um valor inconsistente.
+
         soma_itens = round(sum(float(i["unit_price"]) * i["quantity"] for i in items), 2)
         if soma_itens != round(float(total_para_cobrar), 2):
             logger.error(
@@ -255,12 +223,6 @@ class PaymentService:
                 code="ORDER_TOTAL_MISMATCH",
             )
 
-        # FASE 2: encerra a transação de LEITURA antes da chamada externa ao
-        # Mercado Pago. Com autocommit=False, a primeira query (get_by_id)
-        # abriria uma transação que permaneceria aberta durante todo o request
-        # de rede, segurando uma conexão do pool por até o timeout. Fechar essa
-        # transação agora libera a conexão; o `Payment` é persistido numa
-        # transação nova, logo após o retorno do MP.
         self.session.commit()
 
         preference = self.gateway.create_preference(preference_data)
@@ -275,21 +237,15 @@ class PaymentService:
             status="pending",
         )
 
-        # Transação explícita para persistir o pagamento.
+
         with transacao(self.session):
             self.session.add(payment)
 
         payment_id = payment.id
 
-
-
-        # Sandbox: usa o sandbox_init_point (checkout de teste). Faz fallback
-        # para o init_point caso o MP não retorne o campo em sandbox.
         checkout_url = preference.get("sandbox_init_point") or preference.get(
             "init_point"
         )
-
-
 
         return {
             "id": payment_id,
@@ -315,7 +271,8 @@ class PaymentService:
 
         try:
             provider_payment = self.gateway.get_payment(payment_provider_id)
-        except RuntimeError as err:
+        except IntegrationRejectedError as err:
+            # D23: o 404 do provedor significa que o id é de uma merchant order.
             if "404" not in str(err):
                 raise
 
@@ -341,9 +298,6 @@ class PaymentService:
 
         order_id = int(external_reference)
 
-        # `transacao` reaproveita a transação caso a sessão já tenha feito query
-        # antes (autobegin) — o `begin()` direto lançaria InvalidRequestError.
-        # O commit acontece no exit; não chamamos `commit()` lá dentro.
         with transacao(self.session):
 
             payment = self.repo.get_by_provider_payment_id_for_update(payment_provider_id)
@@ -361,8 +315,6 @@ class PaymentService:
                 )
 
             if payment.status == "approved":
-                # O pedido já estava aprovado: nada a fazer. O `with` abaixo
-                # faz o commit (sem mudanças) ao sair do bloco.
                 return payment
 
             payment.status = provider_payment["status"]
@@ -390,7 +342,7 @@ class PaymentService:
                             exc,
                         )
 
-                    # Gera o comprovante PDF em background (só quando aprovado).
+
                     try:
                         generate_order_receipt.delay(order.id)
                     except Exception as exc:
@@ -406,10 +358,5 @@ class PaymentService:
                     order.status = OrderStatus.CANCELLED
                 order.updated_at = datetime.now()
 
-        # Commit feito por `transacao(self.session)` ao sair do bloco.
-        # Não chamamos `commit()`/`refresh()` lá dentro: o commit manual
-        # encerrava a transação antes do `__exit__` do context manager, que
-        # então operava sobre uma transação já finalizada (e um erro entre o
-        # commit manual e o exit deixava os dois estados inconsistentes).
         self.session.refresh(payment)
         return payment

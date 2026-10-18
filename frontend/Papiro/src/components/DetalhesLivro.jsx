@@ -2,10 +2,7 @@ import { useState } from 'react'
 import Estrelas from './Estrelas'
 import { ChevronDownIcon } from './Icons'
 
-/**
- * Secao — bloco retrátil com título e conteúdo.
- * Fecha/abre com animação de altura via grid-template-rows.
- */
+
 function Secao({ id, titulo, aberta, onToggle, children }) {
   return (
     <section className="border-t border-line">
@@ -182,17 +179,6 @@ function FormularioEdicaoAvaliacao({ notaInicial, textoInicial, enviando, onSalv
   )
 }
 
-/**
- * DetalhesLivro — três seções retráteis: descrição, ficha e avaliações.
- *
- * Props:
- * - `descricao`: string[] parágrafos do produto.
- * - `ficha`: produto normalizado (fonte dos dados técnicos).
- * - `avaliacoes`: lista já normalizada (`avaliacaoParaView`).
- * - `enviando`, `feedback`: estado do fluxo de avaliação.
- * - `onAvaliar({rating, comment})`, `onEditarAvaliacao(reviewId, {rating, comment})`,
- *   `onExcluirAvaliacao(reviewId)`: ações.
- */
 export default function DetalhesLivro({
   descricao = [],
   ficha = {},

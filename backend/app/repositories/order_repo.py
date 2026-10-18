@@ -23,12 +23,7 @@ class OrderRepository(BaseRepository[Order]):
         return self.session.query(OrderItem).options(selectinload(OrderItem.products)).filter(OrderItem.order_id == id).all()
 
     def get_by_user_id_eager(self, user_id: int) -> list[Order]:
-        """Pedidos do usuário com os itens já carregados.
 
-        Evita o N+1 do ``/orders/list``: sem o ``selectinload``, serializar
-        ``OrderResponse.order_items`` disparava 1 SELECT por pedido. Aqui são
-        2 queries fixas (pedidos + itens), não O(N).
-        """
         return (
             self.session.query(Order)
             .options(selectinload(Order.order_items))
@@ -40,12 +35,7 @@ class OrderRepository(BaseRepository[Order]):
     def paginate_by_user_id(
         self, user_id: int, page: int, per_page: int
     ) -> tuple[list[Order], int]:
-        """Pedidos do usuário paginados no banco, com itens pré-carregados.
 
-        ``selectinload`` embutido evita o N+1 na serialização de
-        ``order_items``; o ``count`` roda sobre o mesmo filtro para o
-        ``total_pages`` não mentir.
-        """
         query = self.session.query(Order).filter(Order.user_id == user_id)
         total = query.count()
         items = (

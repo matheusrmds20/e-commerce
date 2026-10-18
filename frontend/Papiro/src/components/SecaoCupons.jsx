@@ -1,17 +1,6 @@
 import { formatarPreco } from '../api/adapters'
 
-/**
- * SecaoCupons — seção do checkout que lista os cupons disponíveis para a
- * sacola atual e permite aplicar/remover um deles.
- *
- * Um cupom é "disponível" quando:
- *   - está ativo (`is_active`) e não expirou (`valid_until`);
- *   - é global (`product_id` null) ou se aplica a algum item da sacola;
- *   - o subtotal atinge a compra mínima (`min_purchase`), quando houver.
- *
- * O valor exibido é uma ESTIMATIVA: o backend recalcula o desconto no
- * checkout (`order_service._calculate_totals`) e rejeita cupons inválidos.
- */
+
 export default function SecaoCupons({
   cuponsDisponiveis = [],
   cupomSelecionado,

@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/auth-context'
 import { CloseIcon, SearchIcon } from '../components/Icons'
 import ModalCupom from '../components/ModalCupom'
@@ -174,7 +175,8 @@ function formatarStatus(st) {
   return map[st?.toLowerCase()] || st || 'Pendente'
 }
 
-export default function Admin({ onVoltarParaLoja }) {
+export default function Admin() {
+  const navigate = useNavigate()
   const { usuario } = useAuth()
   const ehAdmin = usuario?.role === 'admin'
 
@@ -762,7 +764,7 @@ export default function Admin({ onVoltarParaLoja }) {
           </p>
           <button
             type="button"
-            onClick={onVoltarParaLoja}
+            onClick={() => navigate('/')}
             className="mt-5 px-4 py-2 font-body text-sm text-cream bg-forest hover:bg-forest-soft"
           >
             Voltar para a loja
@@ -925,7 +927,7 @@ export default function Admin({ onVoltarParaLoja }) {
         <div className="p-4 border-t border-forest-soft space-y-3">
           <button
             type="button"
-            onClick={onVoltarParaLoja}
+            onClick={() => navigate('/')}
             className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs uppercase tracking-wider font-semibold text-cream border border-forest-soft hover:border-gold/50 rounded transition-colors"
           >
             ← Voltar para a Loja

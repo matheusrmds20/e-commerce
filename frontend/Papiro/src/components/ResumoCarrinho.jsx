@@ -1,12 +1,9 @@
-/**
- * ResumoCarrinho — caixa lateral com total e checkout.
- */
-export default function ResumoCarrinho({
-  subtotal,
-  total,
-  formatarPreco,
-  onCheckout,
-}) {
+import { useNavigate } from 'react-router-dom'
+
+
+export default function ResumoCarrinho({ subtotal, total, formatarPreco }) {
+  const navigate = useNavigate()
+
   return (
     <aside className="rounded-md border border-line bg-cream-soft p-7 lg:sticky lg:top-24">
       <h2 className="font-display text-[1.75rem] font-normal text-coffee">
@@ -28,7 +25,7 @@ export default function ResumoCarrinho({
 
       <button
         type="button"
-        onClick={onCheckout}
+        onClick={() => navigate('/checkout')}
         className="mt-7 w-full rounded-sm bg-forest py-4 font-body text-xs font-semibold uppercase tracking-[0.2em] text-cream-soft shadow-md transition-all duration-300 ease-[var(--ease-cozy)] hover:bg-forest-soft hover:shadow-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest"
       >
         Finalizar compra

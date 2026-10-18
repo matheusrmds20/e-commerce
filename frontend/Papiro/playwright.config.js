@@ -25,7 +25,12 @@ const pythonBin =
 export default defineConfig({
   testDir: './e2e/specs',
   timeout: 30_000,
-  fullyParallel: true,
+  // Testes DENTRO do mesmo arquivo rodam em série (fullyParallel=false). Os
+  // specs de carrinho/auth compartilham o backend E2E single-process; com
+  // fullyParallel=true os drivers de um mesmo spec competiam entre si e o
+  // add de item podia ser perdido (badge vazio). Arquivos diferentes continuam
+  // paralelos (até `workers`).
+  fullyParallel: false,
   // Limita o paralelismo: o backend E2E usa o engine padrão do SQLAlchemy
   // (pool_size=5, max_overflow=10) — com 11 workers simultâneos o pool satura
   // e o acervo fica preso em "Carregando títulos…". 3 páginas simultâneas

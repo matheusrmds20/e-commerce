@@ -1,26 +1,4 @@
-"""Geração de comprovante/recibo de pedido em PDF (reportlab).
 
-O gerador é uma função pura: recebe um payload ``dict`` com os dados do pedido
-e grava o PDF num caminho. Não conhece ORM/banco — isso fica na task Celery
-(``app.utils.receipt_tasks``) que monta o payload e chama esta função.
-
-O payload esperado (primitivos serializáveis) é montado por
-``build_order_details`` (itens/totais) combinado com dados de cliente e
-endereço:
-    {
-        "order_id": int,
-        "created_at": datetime/str,
-        "status": str,
-        "customer_name": str,
-        "customer_email": str,
-        "address": "Rua X, 10 - Centro, São Paulo/SP - 01001000",
-        "subtotal": float,
-        "shipping_cost": float,
-        "discount_amount": float,
-        "total": float,
-        "items": [{"name": str, "quantity": int, "price": float}, ...],
-    }
-"""
 from pathlib import Path
 
 from reportlab.lib import colors
@@ -37,15 +15,12 @@ from reportlab.platypus import (
 
 
 def _fmt_br(value: float) -> str:
-    """Formata um valor como moeda brasileira (R$ 1.234,56)."""
+
     return f"R$ {value:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 
 def generate_receipt(payload: dict, output_path: str | Path) -> Path:
-    """Gera um comprovante simples de pedido e grava em ``output_path``.
 
-    Garante que o diretório exista e retorna o ``Path`` do arquivo.
-    """
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 

@@ -49,22 +49,14 @@ class ProductRepository(BaseRepository[Product]):
         return self.session.query(Product).filter(Product.category_id == category_id).all()
 
     def get_by_title(self, title: str) -> Product | None:
-        """Usado internamente por create/update para unicidade de título."""
+
         return self.session.query(Product).filter(Product.title == title).first()
 
     def get_by_slug(self, slug: str) -> Product | None:
-        """Usado internamente por create/update para unicidade de slug."""
         return self.session.query(Product).filter(Product.slug == slug).first()
 
     def get_by_discount_pct(self, discount_pct: int) -> list[Product]:
-        """Produtos com desconto de **pelo menos** `discount_pct`.
 
-        É um filtro mínimo (`>=`), não igualdade: `discount_pct=10` deve trazer
-        quem tem 10%, 15%, 20%... Usar `==` fazia `discount/1` não encontrar
-        nada, já que nenhum produto tem exatamente 1% de desconto.
-
-        Exclui `NULL` naturalmente — comparação com NULL é desconhecida em SQL.
-        """
         return (
             self.session.query(Product)
             .filter(Product.discount_pct >= discount_pct)
@@ -83,21 +75,7 @@ class ProductRepository(BaseRepository[Product]):
         is_active: bool | None = None,
         search: str | None = None,
     ) -> tuple[list[Product], int]:
-        """Catálogo paginado, com filtros opcionais aplicados NO BANCO.
 
-        Sobrescreve o `BaseRepository.paginate` (genérico) porque aqui existem
-        filtros próprios de produto que o reposiório base não conhece.
-
-        `search` é busca parcial e case-insensitive (`ILIKE %termo%`) sobre
-        título, autor e ISBN — substitui os antigos endpoints de match exato
-        (`/title/{title}`, `/isbn/{isbn}`, ...). O termo é aparado e um valor
-        só de espaços é tratado como "sem busca".
-
-        Ponto sutil: a contagem usa **o mesmo filtro** dos itens. Se o `count`
-        fosse global, `total_pages` mentiria (ex.: 30 itens na categoria mas
-        `total` reportando o catálogo inteiro), e a paginação mostraria páginas
-        que não existem.
-        """
         query = self.session.query(Product)
 
         if category_id is not None:
@@ -128,14 +106,7 @@ class ProductRepository(BaseRepository[Product]):
         exclude_ids: list[int] | None = None,
         limit: int = 4,
     ) -> list[Product]:
-        """Produtos ativos para recomendação, excluindo ids informados.
 
-        Existe para o carrinho não precisar baixar o catálogo inteiro e
-        filtrar em memória: o banco faz o filtro e o limite.
-
-        Prioriza quem tem estoque e aplica uma ordem estável por id, para o
-        resultado não mudar entre chamadas com os mesmos parâmetros.
-        """
         query = self.session.query(Product).filter(
             Product.is_active.is_(True),
             Product.stock_qty > 0,
@@ -147,11 +118,7 @@ class ProductRepository(BaseRepository[Product]):
         return query.order_by(Product.id).limit(limit).all()
 
     def get_featured(self, limit: int | None = None) -> list[Product]:
-        """Produtos marcados como destaque na vitrine.
 
-        Sempre restrito a produtos ativos: um produto desativado não deve
-        aparecer na Home mesmo que a flag de curadoria esteja ligada.
-        """
         query = (
             self.session.query(Product)
             .filter(Product.is_featured.is_(True), Product.is_active.is_(True))
@@ -162,11 +129,7 @@ class ProductRepository(BaseRepository[Product]):
         return query.all()
 
     def get_bestsellers(self, limit: int | None = None) -> list[Product]:
-        """Produtos marcados como mais vendidos na vitrine.
 
-        A curadoria é manual (flag `is_bestseller`), então a ordenação é
-        estável por id — não depende de agregação de pedidos.
-        """
         query = (
             self.session.query(Product)
             .filter(Product.is_bestseller.is_(True), Product.is_active.is_(True))

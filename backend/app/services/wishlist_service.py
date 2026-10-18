@@ -14,14 +14,6 @@ from app.repositories.wishlist_repo import WishlistRepository
 
 
 class WishlistService:
-    """Regras da lista de desejos.
-
-    SEGURANÇA: o dono da wishlist NÃO vem mais da query string (`user_id`), e
-    sim do usuário autenticado (`current_user`, resolvido do token pela rota).
-    Um cliente comum só enxerga/altera a própria wishlist; administradores
-    podem operar sobre qualquer usuário. Qualquer violação vira
-    ``WishlistForbiddenException`` na camada de API.
-    """
 
     def __init__(self, db):
         self.repo = WishlistRepository(db)
@@ -43,11 +35,7 @@ class WishlistService:
     def get_by_user_id(
         self, current_user: User, user_id: int | None = None
     ) -> list:
-        """Lista a wishlist do usuário.
 
-        Sem ``user_id`` devolve a do próprio autenticado. Com ``user_id``
-        diferente, só administradores são aceitos.
-        """
         alvo = current_user.id if user_id is None else user_id
         self._ensure_owner_or_admin(current_user, alvo)
 
@@ -56,16 +44,11 @@ class WishlistService:
         if user is None:
             raise UserNotFoundException(user_id=alvo)
 
-        # Wishlist vazia é estado normal (lista vazia), não erro.
+
         return user.wishlist_items or []
 
     def get_by_product_id(self, product_id: int, current_user: User) -> list:
-        """Itens de wishlist de um produto.
 
-        Clientes comuns recebem apenas o próprio item (se existir); admins
-        recebem todos. Assim o endpoint serve ao "já está nos desejos?" do
-        detalhe do produto sem vazar wishlists alheias.
-        """
         product = self.product_repo.get_by_id(product_id)
 
         if product is None:

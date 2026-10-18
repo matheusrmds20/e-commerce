@@ -8,7 +8,7 @@ import { idDoCard } from '../helpers/navegar'
 test.describe('Acervo → Detalhe', () => {
   test('abre o detalhe do livro clicado com título e preço', async ({ page }) => {
     await page.goto('/')
-    await page.getByTestId('nav-acervo').click()
+    await page.goto('/acervo')
 
     // Primeiro card do catálogo (dados da API de teste).
     const card = page.getByTestId(/^book-card-/).first()

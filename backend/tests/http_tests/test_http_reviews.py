@@ -1,23 +1,4 @@
-"""Testes HTTP da rota /api/v1/reviews.
 
-Sucesso: 201/200 com payloads válidos (criação, minhas avaliações, busca por
-produto, update e delete).
-Erros: validação 422 (nota fora de 1-5, comentário curto), usuário/produto/
-avaliação inexistente 404, avaliação duplicada 409, avaliação de outro
-usuário 403 e ausência de token 401.
-
-SEGURANÇA: o autor da avaliação vem do TOKEN (``Depends(get_current_user)``),
-não mais da query ``user_id``. Isso fecha o IDOR que permitia criar/editar/
-excluir avaliações em nome de outra pessoa. Um cliente comum só acessa as
-próprias avaliações; administradores podem operar sobre qualquer uma.
-
-Rotas removidas como órfãs: ``GET /list`` (substituído por /list autenticado),
-``GET /get/{id}`` e ``GET /rating/{rating}``.
-
-NOTA: o ``ReviewService`` real sinaliza falhas com ``ValueError``; a rota as
-traduz para 403 (não-dono) / 409 (duplicado) / 404 (não encontrado) em
-``_traduzir_value_error``.
-"""
 from unittest.mock import Mock, patch
 
 import pytest
@@ -39,11 +20,7 @@ CREATE_OK = {"product_id": 1, "rating": 5, "comment": "Excelente livro"}
 
 @pytest.fixture
 def auth_user():
-    """Usuário autenticado injetado no lugar de ``get_current_user``.
 
-    Mesmo padrão de test_http_wishlist.py: sobrescreve a dependência e devolve
-    um objeto simples com ``id``/``role``.
-    """
     from app.api.deps import get_current_user
     from app.main import app
 

@@ -1,21 +1,3 @@
-"""Testes HTTP da rota /api/v1/cart.
-
-Sucesso: 201/200 com payloads válidos (criação, busca, add, update,
-remove e clear).
-Erros: validação 422, usuário/produto/carrinho/item inexistente 404, item de
-outro usuário 403, carrinho já existente 409 e estoque insuficiente 409.
-
-AUTENTICAÇÃO: todas as rotas de carrinho exigem Bearer token e derivam o
-``user_id`` do usuário autenticado (``Depends(get_current_user)``). O
-``user_id`` NÃO é mais aceito como query param — essa mudança fechou uma falha
-de autorização (IDOR) em que qualquer cliente podia ler/mutar o carrinho de
-outro usuário. Os testes abaixo injetam o usuário via
-``app.dependency_overrides[get_current_user]``.
-
-NOTA: o CartService real lança exceções de domínio (subclasses de
-``BookCommerceException``) e os handlers globais geram o JSON de erro
-(404/403/409/400). Testes que mockam essas exceções validam o contrato HTTP.
-"""
 from unittest.mock import Mock, patch
 
 import pytest
@@ -37,13 +19,7 @@ ADD_ITEM_OK = {"product_id": 1, "quantity": 2}
 
 @pytest.fixture
 def auth_user():
-    """Usuário autenticado injetado no lugar de ``get_current_user``.
 
-    Retorna uma factory para permitir trocar o ``id`` em testes que exercitam
-    carrinho de outro usuário (o service compara ``cart.user_id != user.id``).
-    O override é removido pelo teardown do fixture ``client``, que chama
-    ``app.dependency_overrides.clear()``.
-    """
     from app.api.deps import get_current_user
     from app.main import app
 
@@ -63,7 +39,7 @@ def auth_user():
 
 
 class TestAuthRequired:
-    """Sem token, nenhuma rota de carrinho deve responder."""
+
 
     def test_create_requires_auth(self, client):
         response = client.post(f"{PREFIX}/create")
@@ -78,11 +54,7 @@ class TestAuthRequired:
         assert response.status_code == 401
 
     def test_user_id_query_is_ignored(self, client, auth_user):
-        """Passar user_id na query não deve autenticar a requisição.
 
-        Regressão do IDOR: antes bastava `?user_id=1` para acessar o carrinho
-        alheio. Hoje a query é simplesmente ignorada e o token é obrigatório.
-        """
         response = client.get(f"{PREFIX}/cart/me?user_id=1")
         assert response.status_code == 401
 
@@ -152,13 +124,7 @@ class TestGetCart:
         assert_error(response, 404, "CART_NOT_FOUND")
 
     def test_get_by_user_id_cart_nao_encontrada_vira_404(self, client, auth_user):
-        """Handshake do front: usuário novo navega e o app chama GET /cart/me.
 
-        O service real lança ``CartNotFoundException`` (404 CART_NOT_FOUND).
-        Regressão: antes a tradução de ``ValueError`` não existia e o erro
-        caía no handler genérico (500 + traceback no log) a cada carrinho de
-        usuário recém-criado.
-        """
         auth_user(1)
         svc = Mock(name="cart_service")
         svc.get_by_user_id.side_effect = CartNotFoundException()
@@ -244,8 +210,7 @@ class TestUpdateItem:
         svc.update_item.assert_called_once_with(1, 1, 1, 5)
 
     def test_update_quantity_zero_removes_item(self, client, auth_user):
-        """quantity=0 remove o item (consistente com o comportamento anterior
-        do decrease_item): o service apaga o cart_item em vez de gravar 0."""
+
         auth_user(1)
         svc = Mock(name="cart_service")
         svc.update_item.return_value = cart_item_payload(quantity=0)
@@ -257,7 +222,6 @@ class TestUpdateItem:
         svc.update_item.assert_called_once_with(1, 1, 1, 0)
 
     def test_update_quantity_missing(self, client, auth_user):
-        """Sem quantity na query o FastAPI responde 422 (campo obrigatório)."""
         auth_user(1)
         response = client.patch(f"{PREFIX}/1/items/update/1")
         assert response.status_code == 422

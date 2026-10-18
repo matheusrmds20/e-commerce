@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useParams } from 'react-router-dom'
 import Estrelas from '../components/Estrelas'
 import GaleriaLivro from '../components/GaleriaLivro'
 import PainelCompra from '../components/PainelCompra'
 import DetalhesLivro from '../components/DetalhesLivro'
-import { PdfIcon } from '../components/Icons'
 import productService from '../api/products'
 import reviewService from '../api/reviews'
 import {
@@ -17,25 +17,13 @@ import { useCart } from '../context/cart-context'
 import wishlistService from '../api/wishlist'
 import orderService from '../api/orders'
 
-/**
- * DetalheLivro — página de produto ligada à API.
- *
- * Fluxo:
- * 1. Busca `GET /products/get/{productId}` e `GET /reviews/product/{productId}`
- *    em paralelo.
- * 2. Normaliza o produto com `produtoParaDetalhe` e as avaliações com
- *    `avaliacaoParaView`.
- * 3. Monta o painel de compra real e as seções retráteis (descrição, ficha,
- *    avaliações) com os dados do backend.
- *
- * Fallbacks:
- * - Sem `productId`, usa o produto 1 (primeiro do catálogo) para manter a
- *   página navegável enquanto o roteador não existe.
- * - Produto sem avaliações: a API responde 200 com lista vazia; qualquer
- *   outra falha nessa chamada também degrada para lista vazia.
- * - Falha de rede/produto inexistente: mostra estado de erro com "tentar de novo".
- */
-export default function DetalheLivro({ productId = 1 }) {
+
+export default function DetalheLivro() {
+  const { productId } = useParams()
+  const id = Number(productId)
+  // Fallback para o primeiro produto quando não há id ou ele é inválido.
+  const idProduto = Number.isInteger(id) && id > 0 ? id : 1
+
   const { usuario, autenticado } = useAuth()
   const { adicionar } = useCart()
 
@@ -56,10 +44,10 @@ export default function DetalheLivro({ productId = 1 }) {
     setErro(null)
     try {
       const [produtoResp, avaliacoesResp] = await Promise.all([
-        productService.obter(productId),
+        productService.obter(idProduto),
         // Lista de avaliações nunca derruba a página: se a chamada falhar por
         // qualquer motivo, degrada para lista vazia.
-        reviewService.listarPorProduto(productId).catch(() => []),
+        reviewService.listarPorProduto(idProduto).catch(() => []),
       ])
 
       const view = produtoParaDetalhe(produtoResp)
@@ -80,7 +68,7 @@ export default function DetalheLivro({ productId = 1 }) {
     } finally {
       setCarregando(false)
     }
-  }, [productId, usuario])
+  }, [idProduto, usuario])
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -110,9 +98,7 @@ export default function DetalheLivro({ productId = 1 }) {
     }
   }, [autenticado, produto?.id])
 
-  // Verifica se o produto já está na wishlist do usuário logado.
-  // Usa `GET /wishlists/product/{id}` (escopado ao usuário pelo token) em vez
-  // de baixar a lista inteira; guarda o id do item para permitir remoção.
+
   useEffect(() => {
     if (!autenticado || !produto) return
     let ativo = true
@@ -395,35 +381,6 @@ export default function DetalheLivro({ productId = 1 }) {
             onEditarAvaliacao={salvarEdicaoAvaliacao}
             onExcluirAvaliacao={excluirAvaliacao}
           />
-        </div>
-
-        {/* Rodapé da página */}
-        <div className="flex flex-col items-center gap-6 py-14 sm:flex-row sm:justify-between">
-          <div className="flex items-center gap-4">
-            <PdfIcon className="h-6 w-6 text-coffee-soft" />
-            <div>
-              <p className="font-body text-[0.75rem] font-semibold uppercase tracking-[0.2em] text-coffee-faint">
-                Ficha técnica
-              </p>
-              <p className="font-body text-[0.92rem] font-medium text-coffee-soft">
-                Baixe a ficha completa em PDF
-              </p>
-            </div>
-          </div>
-
-          <nav className="flex flex-wrap items-center justify-center gap-6">
-            {['Sobre nós', 'Contato', 'Envio e devoluções', 'Privacidade'].map(
-              (item) => (
-                <a
-                  key={item}
-                  href="#"
-                  className="font-body text-[0.88rem] font-medium text-coffee-soft transition-colors duration-300 hover:text-gold"
-                >
-                  {item}
-                </a>
-              ),
-            )}
-          </nav>
         </div>
       </div>
     </main>

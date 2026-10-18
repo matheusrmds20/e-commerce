@@ -1,66 +1,54 @@
-import { useState } from 'react'
 import { ArrowRightIcon } from './Icons'
 
-/**
- * Hero — faixa panorâmica full-bleed (borda a borda).
- *
- * A foto é 16:9; numa faixa larga o `object-cover` precisa cortar, e o corte
- * é ancorado no topo (`object-top`) porque é ali que estão o arco da janela e
- * a árvore de outono — os elementos que sustentam a cena. Em telas estreitas,
- * onde a faixa fica quase na proporção da foto, nada é cortado.
- */
-export default function Hero() {
-  const [imagemOk, setImagemOk] = useState(true)
 
+export default function Hero() {
   return (
     <section className="bg-cream-deep">
-      <div className="relative isolate flex h-[320px] w-full items-center justify-center overflow-hidden sm:h-[420px] lg:h-[500px] xl:h-[540px]">
-        {/* Base — também serve de fallback */}
-        <div className="absolute inset-0 -z-20 bg-gradient-to-br from-coffee via-coffee-soft to-forest" />
+      <div className="mx-auto grid max-w-[1400px] items-center gap-10 px-5 py-12 sm:px-8 sm:py-16 lg:grid-cols-2 lg:gap-16 lg:px-12 lg:py-20 xl:gap-24">
+        <div className="max-w-[34rem] lg:py-6">
+          <p className="label-caps text-caramel-dark">Livraria independente · desde 2026</p>
 
-        {imagemOk && (
-          <img
-            src="/hero-janela.jpg"
-            alt="Janela ampla com almofadas, livros e uma xícara ao sol da tarde"
-            onError={() => setImagemOk(false)}
-            className="absolute inset-0 -z-20 h-full w-full object-cover object-top"
-          />
-        )}
-
-        {/* Véu leve — garante contraste do texto */}
-        <div className="absolute inset-0 -z-10 bg-forest/30" />
-
-        {/* Fade suave do hero para a próxima seção */}
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 sm:h-32 lg:h-40 -z-10 bg-gradient-to-b from-transparent via-cream-soft/50 to-cream-soft" />
-
-        {/* Conteúdo */}
-        <div className="w-full max-w-[720px] px-6 text-center">
-          <p className="label-caps text-cream">Livraria Papiro</p>
-
-          <h1 className="mt-3.5 font-display text-[2.1rem] leading-[1.12] font-normal tracking-[-0.01em] text-cream-soft sm:text-[2.8rem] lg:text-[3.3rem]">
-            Descubra seu próximo capítulo
+          <h1 className="mt-5 font-display text-[2.65rem] font-semibold leading-[1.05] tracking-[-0.04em] text-forest sm:text-[3.7rem] lg:text-[4.35rem]">
+            Histórias que merecem ficar por perto.
           </h1>
 
-          <p className="mx-auto mt-4 hidden max-w-[34rem] font-body text-[0.98rem] font-normal leading-relaxed text-cream sm:block">
-            Uma seleção cuidadosa de livros para quem gosta de ler devagar.
+          <p className="mt-6 max-w-[30rem] font-body text-[0.98rem] font-normal leading-relaxed text-coffee-soft sm:text-[1.05rem]">
+            Uma curadoria atenta de livros para acompanhar suas pausas, conversas e próximas descobertas.
           </p>
 
-          <div className="mt-7 flex flex-col items-center justify-center gap-3.5 sm:flex-row">
+          <div className="mt-8 flex flex-col items-start">
             <a
               href="#destaques"
-              className="group inline-flex w-full items-center justify-center gap-2.5 rounded-sm bg-gold px-7 py-3.5 font-body text-xs font-semibold uppercase tracking-[0.2em] text-cream-soft transition-colors duration-300 ease-[var(--ease-cozy)] hover:bg-caramel focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cream-soft sm:w-auto"
+              className="group inline-flex w-full items-center justify-center gap-2.5 rounded-sm bg-forest px-7 py-3.5 font-body text-xs font-semibold uppercase tracking-[0.18em] text-cream-soft transition-colors duration-300 ease-[var(--ease-cozy)] hover:bg-forest-soft focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest"
             >
               Explorar a coleção
               <ArrowRightIcon className="h-4 w-4 transition-transform duration-300 ease-[var(--ease-cozy)] group-hover:translate-x-1" />
             </a>
 
-            <a
-              href="#"
-              className="inline-flex w-full items-center justify-center rounded-sm border border-cream/70 px-7 py-3.5 font-body text-xs font-semibold uppercase tracking-[0.2em] text-cream-soft transition-colors duration-300 ease-[var(--ease-cozy)] hover:border-cream hover:bg-cream-soft/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cream-soft sm:w-auto"
-            >
-              Conhecer o clube
-            </a>
           </div>
+
+          <ul className="mt-14 grid max-w-[32rem] grid-cols-1 gap-4 border-t border-line-strong/80 pt-6 sm:grid-cols-3 sm:gap-5">
+            <li className="font-body text-[0.72rem] font-semibold uppercase leading-relaxed tracking-[0.12em] text-coffee-soft">
+              Curadoria<br />
+              <span className="text-forest">independente</span>
+            </li>
+            <li className="border-line-strong/80 font-body text-[0.72rem] font-semibold uppercase leading-relaxed tracking-[0.12em] text-coffee-soft sm:border-l sm:pl-5">
+              Envio para<br />
+              <span className="text-forest">todo o Brasil</span>
+            </li>
+            <li className="border-line-strong/80 font-body text-[0.72rem] font-semibold uppercase leading-relaxed tracking-[0.12em] text-coffee-soft sm:border-l sm:pl-5">
+              Compra<br />
+              <span className="text-forest">100% segura</span>
+            </li>
+          </ul>
+        </div>
+
+        <div className="mx-auto aspect-square w-full max-w-[620px] overflow-hidden rounded-md bg-forest/10">
+          <img
+            src="/Stack_of_old_books_on_20261009132000.jpg"
+            alt="Pilha de livros antigos"
+            className="h-full w-full object-cover"
+          />
         </div>
       </div>
     </section>

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import BookCard from '../components/BookCard'
 import Migalhas from '../components/Migalhas'
 import Paginacao from '../components/Paginacao'
@@ -9,15 +10,9 @@ import categoryService from '../api/categories'
 
 const ITENS_POR_PAGINA = 12
 
-/**
- * MaisVendidos — Página editorial dos livros mais vendidos e aclamados da Papiro.
- * 
- * Segue a identidade visual e editorial das páginas da livraria.
- * Se a curadoria do backend não tiver marcado bestsellers, aplica fallback
- * inteligente para exibir os títulos mais relevantes do catálogo, garantindo
- * que a página nunca fique vazia.
- */
-export default function MaisVendidos({ onAbrirLivro, onExplorarAcervo, onVoltarHome }) {
+
+export default function MaisVendidos() {
+  const navigate = useNavigate()
   const [produtos, setProdutos] = useState([])
   const [categorias, setCategorias] = useState([])
   const [categoriaId, setCategoriaId] = useState(null)
@@ -123,7 +118,7 @@ export default function MaisVendidos({ onAbrirLivro, onExplorarAcervo, onVoltarH
         <div className="mx-auto max-w-[1400px] px-5 py-10 sm:px-8 sm:py-14">
           <Migalhas
             itens={[
-              { rotulo: 'Início', onClick: onVoltarHome },
+              { rotulo: 'Início', onClick: () => navigate('/') },
               { rotulo: 'Mais Vendidos' },
             ]}
           />
@@ -252,7 +247,7 @@ export default function MaisVendidos({ onAbrirLivro, onExplorarAcervo, onVoltarH
                     image={book.imagem}
                     tint="bg-coffee"
                     badge={`#${posicao} Mais Vendido`}
-                    onAbrir={onAbrirLivro}
+                    onAbrir={(id) => navigate(`/livro/${id}`)}
                   />
                 </div>
               )
@@ -293,15 +288,13 @@ export default function MaisVendidos({ onAbrirLivro, onExplorarAcervo, onVoltarH
                 ? 'Tente outro termo ou limpe a busca.'
                 : 'Explore nosso acervo completo para descobrir outras leituras memoráveis.'}
             </p>
-            {onExplorarAcervo && (
-              <button
+            <button
                 type="button"
-                onClick={onExplorarAcervo}
+                onClick={() => navigate('/acervo')}
                 className="mt-6 rounded-sm border border-forest px-6 py-3 font-body text-xs font-semibold uppercase tracking-[0.2em] text-forest transition-colors hover:bg-forest hover:text-cream-soft"
               >
                 Explorar Acervo Completo
               </button>
-            )}
           </div>
         )}
 
@@ -316,7 +309,7 @@ export default function MaisVendidos({ onAbrirLivro, onExplorarAcervo, onVoltarH
         )}
 
         {/* Rodapé Editorial de Incentivo */}
-        {!carregando && produtosFiltrados.length > 0 && onExplorarAcervo && (
+        {!carregando && produtosFiltrados.length > 0 && (
           <div className="mt-20 rounded-sm border border-line bg-cream-soft p-8 text-center sm:p-12">
             <h2 className="font-display text-2xl text-coffee sm:text-3xl">
               À procura de outras descobertas?
@@ -327,7 +320,7 @@ export default function MaisVendidos({ onAbrirLivro, onExplorarAcervo, onVoltarH
             </p>
             <button
               type="button"
-              onClick={onExplorarAcervo}
+              onClick={() => navigate('/acervo')}
               className="mt-6 inline-block rounded-sm bg-forest px-8 py-3.5 font-body text-xs font-semibold uppercase tracking-[0.2em] text-cream-soft transition-colors duration-300 hover:bg-forest-soft shadow-sm"
             >
               Ver Todo o Acervo

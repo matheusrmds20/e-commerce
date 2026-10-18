@@ -84,7 +84,7 @@ class TestGetByUserId:
             review_service.get_by_user_id(make_user())
 
     def test_no_reviews(self, review_service, user_repo):
-        """Sem avaliações devolve [] (estado normal), não erro."""
+
         user = make_user()
         user.reviews = []
         user_repo.get_by_id.return_value = user
@@ -110,7 +110,6 @@ class TestGetByProductId:
         product_repo.get_by_id.return_value = make_product()
         review_repo.get_by_product_id.return_value = []
 
-        # Produto válido sem avaliações devolve lista vazia (não é erro).
         assert review_service.get_by_product_id(1) == []
 
 

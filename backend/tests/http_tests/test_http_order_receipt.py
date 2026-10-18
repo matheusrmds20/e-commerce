@@ -1,16 +1,4 @@
-"""Testes HTTP do endpoint de download do comprovante PDF.
 
-Cobre:
-- ``GET /api/v1/orders/{order_id}/comprovante`` (baixar pelo nº do pedido)
-- Autenticação obrigatória (401)
-- Acesso ao próprio pedido (200, arquivo PDF)
-- Proibido para pedido de outro usuário (403, anti-IDOR)
-- Comprovante ainda não gerado (404)
-
-O ``OrderService`` é mockado na factory da rota (``get_order_service``). No teste
-de sucesso, o service retorna um caminho de um PDF real criado no disco para o
-``FileResponse`` servir.
-"""
 from unittest.mock import Mock, patch
 
 import pytest

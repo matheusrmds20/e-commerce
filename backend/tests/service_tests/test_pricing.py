@@ -1,9 +1,4 @@
-"""Testes do cálculo monetário único (``app.services.pricing``).
 
-Motivação: a regra de desconto estava duplicada em `OrderService.create` e
-`_calculate_totals`, e ambas operavam em `float`. Estes testes travam o
-comportamento correto em `Decimal` e cobrem os casos que o `float` errava.
-"""
 from decimal import Decimal
 
 import pytest
@@ -41,7 +36,7 @@ class Item:
 
 class TestToDecimal:
     def test_float_sem_lixo_binario(self):
-        """`Decimal(str(0.1))` = 0.1; `Decimal(0.1)` arrastaria 0.1000...55."""
+
         assert to_decimal(0.1) == Decimal("0.1")
 
     def test_none_vira_zero(self):
@@ -78,7 +73,7 @@ class TestCalcularTotaisSemCupom:
         assert subtotal == 30.02
 
     def test_aceita_dict(self):
-        """O checkout valida itens como dict antes de persistir."""
+
         subtotal, _, _, total = calcular_totais(
             [{"price": 25.0, "quantity": 4}]
         )
@@ -118,7 +113,7 @@ class TestCalcularTotaisComCupom:
         assert total == 80.0
 
     def test_desconto_nunca_ultrapassa_subtotal(self):
-        """Cupom fixo maior que a compra não deixa o total negativo."""
+
         _, desconto, _, total = calcular_totais(
             [Item(30.0, 1)],
             coupon=make_coupon(
@@ -144,18 +139,14 @@ class TestCalcularTotaisComCupom:
 
 class TestMinPurchase:
     def test_exatamente_no_limite_e_aceito(self):
-        """`100.00 >= 100` em Decimal — em float isso podia falhar por epsilon.
 
-        Especificamente: 10 x 10.0 somado em float pode dar 100.00000000000001,
-        mas com preços que geram 99.99999999999999 a comparação erraria.
-        """
-        itens = [Item(33.33, 3)]  # 99.99
+        itens = [Item(33.33, 3)]
         with pytest.raises(InvalidCouponException):
             calcular_totais(
                 itens, coupon=make_coupon(min_purchase=100.0)
             )
 
-        # 100.00 exato passa.
+
         _, _, _, total = calcular_totais(
             [Item(100.0, 1)], coupon=make_coupon(min_purchase=100.0)
         )
@@ -179,12 +170,12 @@ class TestCalcularDescontoIsolado:
         assert calcular_desconto(Decimal("100"), None) == Decimal("0")
 
     def test_quantiza_centavos(self):
-        # 10% de 33.33 = 3.333 -> 3.33
+
         coupon = make_coupon(discount_value=10.0)
         assert calcular_desconto(Decimal("33.33"), coupon) == Decimal("3.33")
 
 
 class TestQuantize:
     def test_half_up(self):
-        # 2.345 -> 2.35 (HALF_UP), não 2.34 (banker's rounding).
+
         assert quantize(Decimal("2.345")) == Decimal("2.35")

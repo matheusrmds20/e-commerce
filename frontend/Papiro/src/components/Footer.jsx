@@ -1,6 +1,18 @@
+import { useNavigate } from 'react-router-dom'
 import Quill from './Quill'
 import { InstagramIcon, FacebookIcon, YoutubeIcon } from './Icons'
 import { useAuth } from '../context/auth-context'
+
+/** Converte o nome de página (legado) em rota. */
+const URL_DA_PAGINA = {
+  home: '/',
+  acervo: '/acervo',
+  'mais-vendidos': '/mais-vendidos',
+  sobre: '/sobre',
+  carrinho: '/carrinho',
+  minhaconta: '/minhaconta',
+  admin: '/admin',
+}
 
 const COLUMNS = [
   {
@@ -25,9 +37,16 @@ const COLUMNS = [
 /**
  * Footer — Rodapé compacto e elegante, com espaçamentos otimizados e estética editorial.
  */
-export default function Footer({ onNavegar }) {
+export default function Footer() {
+  const navigate = useNavigate()
   const { usuario } = useAuth()
   const ehAdmin = usuario?.role === 'admin'
+
+  const irPara = (page) => {
+    navigate(URL_DA_PAGINA[page] ?? '/')
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
 
   return (
     <footer className="border-t border-line bg-cream-soft">
@@ -39,10 +58,7 @@ export default function Footer({ onNavegar }) {
               <div className="flex items-center gap-3">
                 <button
                   type="button"
-                  onClick={() => {
-                    onNavegar?.('home')
-                    window.scrollTo({ top: 0, behavior: 'smooth' })
-                  }}
+                  onClick={() => irPara('home')}
                   className="font-display text-[1.7rem] leading-none text-coffee hover:text-forest transition-colors text-left"
                 >
                   Papiro
@@ -93,10 +109,7 @@ export default function Footer({ onNavegar }) {
                     {link.page ? (
                       <button
                         type="button"
-                        onClick={() => {
-                          onNavegar?.(link.page)
-                          window.scrollTo({ top: 0, behavior: 'smooth' })
-                        }}
+                        onClick={() => irPara(link.page)}
                         className="font-body text-xs text-coffee-soft transition-colors duration-300 hover:text-gold text-left"
                       >
                         {link.label}

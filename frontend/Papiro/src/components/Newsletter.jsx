@@ -3,12 +3,7 @@ import { ArrowRightIcon } from './Icons'
 import Quill from './Quill'
 import newsletterService from '../api/newsletter'
 
-/**
- * Newsletter — "Carta do Livreiro" com forte peso visual, estética de papelaria fina,
- * selo postal vintage, encarte de pergaminho e captura de e-mail de alta conversão.
- *
- * O formulário chama o endpoint de inscrição (`newsletterService.inscrever` -> POST /newsletter/subscribe).
- */
+
 export default function Newsletter() {
   const [enviado, setEnviado] = useState(false)
   const [email, setEmail] = useState('')

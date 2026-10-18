@@ -27,11 +27,6 @@ class CartItemRepository(BaseRepository[CartItem]):
         self.session.refresh(cart_item)
         return cart_item
 
-
-
-
-
-
     def update_quantity(self, cart_item, quantity: int) -> CartItem:
         cart_item.quantity = quantity
 
@@ -40,10 +35,6 @@ class CartItemRepository(BaseRepository[CartItem]):
         self.session.flush()
         self.session.refresh(cart_item)
         return cart_item
-
-
-
-
 
     def delete(self, cart_item) -> None:
 

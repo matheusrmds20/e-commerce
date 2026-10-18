@@ -1,8 +1,6 @@
 import { StarIcon } from './Icons'
 
-/**
- * Estrelas — nota com meia estrela suportada via gradiente.
- */
+
 export default function Estrelas({ nota = 0, total = 5, className = 'h-3.5 w-3.5' }) {
   return (
     <div

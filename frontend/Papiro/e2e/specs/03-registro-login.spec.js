@@ -1,10 +1,7 @@
 import { test, expect } from '../fixtures/base'
 import { refreshCookiePresente } from '../helpers/auth'
 
-/**
- * 03 — Registro + login automático + restauração de sessão no reload.
- * Usa um email único por execução (nunca colide com runs anteriores).
- */
+
 test.describe('Registro / Login', () => {
   test('registra, entra sozinho e restaura a sessão após reload', async ({
     page,

@@ -1,11 +1,23 @@
-/**
- * Navegação — o front ainda não tem roteador (App.jsx usa estado).
- * A forma confiável de "ir para uma página" é clicar no botão da nav
- * flutuante (testid `nav-{nome}`: home, acervo, detalhe, carrinho, checkout,
- * minhaconta, login, registro, admin).
- */
+
+
+/** Mapeia o destino (nome legado da antiga nav) para a rota. */
+const ROTA_DO_DESTINO = {
+  home: '/',
+  acervo: '/acervo',
+  detalhe: '/livro',
+  'mais-vendidos': '/mais-vendidos',
+  sobre: '/sobre',
+  carrinho: '/carrinho',
+  checkout: '/checkout',
+  minhaconta: '/minhaconta',
+  login: '/login',
+  registro: '/registro',
+  admin: '/admin',
+}
+
+
 export async function navegarPara(page, destino) {
-  await page.getByTestId(`nav-${destino}`).click()
+  await page.goto(ROTA_DO_DESTINO[destino] ?? '/')
 }
 
 /**

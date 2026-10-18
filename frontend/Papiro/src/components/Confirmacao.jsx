@@ -1,9 +1,6 @@
 import { useEffect, useRef } from 'react'
 
-/**
- * Confirmacao — diálogo de confirmação em modal, no estilo papel do projeto.
- * Usado antes de ações destrutivas (excluir endereço, cartão...).
- */
+
 export default function Confirmacao({
   aberto,
   titulo = 'Confirmar ação',

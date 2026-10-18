@@ -37,8 +37,7 @@ def quote_shipping(
     user: UserDb,
     db: DbSession,
 ):
-    """Calcula as opções de frete a partir do carrinho do usuário autenticado
-    e do CEP informado. Não cria pedido nem baixa estoque."""
+
     return get_shipping_service(db).quote(user.id, data.postal_code)
 
 
@@ -48,7 +47,7 @@ def quote_shipping(
     summary="Cota o frete de um pedido via Melhor Envio",
 )
 def calculate_shipping(order_id: int, user: UserDb, db: DbSession):
-    """Calcula as opções de frete para um pedido do usuário autenticado."""
+
     return get_shipping_service(db).calculate(order_id, user.id)
 
 
@@ -58,13 +57,7 @@ def calculate_shipping(order_id: int, user: UserDb, db: DbSession):
     summary="Aplica o valor de frete escolhido a um pedido",
 )
 def apply_shipping(data: ShippingApplyRequest, user: UserDb, db: DbSession):
-    """Grava o ``shipping_cost`` de um pedido e recalcula o total.
 
-    ``status`` opcional permite, quando informado, avançar o pedido no fluxo de
-    envio (ex.: ``processing``) no mesmo momento da aplicação do frete.
-    """
-    # Demonstração do contrato: o status de envio pode ser controlado pelo
-    # endpoint admin existente (/admin/orders/{id}/status) ou aqui ao aplicar.
     return get_shipping_service(db).apply_to_order(
         order_id=data.order_id,
         user_id=user.id,

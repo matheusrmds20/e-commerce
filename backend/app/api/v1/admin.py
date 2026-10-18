@@ -12,10 +12,6 @@ from app.schemas.admin import (
 )
 from app.services.admin_service import AdminService
 
-# Toda a área administrativa exige autenticação + papel `admin`.
-# Sem isso (antes), qualquer anônimo lia faturamento, PII de usuários e podia
-# mudar o status de qualquer pedido. A checagem vive em `get_current_admin`:
-# 401 sem token, 403 sem o papel.
 admin_router = APIRouter(dependencies=[Depends(get_current_admin)])
 
 DbSession = Annotated[Session, Depends(get_db)]

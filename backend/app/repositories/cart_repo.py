@@ -36,16 +36,7 @@ class CartRepository(BaseRepository[Cart]):
         return self.session.query(CartItem).options(selectinload(CartItem.carts), selectinload(CartItem.product)).filter(CartItem.cart_id == id).all()
 
     def clear(self, cart_id: int) -> int:
-        """Remove todos os itens de um carrinho, mantendo o carrinho.
 
-        Usado no checkout (passo 18 da seção 8.1): depois de o pedido ser
-        criado, a sacola precisa esvaziar, senão uma nova compra repetiria os
-        mesmos itens.
-
-        Devolve quantas linhas foram removidas. Usa `synchronize_session=False`
-        porque a deleção em massa não precisa reconciliar objetos já carregados
-        na sessão — evita um SELECT extra.
-        """
         removidos = (
             self.session.query(CartItem)
             .filter(CartItem.cart_id == cart_id)

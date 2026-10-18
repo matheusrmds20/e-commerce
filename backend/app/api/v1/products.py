@@ -13,13 +13,9 @@ product_router = APIRouter()
 
 DbSession = Annotated[Session, Depends(get_db)]
 
-# Escritas no catálogo exigem Bearer token de administrador. A checagem do
-# papel acontece no service (`_ensure_admin`), que levanta
-# `InsufficientPermissionException` (403) diretamente — sem tradução na rota.
+
 AuthUser = Annotated[User, Depends(get_current_user)]
 
-# Limite máximo de itens numa vitrine. Evita que um cliente peça a tabela
-# inteira com `?limit=100000`.
 VitrineLimit = Annotated[
     int | None,
     Query(ge=1, le=100, description="Limite de itens retornados"),
@@ -32,11 +28,7 @@ PerPage = Annotated[
 
 
 def parse_exclude_ids(raw: str | None) -> list[int]:
-    """Converte `exclude=1,2,3` numa lista de inteiros, ignorando lixo.
 
-    Tolera espaços e valores não numéricos (que são descartados) para não
-    derrubar a chamada por um parâmetro malformado.
-    """
     if not raw:
         return []
     ids = []
@@ -74,12 +66,7 @@ def list_products(
     page: PageNumber = 1,
     per_page: PerPage = 20,
 ) -> dict:
-    """Catálogo completo paginado no envelope ``{ data, meta }``.
 
-    Antes devolvia ``.all()`` — a tabela inteira numa resposta. Use
-    ``/paginated`` quando precisar de filtro por categoria/busca; este aqui é o
-    "tudo", agora limitado.
-    """
     return get_product_service(db).get_paginated(page, per_page)
 
 
@@ -104,15 +91,7 @@ def list_products_paginated(
         ),
     ] = None,
 ) -> dict:
-    """Catálogo paginado no envelope padrão `{ data, meta }`.
 
-    A paginação, a busca livre (`?search=`) e o filtro por categoria acontecem
-    no banco (`WHERE` + `offset`/`limit`), então o `meta.total` reflete **o
-    filtro**, não o catálogo inteiro. Sem isso, `total_pages` anunciaria
-    páginas inexistentes.
-
-    Categoria inexistente responde 404 (erro do cliente), não lista vazia.
-    """
     return get_product_service(db).get_paginated(
         page, per_page, category_id, search=search
     )
@@ -134,14 +113,7 @@ def list_recommendations(
     ] = None,
     limit: Annotated[int, Query(ge=1, le=50, description="Máximo de itens")] = 4,
 ) -> list:
-    """Recomendações baratas para o carrinho.
 
-    Substitui o padrão antigo de baixar `GET /products/list` inteiro e filtrar
-    no cliente. Aqui o banco aplica o `exclude` e o `limit`, então a resposta
-    é sempre pequena, independente do tamanho do catálogo.
-
-    Lista vazia é resposta válida (catálogo pequeno ou tudo já na sacola).
-    """
     exclude_ids = parse_exclude_ids(exclude)
     return get_product_service(db).get_recommendations(exclude_ids, limit)
 
@@ -152,11 +124,7 @@ def list_recommendations(
     summary="Lista os produtos em destaque da vitrine",
 )
 def list_featured_products(db: DbSession, limit: VitrineLimit = None) -> list:
-    """Produtos com `is_featured = true` e ativos.
 
-    Retorna lista vazia (HTTP 200) quando não há destaques marcados — não é
-    um erro, é ausência de curadoria.
-    """
     return get_product_service(db).get_featured(limit)
 
 
@@ -166,10 +134,7 @@ def list_featured_products(db: DbSession, limit: VitrineLimit = None) -> list:
     summary="Lista os produtos mais vendidos da vitrine",
 )
 def list_bestseller_products(db: DbSession, limit: VitrineLimit = None) -> list:
-    """Produtos com `is_bestseller = true` e ativos.
 
-    A marcação é manual (curadoria). Lista vazia quando nada foi marcado.
-    """
     return get_product_service(db).get_bestsellers(limit)
 
 
@@ -220,7 +185,7 @@ def update_product(
     current_user: AuthUser,
     db: DbSession,
 ) -> ProductResponse:
-    """Atualiza um produto. Exige admin — sem token 401, sem papel 403."""
+
     return get_product_service(db).update(product_id, data, current_user)
 
 
@@ -232,5 +197,5 @@ def update_product(
 def delete_product(
     product_id: int, current_user: AuthUser, db: DbSession
 ) -> ProductResponse:
-    """Exclui um produto. Exige admin — sem token 401, sem papel 403."""
+
     return get_product_service(db).delete(product_id, current_user)

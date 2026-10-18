@@ -8,19 +8,8 @@ import Diferenciais from '../components/Diferenciais'
 import Newsletter from '../components/Newsletter'
 import { carregarHome } from '../api/home'
 
-/**
- * Home — a vitrine do Papiro, alimentada pela API.
- *
- * Fluxo:
- * 1. `carregarHome()` busca catálogo, ofertas, categorias e a recomendação
- *    da casa (com nota média das avaliações) em paralelo.
- * 2. Cada seção recebe seus dados + estado (carregando/erro/vazio).
- * 3. Falha do catálogo mostra um aviso com "tentar de novo"; falhas parciais
- *    apenas esvaziam a seção correspondente.
- *
- * Navbar e Footer ficam no App, compartilhados por todas as páginas.
- */
-export default function Home({ onAbrirLivro, onExplorarAcervo }) {
+
+export default function Home() {
   const [dados, setDados] = useState(null)
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState(null)
@@ -43,8 +32,7 @@ export default function Home({ onAbrirLivro, onExplorarAcervo }) {
     carregar()
   }, [carregar])
 
-  // Erro total (catálogo indisponível): mantém Hero/Diferenciais/Newsletter
-  // estáticos e sinaliza a falha no lugar das seções de dados.
+
   if (erro && !carregando) {
     return (
       <main>
@@ -84,25 +72,15 @@ export default function Home({ onAbrirLivro, onExplorarAcervo }) {
   return (
     <main>
       <Hero />
-      <SlidePromocoes
-        ofertas={ofertas}
-        carregando={carregando}
-        onAbrirLivro={onAbrirLivro}
-      />
+      <SlidePromocoes ofertas={ofertas} carregando={carregando} />
       <LivrosDestaque
         livros={destaques}
         categoriaIds={catalogo}
         categorias={categorias}
         carregando={carregando}
-        onAbrirLivro={onAbrirLivro}
-        onExplorarAcervo={onExplorarAcervo}
       />
       <ProximaLeitura colecoes={categorias} carregando={carregando} />
-      <RecomendacaoDestaque
-        recomendacao={recomendacao}
-        carregando={carregando}
-        onAbrirLivro={onAbrirLivro}
-      />
+      <RecomendacaoDestaque recomendacao={recomendacao} carregando={carregando} />
       <Diferenciais />
       <Newsletter />
     </main>

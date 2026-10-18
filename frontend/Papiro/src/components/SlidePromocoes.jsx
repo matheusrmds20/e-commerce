@@ -1,18 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { ArrowLeftIcon, ArrowRightIcon, BagIcon } from './Icons'
 import { formatarPreco } from '../api/adapters'
 
-/**
- * SlidePromocoes — Slider interativo de ofertas especiais com badges de
- * desconto e navegação fluida.
- *
- * Recebe `ofertas` (produtos com desconto vindos da API, já normalizados por
- * `produtoParaCard`). Estados possíveis:
- * - `carregando`: esqueleto pulsante.
- * - vazio: mensagem "sem ofertas no momento" — a seção não some para manter o
- *   ritmo visual da Home, mas deixa claro que não há promoções ativas.
- */
-export default function SlidePromocoes({ ofertas = [], carregando = false, onAbrirLivro }) {
+
+export default function SlidePromocoes({ ofertas = [], carregando = false }) {
+  const navigate = useNavigate()
   const scrollRef = useRef(null)
   const [podeVoltar, setPodeVoltar] = useState(false)
   const [podeAvancar, setPodeAvancar] = useState(true)
@@ -154,7 +147,7 @@ export default function SlidePromocoes({ ofertas = [], carregando = false, onAbr
                 {/* Ação rápida hover */}
                 <button
                   type="button"
-                  onClick={() => onAbrirLivro?.(item.id)}
+                  onClick={() => navigate(`/livro/${item.id}`)}
                   className="absolute inset-x-3 bottom-3 flex items-center justify-center gap-2 rounded-sm bg-cream-soft/95 py-2.5 font-body text-[0.75rem] font-semibold uppercase tracking-[0.2em] text-forest opacity-0 shadow transition-all duration-300 group-hover:opacity-100 hover:bg-forest hover:text-cream-soft"
                 >
                   <BagIcon className="h-3.5 w-3.5" />
@@ -170,7 +163,7 @@ export default function SlidePromocoes({ ofertas = [], carregando = false, onAbr
                       href="#"
                       onClick={(e) => {
                         e.preventDefault()
-                        onAbrirLivro?.(item.id)
+                        navigate(`/livro/${item.id}`)
                       }}
                       className="transition-colors duration-300 hover:text-gold"
                     >

@@ -4,7 +4,6 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class UserCouponCreate(BaseModel):
-    """Atribui (resgata) um cupom para um usuário."""
 
     user_id: int = Field(..., description="ID do usuário que recebe o cupom")
     coupon_id: int = Field(..., description="ID do cupom atribuído")

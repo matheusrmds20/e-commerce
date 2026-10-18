@@ -1,17 +1,4 @@
-"""Testes do fluxo de envio de e-mail de confirmação de pedido (service).
 
-Cobre:
-- ``OrderService.send_confirmation_email`` (agendamento da task no Celery).
-- Regras de domínio: pedido inexistente, pedido não-completado e pedido de
-  outro usuário (proteção contra IDOR).
-- O payload serializável montado por ``build_order_details`` usado na task.
-
-A task Celery é PATCHADA (``app.services.order_service.send_order_confirmation_email``)
-— nenhum Redis/broker real. Cada teste captura a chamada a ``.delay``.
-
-Os métodos são ``async`` e NÃO há pytest-asyncio no projeto, então cada teste
-chama a coroutine com ``asyncio.run()``.
-"""
 import asyncio
 from unittest.mock import Mock, patch
 
@@ -86,7 +73,7 @@ def _order_completed_com_user_items():
 
 
 class TestBuildOrderDetails:
-    """O payload do e-mail deve ser PLENAMENTE serializável pelo Celery."""
+
 
     def test_monta_dict_de_primitivos(self):
         _, order = _order_completed_com_user_items()
@@ -98,7 +85,7 @@ class TestBuildOrderDetails:
             "subtotal": 100.0,
             "items": [{"name": "Livro Teste", "quantity": 2, "price": 50.0}],
         }
-        # Nenhum objeto não-serializável (SQLAlchemy) no payload.
+
         assert all(
             isinstance(v, (int, float, str, bool, list, dict)) or v is None
             for v in payload.values()

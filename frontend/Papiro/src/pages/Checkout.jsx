@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import ResumoPedido from '../components/ResumoPedido'
 import SeletorEndereco from '../components/SeletorEndereco'
 import SeletorFrete from '../components/SeletorFrete'
@@ -15,7 +16,8 @@ import paymentService from '../api/payments'
 import shippingService from '../api/shipping'
 import couponService from '../api/coupons'
 
-export default function Checkout({ onIrParaLogin }) {
+export default function Checkout() {
+  const navigate = useNavigate()
   const { itens, carregando: carrinhoCarregando, recarregar } = useCart()
   const { autenticado } = useAuth()
 
@@ -106,8 +108,7 @@ export default function Checkout({ onIrParaLogin }) {
 
   const total = Math.max(0, subtotal - desconto + frete)
 
-  // Carrega os cupons ATRIBUÍDOS ao usuário autenticado (ownership).
-  // Sem login não há vínculo: a lista simplesmente fica vazia (não busca).
+
   useEffect(() => {
     if (!autenticado) return
     let ativo = true
@@ -188,9 +189,6 @@ export default function Checkout({ onIrParaLogin }) {
     }
   }, [autenticado])
 
-  // Cota o frete (Melhor Envio) a partir do carrinho + CEP do endereço
-  // selecionado, SEM criar pedido. Roda sempre que o endereço/itens mudam,
-  // para o cliente ver as opções reais antes de pagar.
   useEffect(() => {
     let ativo = true
 
@@ -295,9 +293,7 @@ export default function Checkout({ onIrParaLogin }) {
       // O backend esvazia o carrinho no checkout; sincroniza o badge/estado.
       await recarregar()
 
-      // 1b. Aplica o frete já cotado (pelo carrinho + CEP) ao pedido criado,
-      //     para que o total cobrado no Mercado Pago inclua o valor do frete.
-      //     Sem ofertas/-se cotação falhou, o frete fica 0.
+
       try {
         const escolhida = freteSelecionado
         if (cotacaoFrete?.is_real && escolhida) {
@@ -369,7 +365,7 @@ export default function Checkout({ onIrParaLogin }) {
                   </p>
                   <button
                     type="button"
-                    onClick={onIrParaLogin}
+                    onClick={() => navigate('/login')}
                     className="font-body text-[0.8rem] font-semibold uppercase tracking-[0.16em] text-gold transition-colors duration-300 hover:text-caramel-dark"
                   >
                     Entrar na conta

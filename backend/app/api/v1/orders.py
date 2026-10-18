@@ -51,12 +51,7 @@ def list_orders(
     page: PageNumber = 1,
     per_page: PerPage = 20,
 ) -> dict:
-    """Pedidos paginados no envelope ``{ data, meta }``.
 
-    Antes retornava a lista completa: uma conta antiga baixava o histórico
-    inteiro a cada carregamento. Agora o banco aplica ``offset``/``limit`` e o
-    ``meta.total`` reflete o total real.
-    """
     return get_order_service(db).get_paginated_by_user_id(
         user.id, page, per_page
     )

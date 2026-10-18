@@ -31,8 +31,15 @@
   --color-line-strong: #cfc7ad;
 
   /* ---------- Tipografia ---------- */
-  --font-display: "Cormorant Garamond", "Iowan Old Style", Georgia, serif;
-  --font-body: "Jost", "Avenir Next", system-ui, sans-serif;
+  --font-display: "Inter", system-ui, sans-serif;
+  --font-body: "Inter", system-ui, sans-serif;
+
+  /* Pesos levemente mais altos para uma leitura mais presente em toda a interface. */
+  --font-weight-light: 500;
+  --font-weight-normal: 500;
+  --font-weight-medium: 600;
+  --font-weight-semibold: 700;
+  --font-weight-bold: 800;
 
   /* ---------- Motion ---------- */
   --ease-cozy: cubic-bezier(0.22, 0.61, 0.36, 1);

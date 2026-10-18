@@ -1,9 +1,3 @@
-"""Testes HTTP da rota /api/v1/auth (register, login, me).
-
-Sucesso: 201/200 com payloads válidos.
-Erros: validação 422, e-mail duplicado 409, credenciais inválidas 401,
-usuário inativo 403 e usuário inexistente 404.
-"""
 from unittest.mock import Mock, patch
 
 from helpers import assert_error, assert_validation_error, auth_user_payload
@@ -85,8 +79,7 @@ class TestRegister:
 
 
 class TestLogin:
-    # O login usa OAuth2PasswordRequestForm: form-urlencoded com
-    # `username` (o e-mail) e `password`.
+
     LOGIN_OK = {"username": "user@example.com", "password": "secret123"}
 
     @staticmethod
@@ -183,7 +176,7 @@ class TestMe:
 
 
 class TestRefresh:
-    """POST /auth/refresh — rotação do refresh token (cookie ou body)."""
+
 
     @staticmethod
     def _fresh_response():
@@ -231,7 +224,7 @@ class TestRefresh:
 
 
 class TestLogout:
-    """POST /auth/logout — apaga o cookie de refresh e encerra a sessão."""
+
 
     def test_logout_clears_cookie(self, client):
         svc = Mock(name="auth_service")

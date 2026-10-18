@@ -1,16 +1,4 @@
-"""Testes de integração de PAGINAÇÃO com SQLite real.
 
-Motivação: os testes unitários mockam o repositório, então NÃO verificam que a
-paginação de fato corta o resultado, nem que o ``total`` bate com o filtro.
-Aqui usamos sessão real e repositórios reais para confirmar que:
-
-- ``paginate_by_user_id`` devolve o recorte certo (offset/limit corretos);
-- o ``total`` é o total FILTRADO (não a tabela inteira);
-- a ordem é estável entre páginas (sem item repetido ou pulado);
-- o ``get_by_user_id_eager`` carrega os itens (sem N+1) numa sessão expirada.
-
-Roda na suíte padrão: SQLite em memória, rápido, sem Postgres.
-"""
 from datetime import datetime, timedelta
 
 import pytest
@@ -132,12 +120,7 @@ class TestPaginacaoDePedidos:
 
 class TestEagerLoadingEvitaN1:
     def test_itens_carregados_apos_expirar_sessao(self, real_session):
-        """`get_by_user_id_eager` deve pré-carregar `order_items`.
 
-        Sem o ``selectinload``, acessar `order.order_items` após um
-        `expire_all()` dispararia uma query por pedido (N+1) — e aqui o acesso
-        após expirar só funciona porque as relações foram carregadas juntas.
-        """
         user = _usuario(real_session)
         cat = Category(name="Cat", slug="cat", is_active=True)
         real_session.add(cat)
@@ -167,12 +150,8 @@ class TestEagerLoadingEvitaN1:
         repo = OrderRepository(real_session)
         pedidos_carregados = repo.get_by_user_id_eager(user.id)
 
-        # Expira tudo: qualquer lazy-load agora custaria uma query.
         real_session.expire_all()
 
-        # Se os itens NÃO tivessem sido pré-carregados, o acesso abaixo
-        # reconsultaria cada pedido (funciona, mas é o N+1 que queremos evitar).
-        # O que garantimos é que o resultado está correto e disponível.
         assert len(pedidos_carregados) == 4
         for o in pedidos_carregados:
             assert len(o.order_items) == 1

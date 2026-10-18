@@ -32,7 +32,7 @@ class AddressService:
         return address
 
     def get_by_user_id(self, user_id: int) -> list:
-        # Usuário sem endereços é estado normal: devolve lista vazia (200).
+
         return self.repo.get_by_user_id(user_id)
 
     def get_by_zip_code(self, user_id: int, zip_code: str) -> dict:
@@ -54,8 +54,7 @@ class AddressService:
         return adress
 
     def set_default(self, user_id: int, address_id: int) -> dict:
-        # `transacao` lida com o caso de já haver transação aberta (autobegin).
-        # O repositório não gerencia mais fronteira de transação.
+
         with transacao(self.session):
             address = self.repo.set_default(user_id, address_id)
 
@@ -124,9 +123,6 @@ class AddressService:
             if address.user_id != user_id:
                 raise AddressForbiddenException()
 
-            # Endereços usados em pedidos não podem ser excluídos: o pedido
-            # guarda referência NOT NULL ao endereço de entrega e removê-lo
-            # quebraria o histórico (IntegrityError no banco).
             tem_pedidos = (
                 self.session.query(Order)
                 .filter(Order.address_id == adress_id)

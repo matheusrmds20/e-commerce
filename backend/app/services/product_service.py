@@ -167,6 +167,10 @@ class ProductService:
                     synopsis=data.synopsis,
                     discount_pct=data.discount_pct,
                     stock_qty=data.stock_qty,
+                    weight_kg=data.weight_kg,
+                    height_cm=data.height_cm,
+                    width_cm=data.width_cm,
+                    length_cm=data.length_cm,
                 )
             )
 

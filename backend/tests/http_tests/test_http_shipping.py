@@ -1,8 +1,4 @@
-"""Testes HTTP das rotas /api/v1/shipping (frete Melhor Envio).
 
-Sucesso: 200 em calculate e apply.
-Erros: autenticação 401; validação 422.
-"""
 from unittest.mock import Mock
 
 import pytest
@@ -14,6 +10,8 @@ from helpers import (
 from app.api.exceptions import (
     OrderNotFoundException,
     ShippingCalculationException,
+    ShippingNotConfiguredException,
+    ShippingUnavailableException,
 )
 
 PREFIX = "/api/v1/shipping"
@@ -47,7 +45,7 @@ def auth_user():
 
 @pytest.fixture
 def patch_shipping_service(patch_service):
-    """Instala um Mock no factory ``get_shipping_service`` da rota de shipping."""
+
 
     def _instalar(service: Mock):
         return patch_service("shipping", "get_shipping_service", service)
@@ -87,23 +85,18 @@ class TestCalculate:
         assert body["best_offer_index"] == 0
         service.calculate.assert_called_once_with(1, 1)
 
-    def test_calculate_fallback(self, client, auth_user, patch_shipping_service):
-        """Sem ofertas reais, o service retorna is_real=False (não é erro)."""
+    def test_calculate_unavailable_returns_503(
+        self, client, auth_user, patch_shipping_service
+    ):
+        """D23a: falha transitória do provedor vira 503 visível."""
         auth_user(1)
         service = Mock(name="shipping_service")
-        service.calculate.return_value = {
-            "order_id": 9,
-            "offers": [],
-            "best_offer_index": None,
-            "is_real": False,
-            "fallback_reason": "frete ainda não configurado",
-        }
+        service.calculate.side_effect = ShippingUnavailableException()
 
         with patch_shipping_service(service):
             response = client.post(f"{PREFIX}/calculate/9")
 
-        assert response.status_code == 200
-        assert response.json()["is_real"] is False
+        assert response.status_code == 503
 
     def test_calculate_order_not_found(self, client, auth_user, patch_shipping_service):
         auth_user(1)
@@ -158,27 +151,21 @@ class TestQuote:
         assert service.quote.call_args.args[0] == 1
         assert service.quote.call_args.args[1] == "01310-100"
 
-    def test_quote_fallback(self, client, auth_user, patch_shipping_service):
+    def test_quote_not_configured_returns_400(
+        self, client, auth_user, patch_shipping_service
+    ):
+        """D23a: frete não configurado é erro visível."""
         auth_user(1)
         service = Mock(name="shipping_service")
-        service.quote.return_value = {
-            "postal_code": "01310100",
-            "offers": [],
-            "best_offer_index": None,
-            "is_real": False,
-            "fallback_reason": "frete ainda não configurado",
-        }
+        service.quote.side_effect = ShippingNotConfiguredException()
 
         with patch_shipping_service(service):
             response = client.post(
                 PREFIX + "/quote", json={"postal_code": "01310-100"}
             )
 
-        assert response.status_code == 200
-        body = response.json()
-        assert body["is_real"] is False
-        assert body["offers"] == []
-        assert body["fallback_reason"] == "frete ainda não configurado"
+        assert response.status_code == 400
+        assert response.json()["error"]["code"] == "SHIPPING_NOT_CONFIGURED"
 
     def test_quote_missing_postal_code(self, client, auth_user):
         auth_user(1)
@@ -205,7 +192,6 @@ class TestApply:
         assert body["shipping_cost"] == 27.5
         assert body["total"] == 147.3
         service.apply_to_order.assert_called_once()
-        # user.id é derivado do token, não do corpo
         call_kwargs = service.apply_to_order.call_args.kwargs
         assert call_kwargs["order_id"] == 1
         assert call_kwargs["price"] == 27.5

@@ -1,15 +1,4 @@
-"""Testes das tasks de geração do comprovante PDF e do gerador de PDF.
 
-Cobre:
-- ``pdf.generate_receipt``: gera um arquivo PDF válido a partir do payload.
-- ``receipt_tasks.generate_order_receipt`` (task Celery): busca o pedido,
-  chama o gerador e persiste o caminho em ``orders.receipt_path``.
-- Retry/erro quando o pedido não existe.
-
-O banco é substituído (mock de ``SessionLocal``) e a função de geração de PDF
-é patchada no teste da task — nada é gravado de verdade no banco nem no disco
-salvo o teste isolado do próprio gerador.
-"""
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -52,7 +41,7 @@ class TestGenerateReceipt:
 
 class TestGenerateOrderReceipt:
     def _mock_session_with_order(self, order, db):
-        """Configura o mock de query do order no SessionLocal mockado."""
+
         query = MagicMock()
         query.options.return_value = query
         query.filter.return_value = query
@@ -94,7 +83,7 @@ class TestGenerateOrderReceipt:
 
         def _fake_generate(payload, path):
             captured["payload"] = payload
-            # Simula: a task seta receipt_path com o caminho "gerado".
+
             order.receipt_path = str(fake_path)
             return fake_path
 
@@ -102,9 +91,7 @@ class TestGenerateOrderReceipt:
             "app.utils.receipt_tasks.generate_receipt", side_effect=_fake_generate
         ), patch("app.utils.receipt_tasks.get_settings") as get_settings:
             get_settings.return_value.COMPROVANTES_DIR = "comprovantes"
-            # ``generate_order_receipt.run`` injeta o payload ``order_id``;
-            # como o caminho de sucesso nunca chama ``self.retry``, o self real
-            # da task não interfere no teste.
+
             result = generate_order_receipt.run("7")
 
         assert result["status"] == "success"
@@ -120,7 +107,7 @@ class TestGenerateOrderReceipt:
         db.close.assert_called_once()
 
     def test_pedido_inexistente_retry(self):
-        """Pedido não encontrado → a task agenda retry (via ``self.retry``)."""
+
         db = MagicMock()
         db.query.return_value.options.return_value.filter.return_value.first.return_value = None
 

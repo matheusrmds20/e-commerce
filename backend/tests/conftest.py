@@ -8,8 +8,7 @@ os.environ.setdefault(
     "SECRET_KEY",
     "test-secret-key-0123456789-0123456789-0123456789-0123456789",
 )
-# Rate limiting desligado nos testes: os casos HTTP batem nas mesmas rotas
-# várias vezes (ex.: login) e o limiter por-IP (in-memory) quebraria a suíte.
+
 os.environ.setdefault("RATE_LIMIT_ENABLED", "false")
 
 
@@ -25,15 +24,7 @@ def user_repo():
 
 @pytest.fixture
 def product_repo():
-    """Mock do ProductRepository com semântica de estoque real.
 
-    - ``get_by_id_for_update`` (leitura com ``FOR UPDATE``) é um alias de
-      ``get_by_id``: nos testes o banco é mockado e não há transação real, então
-      o lock é irrelevante.
-    - ``decrement_stock`` / ``restock`` **de fato alteram** ``stock_qty`` do
-      produto recebido. Sem isso os testes de baixa de estoque passariam sem
-      provar nada (um Mock que não muta o objeto esconde regressões).
-    """
     repo = Mock(name="product_repo")
     repo.get_by_id_for_update.side_effect = lambda product_id: (
         repo.get_by_id(product_id)
@@ -119,10 +110,7 @@ def payment_repo():
 
 @pytest.fixture
 def payment_gateway():
-    """Mock do MercadoPagoGateway.
 
-    Isola os testes de service de qualquer chamada HTTP real ao Mercado Pago.
-    """
     return Mock(name="payment_gateway")
 
 

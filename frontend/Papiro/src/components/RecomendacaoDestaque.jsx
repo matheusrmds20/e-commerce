@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom'
 import { ArrowRightIcon, BagIcon } from './Icons'
 import Estrelas from './Estrelas'
 import Quill from './Quill'
@@ -5,25 +6,12 @@ import { formatarPreco } from '../api/adapters'
 import { useCart } from '../context/cart-context'
 import { useState } from 'react'
 
-/**
- * RecomendacaoDestaque — Destaque editorial com o livro recomendado da casa.
- *
- * Dados reais vindos da API (via `carregarHome`):
- * - `recomendacao.produto`: primeiro produto ativo (idealmente com estoque).
- * - `recomendacao.notaMedia`: média das avaliações do produto.
- * - `recomendacao.avaliacoes`: lista crua (contagem).
- *
- * Limitações conhecidas do backend (ver relatório de integração):
- * - Não existe campo de resenha editorial, citação ou curador no modelo de
- *   produto. Esses blocos só aparecem se o produto trouxer `description`/
- *   `synopsis`; caso contrário, são omitidos em vez de exibir texto fictício.
- * - Não há endpoint de "recomendação da casa"; a seleção é feita no front.
- */
+
 export default function RecomendacaoDestaque({
   recomendacao = null,
   carregando = false,
-  onAbrirLivro,
 }) {
+  const navigate = useNavigate()
   const { adicionar } = useCart()
   const [feedback, setFeedback] = useState(null)
 
@@ -133,7 +121,7 @@ export default function RecomendacaoDestaque({
 
                 {/* Moldura da Capa */}
                 <div
-                  onClick={() => onAbrirLivro?.(produto.id)}
+                  onClick={() => navigate(`/livro/${produto.id}`)}
                   className="cursor-pointer overflow-hidden rounded-md bg-forest/10 p-3 shadow-2xl transition-transform duration-700 ease-[var(--ease-cozy)] group-hover:scale-[1.02]"
                 >
                   <div className="relative aspect-[3/4] overflow-hidden rounded-sm bg-coffee">
@@ -184,7 +172,7 @@ export default function RecomendacaoDestaque({
                     href="#"
                     onClick={(e) => {
                       e.preventDefault()
-                      onAbrirLivro?.(produto.id)
+                      navigate(`/livro/${produto.id}`)
                     }}
                     className="transition-colors duration-300 hover:text-gold"
                   >
@@ -249,7 +237,7 @@ export default function RecomendacaoDestaque({
 
                   <button
                     type="button"
-                    onClick={() => onAbrirLivro?.(produto.id)}
+                    onClick={() => navigate(`/livro/${produto.id}`)}
                     className="group inline-flex items-center justify-center rounded-sm border border-line-strong bg-cream-soft px-4 py-4 font-body text-xs uppercase tracking-wider text-coffee transition-colors duration-300 hover:border-gold hover:text-gold"
                     aria-label="Ver mais detalhes do livro"
                   >

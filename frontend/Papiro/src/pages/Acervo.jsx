@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import BookCard from '../components/BookCard'
 import Migalhas from '../components/Migalhas'
 import Paginacao from '../components/Paginacao'
@@ -7,49 +8,54 @@ import { produtoParaCard } from '../api/home'
 import productService from '../api/products'
 import categoryService from '../api/categories'
 
-/** Itens por página. Casa com o `le=100` do backend e mantém a grade 4-col. */
+
 const ITENS_POR_PAGINA = 12
 
-/**
- * Acervo — catálogo completo com paginação e filtro por categoria.
- *
- * Fluxo:
- * 1. `GET /products/paginated?page&per_page&category_id&search` devolve
- *    `{ data, meta }`. A paginação, a busca livre e o filtro acontecem no
- *    banco, então `meta.total` reflete os filtros ativos — não o catálogo
- *    inteiro.
- * 2. A busca (`?search=`) casa por título, autor ou ISBN, case-insensitive.
- *    O termo é comitado com debounce (300ms) para não disparar uma
- *    requisição por tecla.
- * 3. As categorias vêm de `GET /categories/list` e alimentam o filtro.
- * 4. Trocar de categoria ou termo reseta para a página 1: manter a página
- *    atual ao filtrar poderia cair em um intervalo vazio (ex.: estava na
- *    página 3, a categoria só tem 1 página).
- *
- * O catálogo é buscado no servidor a cada mudança de página **ou** de filtro;
- * as categorias ficam em cache no estado (buscadas uma única vez).
- */
-export default function Acervo({ onAbrirLivro, termoInicial = '', onLimparBuscaInicial }) {
+
+export default function Acervo() {
+  const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
+
+
+  const termoAtivo = searchParams.get('termo') ?? ''
+  const busca = termoAtivo.trim() ? termoAtivo.trim() : null
+  const categoriaRaw = searchParams.get('categoria')
+  const categoriaId =
+    categoriaRaw && /^\d+$/.test(categoriaRaw) ? Number(categoriaRaw) : null
+  const pagina = Number(searchParams.get('page')) || 1
+
+  const [categorias, setCategorias] = useState([])
+
+  const [termoBusca, setTermoBusca] = useState(termoAtivo)
+
   const [produtos, setProdutos] = useState([])
   const [meta, setMeta] = useState(null)
-  const [categorias, setCategorias] = useState([])
-  // `null` = "Todas as categorias". Guardamos o id, não o nome.
-  const [categoriaId, setCategoriaId] = useState(null)
-
-  // Busca livre. `termoBusca` é o que está na caixa; `busca` é o termo
-  // efetivamente enviado ao backend, comitado após um debounce curto.
-  const [termoBusca, setTermoBusca] = useState(termoInicial || '')
-  const [busca, setBusca] = useState(termoInicial?.trim() ? termoInicial.trim() : null)
-  const timerBusca = useRef(null)
-  // Espelho do termo comitado para comparar sem reler o state (o debounce
-  // roda fora do render e precisa saber se o termo mudou de fato).
-  const buscaRef = useRef(termoInicial?.trim() ? termoInicial.trim() : null)
-
-  const [pagina, setPagina] = useState(1)
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState(null)
+  const timerBusca = useRef(null)
 
-  /** Busca uma página do catálogo, com filtros opcionais (categoria + termo). */
+
+  const atualizarUrl = useCallback(
+    (mudancas) => {
+      const params = new URLSearchParams(searchParams)
+      Object.entries(mudancas).forEach(([chave, valor]) => {
+        if (valor === null || valor === undefined || valor === '') {
+          params.delete(chave)
+        } else {
+          params.set(chave, String(valor))
+        }
+      })
+      // Saída estável: pagina, termo, categoria.
+      const ordenado = new URLSearchParams()
+      ;['page', 'termo', 'categoria'].forEach((chave) => {
+        if (params.has(chave)) ordenado.set(chave, params.get(chave))
+      })
+      setSearchParams(ordenado, { replace: true })
+    },
+    [searchParams, setSearchParams],
+  )
+
+
   const carregarProdutos = useCallback(async (alvo, catId, buscaAtiva) => {
     setCarregando(true)
     setErro(null)
@@ -63,12 +69,11 @@ export default function Acervo({ onAbrirLivro, termoInicial = '', onLimparBuscaI
 
       const metaResp = resp?.meta ?? null
 
-      // Guarda contra página fora do intervalo: se o filtro reduzir o total
-      // (ou o usuário chegar por link antigo), o backend responde 200 com
-      // `data: []` e um `page` maior que `total_pages`. Voltamos para a última
-      // página válida em vez de exibir "página 9 de 3".
+
       if (metaResp && metaResp.total_pages > 0 && alvo > metaResp.total_pages) {
-        setPagina(metaResp.total_pages)
+        const params = new URLSearchParams(searchParams)
+        params.set('page', String(metaResp.total_pages))
+        setSearchParams(params, { replace: true })
         return
       }
 
@@ -81,9 +86,8 @@ export default function Acervo({ onAbrirLivro, termoInicial = '', onLimparBuscaI
     } finally {
       setCarregando(false)
     }
-  }, [])
+  }, [searchParams, setSearchParams])
 
-  // Categorias: buscadas uma vez. Falha aqui não derruba a listagem.
   useEffect(() => {
     let ativo = true
     categoryService
@@ -99,69 +103,44 @@ export default function Acervo({ onAbrirLivro, termoInicial = '', onLimparBuscaI
     }
   }, [])
 
-  // Recarrega quando muda a página, o filtro ou o termo de busca.
+  // Recarrega quando muda a página, o filtro ou o termo de busca (tudo na URL).
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     carregarProdutos(pagina, categoriaId, busca)
   }, [pagina, categoriaId, busca, carregarProdutos])
 
-  /**
-   * Comita um termo como busca ativa. Só reseta para a página 1 quando o
-   * termo **muda de fato** — digitar e apagar dentro da janela do debounce
-   * (ou alternar espaços) deixaria o filtro igual, e resetar a página nesse
-   * caso jogaria o usuário de volta à página 1 sem motivo.
-   */
-  const comitarTermo = useCallback((termo) => {
-    const limpo = termo.trim()
-    const novo = limpo ? limpo : null
-    if (buscaRef.current === novo) return
-    buscaRef.current = novo
-    setBusca(novo)
-    setPagina(1)
-  }, [])
-
-  // Sincroniza se o termo inicial mudar externamente (ex: busca na Navbar)
+  // Mantém a caixa de busca alinhada ao termo da URL (ex.: busca vinda da Navbar).
   useEffect(() => {
-    if (termoInicial !== undefined) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setTermoBusca(termoInicial)
-      const limpo = termoInicial ? termoInicial.trim() : ''
-      const novo = limpo ? limpo : null
-      if (buscaRef.current !== novo) {
-        buscaRef.current = novo
-        setBusca(novo)
-        setPagina(1)
-      }
-    }
-  }, [termoInicial])
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (termoAtivo !== termoBusca) setTermoBusca(termoAtivo)
+  }, [termoAtivo, termoBusca])
 
   // Debounce do termo digitado: comita a busca 300ms após a última tecla.
   useEffect(() => {
     timerBusca.current = setTimeout(() => {
-      comitarTermo(termoBusca)
+      if (termoBusca.trim() !== termoAtivo) atualizarUrl({ termo: termoBusca, page: null })
     }, 300)
     return () => clearTimeout(timerBusca.current)
-  }, [termoBusca, comitarTermo])
+  }, [termoBusca, termoAtivo, atualizarUrl])
 
   /** Comita o termo na hora (Enter) e cancela o debounce pendente. */
   const comitarBusca = () => {
     clearTimeout(timerBusca.current)
-    comitarTermo(termoBusca)
+    if (termoBusca.trim() !== termoAtivo) {
+      atualizarUrl({ termo: termoBusca, page: null })
+    }
   }
 
   /** Limpa a busca: volta a exibir o catálogo inteiro. */
   const limparBusca = () => {
     clearTimeout(timerBusca.current)
-    buscaRef.current = null
     setTermoBusca('')
-    setBusca(null)
-    setPagina(1)
-    onLimparBuscaInicial?.()
+    atualizarUrl({ termo: null, page: null })
   }
 
   /** Troca de página e volta ao topo da listagem. */
   const trocarPagina = (destino) => {
-    setPagina(destino)
+    if (destino !== pagina) atualizarUrl({ page: destino })
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
@@ -171,8 +150,7 @@ export default function Acervo({ onAbrirLivro, termoInicial = '', onLimparBuscaI
    */
   const filtrarPor = (id) => {
     if (id === categoriaId) return
-    setCategoriaId(id)
-    setPagina(1)
+    atualizarUrl({ categoria: id ?? null, page: null })
   }
 
   const totalPaginas = meta?.total_pages ?? 0
@@ -239,9 +217,8 @@ export default function Acervo({ onAbrirLivro, termoInicial = '', onLimparBuscaI
             {carregando
               ? 'Carregando títulos…'
               : totalItens > 0
-                ? `${totalItens} ${totalItens === 1 ? 'título' : 'títulos'}${
-                    filtrando ? ` em ${nomeDoFiltro}` : ' no acervo'
-                  }${buscando ? ` para “${busca}”` : ''}`
+                ? `${totalItens} ${totalItens === 1 ? 'título' : 'títulos'}${' '}
+                    ${filtrando ? ` em ${nomeDoFiltro}` : ' no acervo'}${buscando ? ` para “${busca}”` : ''}`
                 : buscando
                   ? `Nenhum título para “${busca}”`
                   : filtrando
@@ -318,7 +295,7 @@ export default function Acervo({ onAbrirLivro, termoInicial = '', onLimparBuscaI
                 image={book.imagem}
                 tint="bg-coffee"
                 badge={book.destaque ? 'Curadoria' : null}
-                onAbrir={onAbrirLivro}
+                onAbrir={(id) => navigate(`/livro/${id}`)}
               />
             ))}
         </div>

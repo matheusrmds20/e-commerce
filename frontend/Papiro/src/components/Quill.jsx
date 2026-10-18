@@ -1,7 +1,4 @@
-/**
- * Feather quill — the Papiro mark.
- * Hand-drawn line-art, matching the cozy stationery feel.
- */
+
 export default function Quill({ className = '', width = 120 }) {
   return (
     <svg

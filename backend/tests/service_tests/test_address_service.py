@@ -121,11 +121,7 @@ class TestCreate:
         assert created.zip_code == "01001000"
 
     def test_owner_comes_from_argument_not_payload(self, address_service, address_repo):
-        """O dono é sempre o ``user_id`` recebido (do token), não do payload.
 
-        ``AddressCreate`` não tem mais ``user_id``; este teste garante que o
-        service persiste o endereço sob o usuário autenticado.
-        """
         address_repo.get_by_zip_code.return_value = None
         address_repo.create.side_effect = lambda address: address
 
@@ -167,7 +163,7 @@ class TestUpdate:
 
 class TestDelete:
     def test_success(self, address_service, address_repo, db):
-        # Nenhum pedido vinculado ao endereço.
+
         db.query.return_value.filter.return_value.first.return_value = None
         address = make_address()
         address_repo.get_by_id.return_value = address
@@ -178,7 +174,7 @@ class TestDelete:
         address_repo.delete.assert_called_once_with(address)
 
     def test_linked_to_orders(self, address_service, address_repo, db):
-        """Endereço usado em pedidos não pode ser excluído."""
+
         db.query.return_value.filter.return_value.first.return_value = object()
         address_repo.get_by_id.return_value = make_address()
 

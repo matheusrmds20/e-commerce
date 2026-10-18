@@ -31,11 +31,7 @@ class UserService:
             raise EmailAlreadyExistsException()
 
     def _ensure_owner_or_admin(self, current_user: User, user_id: int) -> None:
-        """Garante que o usuário autenticado só acesse os próprios dados.
 
-        Administradores podem operar sobre qualquer usuário. Qualquer outra
-        tentativa vira 403 ``USER_FORBIDDEN``.
-        """
         if current_user.role == UserRole.ADMIN:
             return
         if current_user.id != user_id:
@@ -45,7 +41,7 @@ class UserService:
             )
 
     def _ensure_admin(self, current_user: User) -> None:
-        """Restringe a operação a administradores (403 ``INSUFFICIENT_PERMISSION``)."""
+
         if current_user.role != UserRole.ADMIN:
             raise InsufficientPermissionException()
 
@@ -91,9 +87,7 @@ class UserService:
     def update(
         self, user_id: int, data: UserUpdate, current_user: User
     ) -> UserResponse:
-        # `transacao` reaproveita a transação já aberta pelo autobegin (ex.: ao
-        # ler atributos de `current_user`), evitando o
-        # "A transaction is already begun on this Session".
+
         with transacao(self.session):
             self._ensure_owner_or_admin(current_user, user_id)
             user = self.user_repo.get_by_id(user_id)

@@ -50,7 +50,6 @@ class CouponResponse(BaseModel):
     max_discount: int | None
     valid_until: datetime
     max_uses: int | None
-    # Quantas vezes o cupom já foi aplicado (contador consumido no checkout).
     used_count: int = 0
     single_use_per_user: bool = False
     is_active: bool

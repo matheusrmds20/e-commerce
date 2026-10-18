@@ -1,8 +1,6 @@
 import Quill from './Quill'
 
-/**
- * Diferenciais — Seção com forte peso visual, profundidade, cartões estruturados e estatísticas de confiança.
- */
+
 export default function Diferenciais() {
   const diferenciais = [
     {

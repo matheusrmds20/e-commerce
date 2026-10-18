@@ -19,12 +19,7 @@ class PaymentRepository(BaseRepository[Payment]):
         return self.session.query(Payment).filter(Payment.order_id == order_id).all()
 
     def get_by_user_id(self, user_id: int) -> list[Payment]:
-        """Lista todos os pagamentos pertencentes a um usuário.
 
-        Filtra via join com ``orders`` (``payments.order_id -> orders.id``)
-        usando ``user_id`` de ``orders``. Permite uma única query agregada para
-        a aba "Pagamentos" da conta, em vez de 1 request por pedido.
-        """
         from app.models.order import Order
 
         return (
@@ -38,11 +33,7 @@ class PaymentRepository(BaseRepository[Payment]):
     def paginate_by_user_id(
         self, user_id: int, page: int, per_page: int
     ) -> tuple[list[Payment], int]:
-        """Histórico de pagamentos do usuário paginado no banco.
 
-        Mesmo join de ``get_by_user_id``, mas com ``count`` + ``offset``/``limit``
-        para o histórico não crescer indefinidamente com o tempo de conta.
-        """
         from app.models.order import Order
 
         query = (

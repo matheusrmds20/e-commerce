@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import Field from '../components/Field'
 import TextLink from '../components/TextLink'
 import Quill from '../components/Quill'
 import { useAuth } from '../context/auth-context'
 
-export default function Login({ onEntrar, onRegistrar }) {
+export default function Login() {
+  const navigate = useNavigate()
   const [mostrarSenha, setMostrarSenha] = useState(false)
   const [form, setForm] = useState({ email: '', password: '' })
   const [erro, setErro] = useState(null) // { message, code, details }
@@ -37,7 +39,7 @@ export default function Login({ onEntrar, onRegistrar }) {
       await login({ email: form.email, password: form.password })
       // Pequena pausa para o leitor ver a confirmação antes de sair da tela.
       setSucesso(true)
-      timerRef.current = setTimeout(() => onEntrar?.(), 900)
+      timerRef.current = setTimeout(() => navigate('/'), 900)
     } catch (error) {
       setErro(error)
       setEnviando(false)
@@ -168,7 +170,7 @@ export default function Login({ onEntrar, onRegistrar }) {
               href="#"
               onClick={(e) => {
                 e.preventDefault()
-                onRegistrar?.()
+                navigate('/registro')
               }}
               className="ml-1 font-semibold"
             >

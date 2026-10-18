@@ -9,12 +9,7 @@ from app.repositories.newsletter_repo import NewsletterRepository
 
 
 class NewsletterService:
-    """Regras da newsletter.
 
-    Público: ``subscribe`` (idempotente para o cliente — já inscrito vira
-    ``ConflictException`` traduzido para 409) e ``unsubscribe``.
-    Administrador: ``list_all`` (base da aba Newsletter do painel).
-    """
 
     def __init__(self, db):
         self.repo = NewsletterRepository(db)

@@ -1,22 +1,7 @@
 import { useEffect, useState } from 'react'
 import { CloseIcon } from './Icons'
 
-/**
- * Modal de criação/edição de cupons de desconto (Painel Admin).
- *
- * Contrato com o backend (`CouponCreate` / `CouponUpdate`):
- *   { code, product_id?, discount_type, discount_value, min_purchase?,
- *     max_discount?, valid_until, max_uses?, is_active }
- *
- * `discount_type` ∈ 'percentage' | 'fixed'. `valid_until` é enviado em ISO
- * 8601 (o input é `datetime-local` e a conversão é local → ISO).
- *
- * O modal é "burro" em relação ao estado da lista: recebe `cupomParaEditar`
- * (null = criação), salva via `onSalvar(payload, cupomId)` e deixa o Admin
- * decidir como atualizar a lista. Assim o mesmo componente serve criar/editar.
- */
 
-/** Converte uma data ISO em valor aceito pelo input datetime-local (hora local). */
 function isoParaInput(iso) {
   if (!iso) return ''
   const data = new Date(iso)

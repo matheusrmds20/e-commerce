@@ -7,11 +7,6 @@ on:
     branches: [main, Frontend, Backend]
   workflow_dispatch:
 
-# Serializa execuções do mesmo branch SEM cancelar as que já estão rodando.
-# Com cancel-in-progress: true, empurrar `Frontend` e `main` em sequência (ou
-# corrigir um commit logo depois) matava o run anterior no meio — e o job E2E,
-# que depende de backend+frontend, era marcado como 'skipped' por ter os pais
-# cancelados. Agora o run novo espera na fila e nenhum resultado é perdido.
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: false
@@ -23,18 +18,9 @@ jobs:
   backend:
     name: Backend (lint + testes)
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: backend
 
     env:
-      # Settings (app/core/config.py) exige estas variáveis sem default.
-      # Localmente elas vêm do backend/.env; no CI esse arquivo não existe
-      # (é ignorado pelo git), então precisam ser definidas aqui.
-      # Valores fictícios: a suíte usa sqlite em memória (tests/conftest.py)
-      # e não chama nenhum serviço externo real.
-      # Aspas obrigatórias: em YAML, ':' dentro do valor quebra o parse
-      # (ex.: sqlite:///:memory: ou host:porta). Sempre citar URL/DSN.
+
       DATABASE_URL: "sqlite:///:memory:"
       FRONTEND_URL: "http://localhost:5173"
       BACKEND_URL: "http://localhost:8000"
@@ -52,8 +38,6 @@ jobs:
       SMTP_FROM: "ci@example.com"
       CELERY_BROKER_URL: "redis://localhost:6379/0"
       CELERY_RESULT_BACKEND: "redis://localhost:6379/1"
-      # Rate limiting desligado no CI: a suíte HTTP chama as mesmas rotas
-      # repetidamente (ex.: login) e o limiter por-IP quebraria os testes.
       RATE_LIMIT_ENABLED: "false"
 
     steps:
@@ -66,26 +50,22 @@ jobs:
           cache-dependency-path: backend/pyproject.toml
 
       - name: Instalar dependências
+        working-directory: backend
         run: |
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
 
       - name: Lint (ruff)
+        working-directory: backend
         run: ruff check .
 
       - name: Testes (pytest)
-        # A suíte roda com sqlite em memória e não precisa de Postgres nem Redis.
-        # Os testes marcados como `integration` exigem Postgres real e são
-        # deselecionados por padrão via addopts em pyproject.toml.
-        # As settings obrigatórias vêm do `env:` deste job (ver acima).
+        working-directory: backend
         run: pytest -q
 
   frontend:
     name: Frontend (lint + build)
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: frontend/Papiro
 
     steps:
       - uses: actions/checkout@v4
@@ -97,16 +77,18 @@ jobs:
           cache-dependency-path: frontend/Papiro/package-lock.json
 
       - name: Instalar dependências
+        working-directory: frontend/Papiro
         run: npm ci
 
       - name: Lint (eslint)
+        working-directory: frontend/Papiro
         run: npm run lint
 
       - name: Build (vite)
+        working-directory: frontend/Papiro
         run: npm run build
 
-  # Só roda se backend e frontend passarem — evita gastar ~5 min de E2E quando
-  # um lint trivial já quebrou.
+
   e2e:
     name: E2E (Playwright)
     runs-on: ubuntu-latest
@@ -137,10 +119,6 @@ jobs:
           --health-retries 5
 
     env:
-      # Settings (app/core/config.py) exige estas variáveis sem default.
-      # Valores fictícios: nenhum teste E2E chama serviço externo real
-      # (ViaCEP e Mercado Pago são mockados via page.route).
-      # Aspas obrigatórias: valores com ':' não-citados quebram o YAML.
       FRONTEND_URL: "http://localhost:5173"
       BACKEND_URL: "http://localhost:8000"
       SECRET_KEY: "ci-fake-secret-key-0123456789-0123456789-0123456789"
@@ -157,8 +135,6 @@ jobs:
       SMTP_FROM: "ci@example.com"
       CELERY_BROKER_URL: "redis://localhost:6379/0"
       CELERY_RESULT_BACKEND: "redis://localhost:6379/1"
-      # Rate limiting desligado no E2E: o Playwright faz login/refresh e
-      # inscreve usuários repetidamente a partir do mesmo IP.
       RATE_LIMIT_ENABLED: "false"
       E2E_DATABASE_URL: "postgresql+psycopg2://postgres:postgres@localhost:5432/bookcommerce_e2e"
       DATABASE_URL: "postgresql+psycopg2://postgres:postgres@localhost:5432/bookcommerce_e2e"
@@ -185,11 +161,7 @@ jobs:
           pip install -e ".[dev]"
 
       - name: Aplicar migrations no banco de teste
-        # alembic.ini e a pasta alembic/ ficam na RAIZ do repo (não em backend/).
-        # O env.py lê DATABASE_URL via get_settings(), que vem do env do job.
-        # `python -m alembic` em vez de `alembic`: não depende do console script
-        # estar no PATH (neste venv local ele não está).
-        run: python -m alembic upgrade head
+        run: python -m alembic -c alembic.ini upgrade head
 
       - name: Popular o banco (4 categorias, 24 produtos)
         working-directory: backend
