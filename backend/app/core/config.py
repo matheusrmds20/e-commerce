@@ -8,7 +8,7 @@ ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
 
 
 class Settings(BaseSettings):
-    APP_NAME: str = "CRM de vendas"
+    APP_NAME: str = "E-commerce"
     DEBUG: bool = False
 
     FRONTEND_URL: str

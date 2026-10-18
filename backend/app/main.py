@@ -1,3 +1,5 @@
+import ssl
+
 from celery import Celery
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -22,6 +24,10 @@ celery = Celery(
 )
 
 celery.conf.imports = ("app.utils.email", "app.utils.receipt_tasks")
+
+
+celery.conf.broker_use_ssl = {"ssl_cert_reqs": ssl.CERT_REQUIRED}
+celery.conf.redis_backend_use_ssl = {"ssl_cert_reqs": ssl.CERT_REQUIRED}
 
 
 
