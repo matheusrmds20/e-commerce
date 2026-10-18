@@ -140,7 +140,7 @@ class TestListMyCoupons:
 
 
 class TestRotasAdmin:
-  
+
 
     def test_list_sem_token_401(self, client):
         response = client.get(f"{PREFIX}/list?user_id=1")

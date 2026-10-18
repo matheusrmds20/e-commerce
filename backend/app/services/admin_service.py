@@ -247,7 +247,7 @@ class AdminService:
         )
 
     def list_users(self) -> list[AdminUserResponse]:
-        
+
         users = (
             self.db.query(User)
             .options(joinedload(User.orders))

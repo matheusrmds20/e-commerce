@@ -20,7 +20,7 @@ CREATE_OK = {"product_id": 1, "rating": 5, "comment": "Excelente livro"}
 
 @pytest.fixture
 def auth_user():
- 
+
     from app.api.deps import get_current_user
     from app.main import app
 

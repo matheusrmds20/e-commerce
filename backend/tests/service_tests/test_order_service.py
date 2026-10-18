@@ -521,7 +521,7 @@ class TestDelete:
 
 
 class TestBaixaDeEstoque:
-  
+
     def _setup(
         self, address_repo, product_repo, order_item_repo, order_repo, produto
     ):
@@ -547,7 +547,7 @@ class TestBaixaDeEstoque:
     def test_create_sem_estoque_nao_baixa(
         self, order_service, address_repo, product_repo, order_item_repo, order_repo
     ):
-  
+
         produto = make_product(stock_qty=1)
         self._setup(
             address_repo, product_repo, order_item_repo, order_repo, produto
@@ -803,7 +803,7 @@ class TestLimpezaDoCarrinho:
         user_repo,
         cart_repo,
     ):
-  
+
         self._setup(
             address_repo,
             product_repo,
@@ -847,7 +847,7 @@ class TestLimpezaDoCarrinho:
         user_repo,
         cart_repo,
     ):
-  
+
         cart = Cart(id=99, user_id=1)
         self._setup(
             address_repo,
@@ -866,7 +866,7 @@ class TestLimpezaDoCarrinho:
 
 
 class TestCartRepositoryClear:
-  
+
 
     def test_clear_deleta_por_cart_id(self):
         from unittest.mock import MagicMock
@@ -884,7 +884,7 @@ class TestCartRepositoryClear:
 
 
 class TestProductRepositoryEstoque:
-   
+
 
     def test_decrement_stock_reduz(self):
         from unittest.mock import MagicMock

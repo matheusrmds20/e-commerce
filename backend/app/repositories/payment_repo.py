@@ -33,7 +33,7 @@ class PaymentRepository(BaseRepository[Payment]):
     def paginate_by_user_id(
         self, user_id: int, page: int, per_page: int
     ) -> tuple[list[Payment], int]:
-  
+
         from app.models.order import Order
 
         query = (

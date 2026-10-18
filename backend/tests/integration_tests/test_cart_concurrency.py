@@ -95,9 +95,9 @@ class TestAddItemConcorrente:
         cart_id = dados["cart_id"]
         user_id = dados["user_id"]
 
-        N = 8  
-        item_esperado = 1 
-        qtd_esperada = N  
+        N = 8
+        item_esperado = 1
+        qtd_esperada = N
 
         erros = []
 
@@ -106,7 +106,7 @@ class TestAddItemConcorrente:
                 with Session() as s:
                     svc = CartService(s)
                     svc.add_item(cart_id, user_id, product_id, 1)
-            except Exception as exc:  
+            except Exception as exc:
                 erros.append(exc)
 
         threads = [threading.Thread(target=adicionar) for _ in range(N)]

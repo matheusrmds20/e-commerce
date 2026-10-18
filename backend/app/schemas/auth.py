@@ -43,7 +43,7 @@ class TokenResponse(BaseModel):
 
 
 class RefreshRequest(BaseModel):
-    
+
     refresh_token: str = Field(
         ...,
         description="Refresh token JWT (rotação: usado uma única vez)",

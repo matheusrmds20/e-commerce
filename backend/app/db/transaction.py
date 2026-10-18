@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 @contextmanager
 def transacao(session: Session):
-    
+
     em_transacao = session.in_transaction() is True
 
     if em_transacao:

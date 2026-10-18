@@ -168,7 +168,7 @@ class TestAddItem:
     def test_insufficient_stock_considera_o_que_ja_esta_na_sacola(
         self, cart_service, cart_repo, product_repo, cart_item_repo
     ):
-  
+
         cart_repo.get_by_id.return_value = make_cart()
         product_repo.get_by_id.return_value = make_product(stock_qty=3)
         cart_item_repo.get_by_cart_and_product.return_value = make_cart_item(

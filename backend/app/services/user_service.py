@@ -31,7 +31,7 @@ class UserService:
             raise EmailAlreadyExistsException()
 
     def _ensure_owner_or_admin(self, current_user: User, user_id: int) -> None:
- 
+
         if current_user.role == UserRole.ADMIN:
             return
         if current_user.id != user_id:

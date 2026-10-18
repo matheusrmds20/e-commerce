@@ -140,13 +140,13 @@ class TestCalcularTotaisComCupom:
 class TestMinPurchase:
     def test_exatamente_no_limite_e_aceito(self):
 
-        itens = [Item(33.33, 3)]  
+        itens = [Item(33.33, 3)]
         with pytest.raises(InvalidCouponException):
             calcular_totais(
                 itens, coupon=make_coupon(min_purchase=100.0)
             )
 
-  
+
         _, _, _, total = calcular_totais(
             [Item(100.0, 1)], coupon=make_coupon(min_purchase=100.0)
         )

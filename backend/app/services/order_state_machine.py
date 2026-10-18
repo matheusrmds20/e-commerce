@@ -2,7 +2,6 @@
 from app.api.exceptions import InvalidStateTransitionException
 from app.models.order import OrderStatus
 
-
 _ESTADOS_ABERTOS: frozenset[OrderStatus] = frozenset(
     {OrderStatus.PENDING, OrderStatus.PROCESSING}
 )

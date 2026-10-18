@@ -6,8 +6,7 @@ import argparse
 import sys
 from pathlib import Path
 
-
-try:  
+try:
     sys.stdout.reconfigure(encoding="utf-8")
     sys.stderr.reconfigure(encoding="utf-8")
 except (AttributeError, ValueError):  # pragma: no cover
@@ -16,23 +15,9 @@ except (AttributeError, ValueError):  # pragma: no cover
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 
-import app.models.address  
-import app.models.cart
-import app.models.cart_item  
-import app.models.category  
-import app.models.coupon  
-import app.models.newsletter  
-import app.models.order  
-import app.models.order_item  
-import app.models.payment  
-import app.models.product  
-import app.models.review  
-import app.models.user  
-import app.models.user_coupon  
-import app.models.wishlist  
-from app.db.database import SessionLocal  
-from app.models.category import Category  
-from app.models.product import Product  
+from app.db.database import SessionLocal
+from app.models.category import Category
+from app.models.product import Product
 
 IMG = {
     "biblioteca": "https://images.unsplash.com/photo-1507842217343-583bb7270b66?auto=format&fit=crop&w=800&q=80",

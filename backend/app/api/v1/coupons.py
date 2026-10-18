@@ -7,7 +7,6 @@ from app.api.deps import get_current_admin, get_db
 from app.schemas.coupon import CouponCreate, CouponResponse, CouponUpdate
 from app.services.coupon_service import CouponService
 
-
 coupon_router = APIRouter(dependencies=[Depends(get_current_admin)])
 
 DbSession = Annotated[Session, Depends(get_db)]

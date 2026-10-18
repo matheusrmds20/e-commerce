@@ -12,7 +12,6 @@ from app.schemas.admin import (
 )
 from app.services.admin_service import AdminService
 
-
 admin_router = APIRouter(dependencies=[Depends(get_current_admin)])
 
 DbSession = Annotated[Session, Depends(get_db)]

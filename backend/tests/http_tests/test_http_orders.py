@@ -63,7 +63,7 @@ class TestAuthRequired:
         assert response.status_code == 401
 
     def test_user_id_query_is_ignored(self, client, auth_user):
-  
+
         auth_user(1)
         svc = Mock(name="order_service")
         svc.get_paginated_by_user_id.return_value = {

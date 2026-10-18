@@ -112,16 +112,6 @@ export function CartProvider({ children }) {
 
   const adicionar = useCallback(
     async (produto, quantidade = 1) => {
-      // TEMP-DIAG
-      if (process.env.NODE_ENV !== 'production') {
-        console.log(
-          '[CART-DIAG] adicionar userId=' + userId +
-            ' autenticado=' + autenticado +
-            ' usuario.id=' + (usuario?.id) +
-            ' produto.id=' + produto?.id +
-            ' cartId=' + cartId,
-        )
-      }
       // Visitante: apenas estado local.
       if (!userId) {
         setItens((atual) => {

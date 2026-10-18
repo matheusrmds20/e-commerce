@@ -112,7 +112,7 @@ class TestCreate:
     def test_create_pedido_de_outro_usuario_e_proibido(
         self, payment_service, order_repo
     ):
-  
+
         order_repo.get_by_id.return_value = make_order(user_id=2)
 
         with pytest.raises(ForbiddenException):
@@ -170,7 +170,7 @@ class TestGetByOrderId:
         self, payment_service, payment_repo, user_repo, order_repo
     ):
         user = self._make_user()
-   
+
         user_repo.get_by_id.return_value = user
         order_repo.get_by_id.return_value = make_order(user_id=1)
         payments = [make_payment()]
@@ -197,7 +197,7 @@ class TestGetHistory:
         return user
 
     def test_get_history_success(self, payment_service, payment_repo, user_repo):
- 
+
         user = self._make_user()
         user_repo.get_by_id.return_value = user
         pagamentos = [make_payment(), make_payment(id=2)]
@@ -357,7 +357,7 @@ class TestCreateCheckout:
     def test_create_checkout_usa_sandbox_init_point(
         self, payment_service, order_repo, payment_repo, payment_gateway
     ):
-  
+
         self._setup_success(order_repo, payment_repo)
         payment_gateway.create_preference.return_value = {
             "id": "PREF1",
@@ -401,7 +401,7 @@ class TestCreateCheckout:
     def test_create_checkout_sem_urls_retorna_none(
         self, payment_service, order_repo, payment_repo, payment_gateway
     ):
-  
+
         self._setup_success(order_repo, payment_repo)
         payment_gateway.create_preference.return_value = {"id": "PREF1"}
 

@@ -344,7 +344,7 @@ class TestPaginacao:
 
 
 class TestRecommendations:
-  
+
 
     def test_recommendations_success(self, product_service, product_repo):
         product_repo.get_recommendations.return_value = [make_product()]
@@ -363,7 +363,7 @@ class TestRecommendations:
 
 
 class TestPaginacaoComFiltro:
-   
+
 
     def test_paginated_passa_category_id(
         self, product_service, product_repo, category_repo
@@ -378,7 +378,7 @@ class TestPaginacaoComFiltro:
     def test_paginated_passa_search(
         self, product_service, product_repo, category_repo
     ):
-  
+
         product_repo.paginate.return_value = ([], 0)
 
         product_service.get_paginated(page=1, per_page=12, search="tolkien")
@@ -388,7 +388,7 @@ class TestPaginacaoComFiltro:
     def test_paginated_total_reflete_o_filtro(
         self, product_service, product_repo, category_repo
     ):
-   
+
         category_repo.get_by_id.return_value = make_category()
         # 13 itens NA CATEGORIA, com 12 por página = 2 páginas.
         product_repo.paginate.return_value = ([make_product()], 13)

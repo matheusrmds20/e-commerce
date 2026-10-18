@@ -1,9 +1,7 @@
 
 import pytest
 
-import app.models  
 from app.db.base import Base
-
 
 COLUNAS_QUENTES = [
 

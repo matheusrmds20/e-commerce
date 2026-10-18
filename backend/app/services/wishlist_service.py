@@ -35,7 +35,7 @@ class WishlistService:
     def get_by_user_id(
         self, current_user: User, user_id: int | None = None
     ) -> list:
-  
+
         alvo = current_user.id if user_id is None else user_id
         self._ensure_owner_or_admin(current_user, alvo)
 

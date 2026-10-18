@@ -96,10 +96,15 @@ class TestAutobeginDoUsuarioDoToken:
         user = _criar_usuario(real_session, email="c@example.com")
         service = UserService(real_session)
 
+        # `_criar_usuario` comita, o que encerra a transação do INSERT.
+        assert real_session.in_transaction() is False
 
-        
+        _ = user.role  # dispara autobegin (atributo expirado pelo commit)
+
         assert real_session.in_transaction() is True
 
+        # O service precisa conviver com a transação já aberta sem
+        # levantar InvalidRequestError.
         resultado = service.deactivate(user.id, user)
 
         assert resultado.is_active is False
@@ -114,7 +119,9 @@ class TestAutobeginDoUsuarioDoToken:
         )
         service = UserService(real_session)
 
+        assert real_session.in_transaction() is False
         _ = user.role  # dispara autobegin
+        assert real_session.in_transaction() is True
 
         service.change_password(
             user.id,
