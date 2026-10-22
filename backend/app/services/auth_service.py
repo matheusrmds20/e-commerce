@@ -1,5 +1,5 @@
 import hashlib
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from uuid import uuid4
 
 from jose import ExpiredSignatureError, JWTError
@@ -7,7 +7,6 @@ from sqlalchemy.orm import Session
 
 from app.api.exceptions import (
     AccountLockedException,
-    EmailAlreadyExistsException,
     InactiveUserException,
     InvalidCredentialsException,
     InvalidTokenException,

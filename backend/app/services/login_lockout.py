@@ -77,7 +77,7 @@ def check(email: str) -> LockoutDecision:
         return LockoutDecision(allowed=True)
 
     r = _client()
-    if r is None:  
+    if r is None:
         return LockoutDecision(allowed=True)
 
     try:
@@ -89,7 +89,7 @@ def check(email: str) -> LockoutDecision:
                 retry_after=lock_until - _now(),
             )
         return LockoutDecision(allowed=True)
-    except redis_client.RedisError as exc:   
+    except redis_client.RedisError as exc:
         logger.warning("Redis indisponível no check de lockout: %s", exc)
         return LockoutDecision(allowed=True)
 

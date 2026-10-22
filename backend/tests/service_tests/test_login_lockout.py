@@ -1,6 +1,5 @@
 """Testes do lockout por conta no login (P1-5)."""
 
-from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
@@ -20,8 +19,6 @@ def _set(**kwargs):
 
 def _fake_client(store: dict):
     """Cliente Redis fake com memória (get/set/delete)."""
-    now = lockout._now()
-
     class FakeRedis:
         def get(self, key):
             return store.get(key)
