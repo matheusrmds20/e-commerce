@@ -61,6 +61,9 @@ class Settings(BaseSettings):
     LOGIN_LOCKOUT_MAX_SECONDS: int = 1800
     LOGIN_LOCKOUT_REDIS_URL: str | None = None
     COMPROVANTES_DIR: str = "comprovantes"
+    SUPABASE_URL: str = ""
+    SUPABASE_SERVICE_KEY: str = ""
+    SUPABASE_STORAGE_BUCKET: str = "comprovantes"
 
     model_config=SettingsConfigDict(
         env_file=str(ENV_FILE),

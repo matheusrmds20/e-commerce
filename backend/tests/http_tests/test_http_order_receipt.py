@@ -26,13 +26,6 @@ def auth_user():
     app.dependency_overrides.pop(get_current_user, None)
 
 
-def _fake_pdf(tmp_path) -> str:
-    """Cria um PDF mínimo no disco e retorna seu caminho."""
-    p = tmp_path / "comprovante_order_7.pdf"
-    p.write_bytes(b"%PDF-1.4\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF")
-    return str(p)
-
-
 class TestDownloadReceipt:
     def test_require_auth(self, client):
         response = client.get(f"{PREFIX}/7/comprovante")
@@ -40,11 +33,13 @@ class TestDownloadReceipt:
 
     def test_success_downloads_pdf(self, client, auth_user, tmp_path):
         auth_user(1)
-        pdf_path = _fake_pdf(tmp_path)
         svc = Mock(name="order_service")
-        svc.get_receipt_path.return_value = pdf_path
+        svc.get_receipt_path.return_value = "comprovantes/comprovante_order_7.pdf"
 
-        with patch("app.api.v1.orders.get_order_service", return_value=svc):
+        with patch("app.api.v1.orders.get_order_service", return_value=svc), patch(
+            "app.utils.storage.download_receipt",
+            return_value=b"%PDF-1.4\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF",
+        ) as download:
             response = client.get(f"{PREFIX}/7/comprovante")
 
         assert response.status_code == 200
@@ -54,6 +49,7 @@ class TestDownloadReceipt:
         )
         assert response.content.startswith(b"%PDF-")
         svc.get_receipt_path.assert_called_once_with(7, 1)
+        download.assert_called_once_with("comprovantes/comprovante_order_7.pdf")
 
     def test_forbidden_for_other_user(self, client, auth_user):
         auth_user(1)
