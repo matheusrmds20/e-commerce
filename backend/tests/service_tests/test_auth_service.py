@@ -1,11 +1,11 @@
+from datetime import UTC, datetime
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import pytest
 
 import app.services.auth_service as auth_module
 from app.api.exceptions import (
-    EmailAlreadyExistsException,
     InactiveUserException,
     InvalidCredentialsException,
     InvalidTokenException,
@@ -47,19 +47,20 @@ class TestRegister:
 
         result = auth_service.register(register_payload())
 
-        assert result is user
+        assert result.message == "Cadastro realizado com sucesso."
         user_repo.get_by_email.assert_called_once_with("user@example.com")
         created = user_repo.create.call_args[0][0]
         assert created.email == "user@example.com"
         assert created.full_name == "John Doe"
         assert created.password_hash == "hashed-password"
 
-    def test_register_email_already_exists(self, auth_service, user_repo):
+    def test_register_email_already_exists_returns_generic(self, auth_service, user_repo):
+        """P1-2: e-mail já existente NÃO revela o conflito (mesmo 201 genérico)."""
         user_repo.get_by_email.return_value = make_user()
 
-        with pytest.raises(EmailAlreadyExistsException):
-            auth_service.register(register_payload())
+        result = auth_service.register(register_payload())
 
+        assert result.message == "Cadastro realizado com sucesso."
         user_repo.create.assert_not_called()
 
 
@@ -107,14 +108,29 @@ class TestMe:
 
 class TestRefresh:
     def test_refresh_success_rotates(self, auth_service, user_repo):
+        # Token armazenado ativo (não revogado, não expirado) -> rotação.
+        stored = Mock(name="stored")
+        stored.revoked = False
+        stored.expires_at = datetime(2030, 1, 1, tzinfo=UTC)
+        stored.jti = "jti-1"
+        stored.user_id = 1
+        stored.family_id = "fam-1"
 
-        with patch("app.services.auth_service.decode_token", return_value={"sub": "1", "type": "refresh"}):
+        auth_service.refresh_repo.get_by_token_hash.return_value = stored
+
+        with patch(
+            "app.services.auth_service.decode_token",
+            return_value={"sub": "1", "type": "refresh", "jti": "jti-1"},
+        ):
             user_repo.get_by_id.return_value = make_user()
             result = auth_service.refresh("old-refresh-token")
 
         assert result.access_token == "access-token"
         assert result.refresh_token == "refresh-token"
         user_repo.get_by_id.assert_called_once_with(1)
+        # O token antigo foi revogado (rotação) e um novo foi persistido na família.
+        auth_service.refresh_repo.revoke.assert_called_once_with(stored)
+        assert auth_service.session.add.called
 
     def test_refresh_rejects_access_token(self, auth_service, user_repo):
         with patch("app.services.auth_service.decode_token", return_value={"sub": "1", "type": "access"}):
@@ -124,7 +140,7 @@ class TestRefresh:
         user_repo.get_by_id.assert_not_called()
 
     def test_refresh_invalid_user(self, auth_service, user_repo):
-        with patch("app.services.auth_service.decode_token", return_value={"sub": "999", "type": "refresh"}):
+        with patch("app.services.auth_service.decode_token", return_value={"sub": "999", "type": "refresh", "jti": "x"}):
             user_repo.get_by_id.return_value = None
             with pytest.raises(InvalidTokenException):
                 auth_service.refresh("old-refresh-token")
@@ -142,8 +158,54 @@ class TestRefresh:
 
         user_repo.get_by_id.assert_not_called()
 
+    def test_refresh_rejected_when_stored_token_revoked(self, auth_service, user_repo):
+        """P1-1: refresh já revogado (= reuso) derruba a família inteira."""
+        stored = Mock(name="stored")
+        stored.revoked = True
+        stored.family_id = "fam-1"
+        auth_service.refresh_repo.get_by_token_hash.return_value = stored
+
+        user_repo.get_by_id.return_value = make_user()
+
+        with patch(
+            "app.services.auth_service.decode_token",
+            return_value={"sub": "1", "type": "refresh", "jti": "jti-1"},
+        ):
+            with pytest.raises(TokenExpiredException):
+                auth_service.refresh("old-refresh-token")
+
+        auth_service.refresh_repo.revoke_family.assert_called_once_with("fam-1")
+        auth_service.session.commit.assert_called()
+
+    def test_refresh_rejected_when_token_unknown(self, auth_service, user_repo):
+        """P1-1: token que nunca emitimos é rejeitado."""
+        auth_service.refresh_repo.get_by_token_hash.return_value = None
+        user_repo.get_by_id.return_value = make_user()
+
+        with patch(
+            "app.services.auth_service.decode_token",
+            return_value={"sub": "1", "type": "refresh", "jti": "jti-1"},
+        ):
+            with pytest.raises(InvalidTokenException):
+                auth_service.refresh("forged-refresh-token")
+
 
 class TestLogout:
-    def test_logout_returns_none(self, auth_service):
-        # Sem blacklist ainda, logout apenas sinaliza (cookie é apagado na rota).
-        assert auth_service.logout() is None
+    def test_logout_revokes_token(self, auth_service):
+        """P1-1: logout revoga o refresh token apresentado."""
+        stored = Mock(name="stored")
+        stored.revoked = False
+        auth_service.refresh_repo.get_by_token_hash.return_value = stored
+
+        assert auth_service.logout("some-refresh-token") is None
+        auth_service.refresh_repo.revoke.assert_called_once_with(stored)
+        auth_service.session.commit.assert_called()
+
+    def test_logout_no_token_does_nothing(self, auth_service):
+        assert auth_service.logout(None) is None
+        auth_service.refresh_repo.get_by_token_hash.assert_not_called()
+
+    def test_revoke_all_for_user(self, auth_service):
+        auth_service.revoke_all_for_user(1)
+        auth_service.refresh_repo.revoke_all_for_user.assert_called_once_with(1)
+        auth_service.session.commit.assert_called()

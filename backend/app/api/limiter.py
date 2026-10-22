@@ -8,11 +8,6 @@ _settings = get_settings()
 
 
 def _client_key(request: Request) -> str:
-
-    if _settings.RATE_LIMIT_TRUST_XFF:
-        forwarded = request.headers.get("x-forwarded-for")
-        if forwarded:
-            return forwarded.split(",")[0].strip()
     return get_remote_address(request)
 
 

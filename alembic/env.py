@@ -43,6 +43,7 @@ from app.models.order import Order  # noqa: F401
 from app.models.order_item import OrderItem  # noqa: F401
 from app.models.payment import Payment  # noqa: F401
 from app.models.product import Product  # noqa: F401
+from app.models.refresh_token import RefreshToken  # noqa: F401
 from app.models.review import Review  # noqa: F401
 from app.models.user import User  # noqa: F401
 from app.models.user_coupon import UserCoupon  # noqa: F401

@@ -109,10 +109,11 @@ celery.conf.imports = ("app.utils.email", "app.utils.receipt_tasks")
 
 - ⚠️ O trabalho acontece **no processo da API**. Se o volume de notificações
   crescer muito, o threadpool pode saturar.
-- ⚠️ A validação de assinatura (`VALIDATE_WEBHOOK_SIGNATURE`) é desativável para
-  sandbox/depuração. Em **produção mantenha `true`**. Segredos extras podem ser
-  informados em `MERCADO_PAGO_WEBHOOK_SECRETS_EXTRA` (lista separada por vírgula)
-  durante rotação de chaves.
+- ⚠️ A validação de assinatura (`VALIDATE_WEBHOOK_SIGNATURE`) está **desligada** neste
+  projeto de portfólio (decisão e mitigação de risco em **ADR-002**,
+  `README_WEBHOOK_SIGNATURE_DECISION.md`). Só reative com `true` em produção com
+  pagamentos reais. Segredos extras podem ser informados em
+  `MERCADO_PAGO_WEBHOOK_SECRETS_EXTRA` (lista separada por vírgula) durante rotação de chaves.
 - ⚠️ O endpoint tem rate limit próprio (`120/minute`, ver
   `app/api/v1/payments.py` e `app/api/limiter.py`) — se o MP reenviar em rajada
   acima disso, as notificações podem ser descartadas com `429`.

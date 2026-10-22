@@ -1,4 +1,5 @@
 
+import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Response, status
@@ -8,6 +9,8 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_db
 from app.core.config import get_settings
 from app.schemas.common import DependencyHealth, HealthResponse
+
+logger = logging.getLogger(__name__)
 
 health_router = APIRouter()
 
@@ -21,10 +24,15 @@ def _check_database(db: Session) -> DependencyHealth:
         db.execute(text("SELECT 1"))
         return DependencyHealth(name="database", status="ok")
     except Exception as exc:
+        logger.exception("Health check do banco falhou: %s", exc)
+        if settings.DEBUG:
+            detail = f"{type(exc).__name__}: {exc}"
+        else:
+            detail = "unavailable"
         return DependencyHealth(
             name="database",
             status="error",
-            detail=f"{type(exc).__name__}: {exc}",
+            detail=detail,
         )
 
 

@@ -10,6 +10,7 @@ from app.api.exceptions import (
 from app.core.security import hash_password, verify_password
 from app.db.transaction import transacao
 from app.models.user import User, UserRole
+from app.repositories.refresh_token_repo import RefreshTokenRepository
 from app.repositories.user_repo import UserRepository
 from app.schemas.auth import MessageResponse
 from app.schemas.user import (
@@ -23,6 +24,7 @@ from app.schemas.user import (
 class UserService:
     def __init__(self, db: Session) -> None:
         self.user_repo = UserRepository(db)
+        self.refresh_repo = RefreshTokenRepository(db)
         self.session = db
 
     def _check_email_available(self, email: str, exclude_user_id: int | None = None) -> None:
@@ -48,8 +50,7 @@ class UserService:
     def create(
         self, data: AdminUserCreate | CustomerUserCreate, current_user: User
     ) -> UserResponse:
-        # `transacao` evita o InvalidRequestError quando a sessão já iniciou
-        # transação ao ler atributos de `current_user` (autobegin).
+
         with transacao(self.session):
             self._ensure_admin(current_user)
 
@@ -124,6 +125,7 @@ class UserService:
                 )
 
             self.user_repo.change_password(user_id, hash_password(new_password))
+            self.refresh_repo.revoke_all_for_user(user_id)
 
             return MessageResponse(message="Senha alterada com sucesso.")
 

@@ -65,6 +65,11 @@ class User(Base):
         back_populates="users",
         cascade="all, delete-orphan",
     )
+    refresh_tokens = relationship(
+        "RefreshToken",
+        back_populates="users",
+        cascade="all, delete-orphan",
+    )
 
     def __repr__(self) -> str:
         """Representação legível do usuário."""

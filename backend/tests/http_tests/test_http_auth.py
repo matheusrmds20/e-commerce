@@ -3,7 +3,7 @@ from unittest.mock import Mock, patch
 from helpers import assert_error, assert_validation_error, auth_user_payload
 
 from app.api.exceptions import (
-    EmailAlreadyExistsException,
+    AccountLockedException,
     InactiveUserException,
     InvalidCredentialsException,
     InvalidTokenException,
@@ -22,27 +22,31 @@ REGISTER_OK = {
 
 class TestRegister:
     def test_register_success(self, client):
+        from app.schemas.auth import MessageResponse
+
         svc = Mock(name="auth_service")
-        svc.register.return_value = auth_user_payload()
+        svc.register.return_value = MessageResponse(message="Cadastro realizado com sucesso.")
 
         with patch("app.api.v1.auth.get_auth_service", return_value=svc):
             response = client.post(f"{PREFIX}/register", json=REGISTER_OK)
 
         assert response.status_code == 201
-        body = response.json()
-        assert body["id"] == 1
-        assert body["email"] == "user@example.com"
-        assert body["role"] == "customer"
-        assert body["is_active"] is True
+        assert response.json()["message"] == "Cadastro realizado com sucesso."
 
-    def test_register_email_already_exists(self, client):
+    def test_register_email_already_exists_is_generic(self, client):
+        """P1-2: e-mail já existente responde o mesmo 201 genérico (anti-enumeração)."""
+        from app.schemas.auth import MessageResponse
+
         svc = Mock(name="auth_service")
-        svc.register.side_effect = EmailAlreadyExistsException()
+        svc.register.return_value = MessageResponse(message="Cadastro realizado com sucesso.")
 
         with patch("app.api.v1.auth.get_auth_service", return_value=svc):
             response = client.post(f"{PREFIX}/register", json=REGISTER_OK)
 
-        assert_error(response, 409, "EMAIL_ALREADY_EXISTS")
+        assert response.status_code == 201
+        assert response.json()["message"] == "Cadastro realizado com sucesso."
+        assert "EMAIL_ALREADY_EXISTS" not in response.text
+        assert "error" not in response.json()
 
     def test_register_invalid_email(self, client):
         payload = {**REGISTER_OK, "email": "not-an-email"}
@@ -119,6 +123,16 @@ class TestLogin:
         response = self._enviar(client, svc)
 
         assert_error(response, 403, "INACTIVE_USER")
+
+    def test_login_account_locked_returns_429_with_retry_after(self, client):
+        """P1-5: conta bloqueada -> 429 com Retry-After (e código ACCOUNT_LOCKED)."""
+        svc = Mock(name="auth_service")
+        svc.login.side_effect = AccountLockedException(retry_after=120)
+
+        response = self._enviar(client, svc)
+
+        assert_error(response, 429, "ACCOUNT_LOCKED")
+        assert response.headers.get("Retry-After") == "120"
 
     def test_login_missing_username(self, client):
         response = client.post(f"{PREFIX}/login", data={"password": "secret123"})

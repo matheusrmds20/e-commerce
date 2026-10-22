@@ -105,6 +105,22 @@ class InvalidCredentialsException(UnauthorizedException):
         super().__init__("E-mail ou senha inválidos.", code="INVALID_CREDENTIALS")
 
 
+class AccountLockedException(BookCommerceException):
+    """Conta temporariamente bloqueada por excesso de tentativas de login.
+
+    Usa 429 (não 401) para não revelar se o e-mail existe e para sinalizar que
+    é uma limitação de tentativas, não erro de credencial.
+    """
+
+    def __init__(self, retry_after: int = 60) -> None:
+        super().__init__(
+            "Muitas tentativas. Tente novamente mais tarde.",
+            code="ACCOUNT_LOCKED",
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+        )
+        self.retry_after = retry_after
+
+
 class TokenExpiredException(UnauthorizedException):
     """Token JWT expirado."""
 
@@ -511,7 +527,13 @@ def register_exception_handlers(app: FastAPI) -> None:
                 request.url.path,
                 getattr(request.state, "user_id", None),
             )
-        return JSONResponse(status_code=exc.status_code, content=exc.to_dict())
+        headers = None
+        retry_after = getattr(exc, "retry_after", None)
+        if isinstance(retry_after, int) and retry_after > 0:
+            headers = {"Retry-After": str(retry_after)}
+        return JSONResponse(
+            status_code=exc.status_code, content=exc.to_dict(), headers=headers
+        )
 
     @app.exception_handler(RequestValidationError)
     async def validation_exception_handler(

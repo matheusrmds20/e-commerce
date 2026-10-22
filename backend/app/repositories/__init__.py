@@ -8,6 +8,7 @@ from app.repositories.order_item import OrderItemRepository as OrderItemReposito
 from app.repositories.order_repo import OrderRepository as OrderRepository
 from app.repositories.payment_repo import PaymentRepository as PaymentRepository
 from app.repositories.product_repo import ProductRepository as ProductRepository
+from app.repositories.refresh_token_repo import RefreshTokenRepository as RefreshTokenRepository
 from app.repositories.review_repo import ReviewRepository as ReviewRepository
 from app.repositories.user_repo import UserRepository as UserRepository
 from app.repositories.wishlist_repo import WishlistRepository as WishlistRepository
@@ -23,6 +24,7 @@ __all__ = [
     "OrderRepository",
     "PaymentRepository",
     "ProductRepository",
+    "RefreshTokenRepository",
     "ReviewRepository",
     "UserRepository",
     "WishlistRepository",
