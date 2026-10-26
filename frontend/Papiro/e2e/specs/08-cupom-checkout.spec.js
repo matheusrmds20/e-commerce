@@ -56,11 +56,25 @@ test.describe('Cupom / Checkout (MP mockado)', () => {
     await page.goto('/acervo')
     const card = page.getByTestId(/^book-card-/).first()
     await expect(card).toBeVisible({ timeout: 15_000 })
+    // Guarda o título do produto clicado p/ confirmar no resumo do checkout.
+    const alt = await card.locator('img').getAttribute('alt')
+    const titulo = alt ? alt.replace(/^Capa de /, '') : 'Dom Casmurro'
     await card.locator('img').click()
     await expect(page.getByTestId('btn-add-carrinho')).toBeVisible({
       timeout: 15_000,
     })
     await page.getByTestId('btn-add-carrinho').click()
+
+    // Garante que o item foi de fato persistido no servidor antes de navegar;
+    // do contrário o `goto('/checkout')` pode interromper/atrasar o POST de
+    // add e o carrinho chega vazio no checkout (flaky: "sacola vazia").
+    await page.waitForResponse(
+      (res) =>
+        res.url().includes('/cart/') &&
+        res.url().includes('/items/add') &&
+        res.ok(),
+      { timeout: 15_000 },
+    )
 
     // Checkout: endereço do setup aparece e é selecionado.
     await page.goto('/checkout')
@@ -68,6 +82,12 @@ test.describe('Cupom / Checkout (MP mockado)', () => {
       timeout: 15_000,
     })
     await page.getByLabel(/Rua do Teste E2E/).check()
+
+    // O carrinho é carregado no resumo de forma assíncrona; aguarda o item
+    // aparecer antes de finalizar (evita clicar com a sacola ainda vazia).
+    await expect(
+      page.locator('aside ul li').filter({ hasText: titulo }).first(),
+    ).toBeVisible({ timeout: 15_000 })
 
     // Seção de cupons renderiza (usuário novo não tem cupom — estado vazio).
     await expect(page.getByText(/Nenhum cupom disponível/)).toBeVisible({

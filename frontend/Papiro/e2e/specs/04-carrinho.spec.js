@@ -26,6 +26,11 @@ test.describe('Carrinho', () => {
       timeout: 15_000,
     })
     await page.getByTestId('btn-add-carrinho').click()
+    // Aguarda o add ser persistido antes de ler o badge (evitar flaky).
+    await page.waitForResponse(
+      (res) => res.url().includes('/items/add') && res.ok(),
+      { timeout: 15_000 },
+    )
 
     // Badge da navbar reflete 1 exemplar.
     await expect(page.getByTestId('navbar-sacola')).toContainText('1')
@@ -77,6 +82,11 @@ test.describe('Carrinho', () => {
       timeout: 15_000,
     })
     await page.getByTestId('btn-add-carrinho').click()
+    // Aguarda o add ser persistido antes de ler o badge (evitar flaky).
+    await page.waitForResponse(
+      (res) => res.url().includes('/items/add') && res.ok(),
+      { timeout: 15_000 },
+    )
     await expect(page.getByTestId('navbar-sacola')).toContainText('1')
 
     // Reload → carrinho recarregado do backend (persistiu via API).

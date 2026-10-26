@@ -24,7 +24,13 @@ export async function registrarPelaUi(page, { fullName, email, password } = {}) 
   await page.getByTestId('input-confirmacao').fill(dados.password)
   await page.getByTestId('btn-registrar').click()
 
-  // Home renderizada com sessão ativa (navbar mostra "Minha conta — <nome>").
+  // A navbar da rota de registro é propositalmente simples e não contém o
+  // botão de conta. Primeiro esperamos a confirmação e o redirecionamento
+  // para a home; só então validamos a sessão na navbar completa.
+  await expect(page.getByRole('status')).toContainText('Conta criada', {
+    timeout: 15_000,
+  })
+  await page.waitForURL(/\/$/, { timeout: 15_000 })
   await expect(page.getByTestId('navbar-login')).toHaveAttribute(
     'aria-label',
     new RegExp(`Minha conta — ${dados.fullName}`),

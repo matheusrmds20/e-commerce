@@ -9,7 +9,6 @@ PREFIX = "/api/v1/health"
 
 @pytest.fixture
 def health_db(client):
-    """Banco mockado com ``execute`` controlado para o health check."""
     db = Mock(name="db")
     client.app.dependency_overrides[get_db] = lambda: db
     return db

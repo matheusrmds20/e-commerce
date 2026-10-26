@@ -21,17 +21,17 @@ com o novo (``unique_cart_item``), a coluna não existe no ``pg_constraint`` e o
 ``SELECT`` devolve vazio → não faz nada. Assim roda de forma segura sobre
 qualquer estado anterior.
 """
-from typing import Sequence, Union
+from collections.abc import Sequence
 
-from alembic import op
 import sqlalchemy as sa
 
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = 'aa6744938b86'
-down_revision: Union[str, Sequence[str], None] = '0c3b7bfca865'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | Sequence[str] | None = '0c3b7bfca865'
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:

@@ -23,16 +23,11 @@ usado internamente pela aplicação.
 
 from logging.config import fileConfig
 
-from sqlalchemy import engine_from_config, pool
-
-from alembic import context
-
 # Importa as settings da aplicação para obter a URL do banco.
 from app.core.config import get_settings
 from app.db.base import Base
 
 # Importa TODOS os models para registro no metadata do autogenerate.
-# noqa: F401 — os imports são "usados" por efeito colateral (registrar tabelas).
 from app.models.address import Address  # noqa: F401
 from app.models.cart import Cart  # noqa: F401
 from app.models.cart_item import CartItem  # noqa: F401
@@ -48,6 +43,9 @@ from app.models.review import Review  # noqa: F401
 from app.models.user import User  # noqa: F401
 from app.models.user_coupon import UserCoupon  # noqa: F401
 from app.models.wishlist import Wishlist  # noqa: F401
+from sqlalchemy import engine_from_config, pool
+
+from alembic import context
 
 # Objeto de configuração do Alembic (lê o alembic.ini).
 config = context.config

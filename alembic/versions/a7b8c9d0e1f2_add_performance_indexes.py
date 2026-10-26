@@ -30,16 +30,15 @@ bancos que já tenham algum destes índices criado manualmente.
 
 ``down_revision`` = f6a7b8c9d0e1 (coupon_single_use_per_user), o HEAD anterior.
 """
-from typing import Sequence, Union
+from collections.abc import Sequence
 
 from alembic import op
 
-
 # revision identifiers, used by Alembic.
 revision: str = 'a7b8c9d0e1f2'
-down_revision: Union[str, Sequence[str], None] = 'f6a7b8c9d0e1'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | Sequence[str] | None = 'f6a7b8c9d0e1'
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 # (tabela, coluna) — cada um vira um índice simples.

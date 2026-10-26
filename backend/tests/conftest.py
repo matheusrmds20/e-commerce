@@ -11,6 +11,11 @@ os.environ.setdefault(
 
 os.environ.setdefault("RATE_LIMIT_ENABLED", "false")
 
+# O ambiente de teste roda com DEBUG=false para reproduzir o comportamento de
+# produção (ex.: health check mascara detalhes do banco). Globalização de side
+# effects de debug desligada durante a suíte.
+os.environ.setdefault("DEBUG", "false")
+
 # Lockout por conta (P1-5) desligado no ambiente de teste: evita contagem real
 # no Redis de falhas de login durante a suíte e mantém os testes determinísticos.
 os.environ.setdefault("LOGIN_LOCKOUT_ENABLED", "false")

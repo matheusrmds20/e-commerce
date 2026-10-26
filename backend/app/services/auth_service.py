@@ -1,8 +1,10 @@
 import hashlib
+import logging
 from datetime import UTC, datetime
 from uuid import uuid4
 
 from jose import ExpiredSignatureError, JWTError
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.exceptions import (
@@ -26,6 +28,8 @@ from app.repositories.refresh_token_repo import RefreshTokenRepository
 from app.repositories.user_repo import UserRepository
 from app.schemas.auth import AuthResponse, MessageResponse, TokenResponse
 from app.services import login_lockout
+
+logger = logging.getLogger(__name__)
 
 
 def _token_hash(token: str) -> str:
@@ -75,7 +79,21 @@ class AuthService:
 
         login_lockout.record_success(data.username)
 
-        return self._issue_tokens(user.id)
+        result = self._issue_tokens(user.id)
+        # O refresh token só fica utilizável se a transação for confirmada;
+        # sem commit o flush() é revertido no fechamento da sessão e o token
+        # vira órfão (refresh sempre 401). Garantimos aqui o persistir real.
+        try:
+            self.session.commit()
+        except IntegrityError as err:
+            self.session.rollback()
+            logger.warning(
+                "Falha ao confirmar emissão de tokens (user_id=%s): %s",
+                user.id,
+                err.orig,
+            )
+            raise InvalidTokenException() from err
+        return result
 
     def _issue_tokens(
         self,
@@ -94,24 +112,49 @@ class AuthService:
             jti=refresh_jti,
         )
 
-        expires_at = datetime.now(UTC) + RefreshTokenRepository.expire_days()
-
-        self.session.add(
-            RefreshToken(
-                user_id=user_id,
-                jti=refresh_jti,
-                token_hash=_token_hash(refresh_token),
-                family_id=family_id,
-                expires_at=expires_at,
-            )
+        self._persist_refresh_token(
+            user_id=user_id,
+            jti=refresh_jti,
+            token=refresh_token,
+            family_id=family_id,
         )
-        self.session.flush()
 
         access_token = create_access_token({"sub": str(user_id)})
         return TokenResponse(
             access_token=access_token,
             refresh_token=refresh_token,
         )
+
+    def _persist_refresh_token(
+        self,
+        *,
+        user_id: int,
+        jti: str,
+        token: str,
+        family_id: str,
+    ) -> None:
+
+        self.session.add(
+            RefreshToken(
+                user_id=user_id,
+                jti=jti,
+                token_hash=_token_hash(token),
+                family_id=family_id,
+                expires_at=datetime.now(UTC) + RefreshTokenRepository.expire_days(),
+            )
+        )
+
+        try:
+            self.session.flush()
+        except IntegrityError as err:
+            self.session.rollback()
+            logger.warning(
+                "Falha ao persistir refresh token (user_id=%s): %s",
+                user_id,
+                err.orig,
+            )
+            raise InvalidTokenException() from err
+
 
     def refresh(self, refresh_token: str) -> TokenResponse:
         if not refresh_token:
@@ -145,7 +188,16 @@ class AuthService:
             self.session.commit()
             raise TokenExpiredException()
 
-        if stored.expires_at < datetime.now(UTC):
+        if stored.expires_at.tzinfo is None:
+            # ``expires_at`` vem de uma coluna ``timestamp without time zone``
+            # (lida como naive pelo psycopg2) mesmo tendo sido salva com UTC;
+            # normaliza para UTC-aware antes de comparar. Sem isso o TypeError
+            # naive vs aware quebra o refresh com 500.
+            stored_expires = stored.expires_at.replace(tzinfo=UTC)
+        else:
+            stored_expires = stored.expires_at
+
+        if stored_expires < datetime.now(UTC):
             self.refresh_repo.revoke(stored)
             self.session.commit()
             raise TokenExpiredException()

@@ -9,11 +9,13 @@ ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
 
 class Settings(BaseSettings):
     APP_NAME: str = "E-commerce"
-    DEBUG: bool = False
+    DEBUG: bool = True
 
     FRONTEND_URL: str
     BACKEND_URL: str
     CORS_ORIGINS: list[str] = [
+        "http://http://127.0.0.1:8000",
+        "http://localhost:5173",
         "https://papiro.matheuslab.xyz",
         "https://e-commerce-de-livros-api.onrender.com",
         "https://e-commerce-nine-nu-59.vercel.app",

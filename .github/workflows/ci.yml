@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-
+      DEBUG: "true"
       DATABASE_URL: "sqlite:///:memory:"
       FRONTEND_URL: "http://localhost:5173"
       BACKEND_URL: "http://localhost:8000"
@@ -119,6 +119,7 @@ jobs:
           --health-retries 5
 
     env:
+      DEBUG: "true"
       FRONTEND_URL: "http://localhost:5173"
       BACKEND_URL: "http://localhost:8000"
       SECRET_KEY: "ci-fake-secret-key-0123456789-0123456789-0123456789"

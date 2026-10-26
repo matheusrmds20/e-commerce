@@ -95,6 +95,35 @@ class TestLogin:
             auth_service.login(SimpleNamespace(username="user@example.com", password="secret123"))
 
 
+    def test_login_integrity_error_becomes_401_and_rollbacks(self, auth_service, user_repo):
+        """Item 2: IntegrityError ao persistir refresh vira 401 e faz rollback.
+
+        Reproduz o bug que derrubava os testes e2e com 500 (tabela ausente /
+        FK órfã) — agora devolve InvalidTokenException controlada e limpa a
+        transação quebrada.
+        """
+        from sqlalchemy.exc import IntegrityError
+
+        user_repo.get_by_email.return_value = make_user()
+
+        with patch(
+            "app.services.auth_service.login_lockout.check",
+            return_value=SimpleNamespace(allowed=True),
+        ), patch(
+            "app.services.auth_service.login_lockout.record_success",
+        ):
+            auth_service.session.flush.side_effect = IntegrityError(
+                "INSERT INTO refresh_tokens ...",
+                {},
+                Exception('relation "refresh_tokens" does not exist'),
+            )
+            with pytest.raises(InvalidTokenException):
+                auth_service.login(SimpleNamespace(username="user@example.com", password="secret123"))
+
+        auth_service.session.rollback.assert_called_once()
+        auth_service.session.flush.side_effect = None
+
+
 class TestMe:
     def test_me_success(self, auth_service):
         user = make_user()
