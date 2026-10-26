@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      DEBUG: "true"
+      DEBUG: "false"
       DATABASE_URL: "sqlite:///:memory:"
       FRONTEND_URL: "http://localhost:5173"
       BACKEND_URL: "http://localhost:8000"
