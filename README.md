@@ -192,7 +192,6 @@ E-commerce v1/
 ├── alembic/                      # migrations (na RAIZ do repositório)
 ├── alembic.ini                   # prepend_sys_path = backend
 ├── .github/workflows/ci.yml      # pipeline de CI
-├── MIGRACAO-ESTILO.md              # checklist de padronização pendente
 └── README.md
 ```
 
