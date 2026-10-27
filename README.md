@@ -103,7 +103,8 @@ frete real e pagamento — com **API REST em FastAPI** e **SPA em React + Vite**
 ### Infra / DevOps
 - **GitHub Actions** — CI em 3 jobs: backend (lint + testes), frontend (lint + build) e E2E (Playwright com Postgres + Redis)
 - **Docker Compose** — provisiona Postgres e Redis para o ambiente local
-- **Render** — deploy do plano gratuito (ver [Deploy](#-deploy))
+- **Render** — Web Service da API no plano gratuito
+- **Supabase** — banco de dados PostgreSQL (plano free) (ver [Deploy](#-deploy))
 
 ---
 
@@ -615,7 +616,7 @@ variáveis estão em [Segurança](#-segurança) e no `.env.example`.
 
 O passo a passo detalhado é mantido localmente em `backend/deploy.md`
 (Render, plano free). Resumo:
-1. **PostgreSQL** (free) → pegue a *Internal Database URL*.
+1. **PostgreSQL no Supabase** (free) → crie o projeto e copie a *Connection String* (pooler, porta 6543) para `DATABASE_URL`.
 2. **Web Service** (free) — Root Directory `backend`,
    Build `pip install .`, Start `uvicorn app.main:app --host 0.0.0.0 --port $PORT`.
 3. **(Opcional)** **Key Value (Redis)** + **Background Worker**
@@ -629,9 +630,9 @@ O passo a passo detalhado é mantido localmente em `backend/deploy.md`
 7. Configure o Mercado Pago com `notification_url` apontando para
    `https://<seu-web-service>.onrender.com/api/v1/payments/webhook/`.
 
-> ℹ️ No plano free o serviço hiberna após ~15 min sem tráfego (cold start de ~1 min)
-> e o Postgres free expira em 30 dias — suficiente para demonstração, mas exige
-> recriar/`pg_dump` periodicamente.
+> ℹ️ No plano free o Web Service da Render hiberna após ~15 min sem tráfego
+> (cold start de ~1 min). O projeto Supabase free é pausado após ~7 dias de
+> inatividade e volta com um clique no painel — suficiente para demonstração.
 
 ---
 
