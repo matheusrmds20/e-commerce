@@ -8,8 +8,9 @@ from app.core.config import get_settings
 from app.db.database import SessionLocal
 from app.models.address import Address
 from app.models.order import Order
+from app.utils import storage
 from app.utils.email import build_order_details
-from app.utils.pdf import generate_receipt
+from app.utils.pdf import generate_receipt_bytes
 
 logger = logging.getLogger(__name__)
 
@@ -58,11 +59,11 @@ def generate_order_receipt(self, order_id: int) -> dict:
         }
 
         filename = FILENAME_TEMPLATE.format(order_id=order.id)
-        directory = get_settings().COMPROVANTES_DIR
-        full_path = generate_receipt(payload, f"{directory}/{filename}")
+        content = generate_receipt_bytes(payload)
+        storage_path = f"{get_settings().SUPABASE_STORAGE_BUCKET}/{filename}"
+        storage.upload_receipt(storage_path, content)
 
-
-        order.receipt_path = str(full_path)
+        order.receipt_path = storage_path
         db.commit()
 
         return {

@@ -109,19 +109,26 @@ async def get_task_status(
 @order_router.get(
     "/{order_id}/comprovante",
     summary="Baixa o comprovante PDF do pedido (somente o dono)",
-    # Sem response_model: devolvemos um FileResponse (arquivo binário).
+    # Sem response_model: devolvemos um Response binário (PDF).
 )
 def download_receipt(
     order_id: int,
     user: UserDb,
     db: DbSession,
 ):
-    from fastapi.responses import FileResponse
+    from fastapi.responses import Response
 
-    path = get_order_service(db).get_receipt_path(order_id, user.id)
+    from app.utils import storage
 
-    return FileResponse(
-        path,
+    storage_path = get_order_service(db).get_receipt_path(order_id, user.id)
+    content = storage.download_receipt(storage_path)
+
+    return Response(
+        content=content,
         media_type="application/pdf",
-        filename=f"comprovante_order_{order_id}.pdf",
+        headers={
+            "Content-Disposition": (
+                f"attachment; filename=\"comprovante_order_{order_id}.pdf\""
+            )
+        },
     )

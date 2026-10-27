@@ -80,6 +80,8 @@ backend/_auth_test.db
 !README.md
 !backend/README.md
 !backend/README_WEBHOOK_DECISION.md
+!backend/README_WEBHOOK_SIGNATURE_DECISION.md
+!backend/deploy.md
 !frontend/README.md
 
 

@@ -49,7 +49,7 @@ class TestGenerateOrderReceipt:
         db.query.return_value = query
         return query
 
-    def test_sucesso_chama_gerador_e_persiste_caminho(self, tmp_path):
+    def test_sucesso_gera_upload_na_storage_e_persiste_caminho(self, tmp_path):
         from datetime import datetime
 
         order = MagicMock()
@@ -78,25 +78,32 @@ class TestGenerateOrderReceipt:
         db = MagicMock()
         self._mock_session_with_order(order, db)
 
-        fake_path = tmp_path / "comprovante_order_7.pdf"
         captured = {}
 
-        def _fake_generate(payload, path):
+        def _fake_bytes(payload):
             captured["payload"] = payload
+            return b"%PDF-1.4%-falso"
 
-            order.receipt_path = str(fake_path)
-            return fake_path
-
-        with patch("app.utils.receipt_tasks.SessionLocal", return_value=db), patch(
-            "app.utils.receipt_tasks.generate_receipt", side_effect=_fake_generate
-        ), patch("app.utils.receipt_tasks.get_settings") as get_settings:
-            get_settings.return_value.COMPROVANTES_DIR = "comprovantes"
+        with patch(
+            "app.utils.receipt_tasks.SessionLocal", return_value=db
+        ), patch(
+            "app.utils.receipt_tasks.generate_receipt_bytes",
+            side_effect=_fake_bytes,
+        ), patch(
+            "app.utils.receipt_tasks.storage.upload_receipt",
+        ) as upload, patch(
+            "app.utils.receipt_tasks.get_settings"
+        ) as get_settings:
+            get_settings.return_value.SUPABASE_STORAGE_BUCKET = "comprovantes"
 
             result = generate_order_receipt.run("7")
 
         assert result["status"] == "success"
         assert result["order_id"] == 7
-        assert result["receipt_path"] == str(fake_path)
+        assert result["receipt_path"] == "comprovantes/comprovante_order_7.pdf"
+        upload.assert_called_once_with(
+            "comprovantes/comprovante_order_7.pdf", b"%PDF-1.4%-falso"
+        )
         assert captured["payload"]["total"] == 105.0
         assert captured["payload"]["items"][0] == {
             "name": "Livro X",

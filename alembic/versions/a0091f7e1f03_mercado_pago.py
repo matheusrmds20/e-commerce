@@ -20,17 +20,17 @@ Esta revisão agora:
 - garante que ``newsletter_subscribers`` exista (recria caso o DROP original
   já tenha rodado em algum ambiente).
 """
-from typing import Sequence, Union
+from collections.abc import Sequence
 
-from alembic import op
 import sqlalchemy as sa
 
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = 'a0091f7e1f03'
-down_revision: Union[str, Sequence[str], None] = 'a1f2e3d4c5b6'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | Sequence[str] | None = 'a1f2e3d4c5b6'
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:

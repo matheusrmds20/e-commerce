@@ -30,6 +30,7 @@ frete real e pagamento — com **API REST em FastAPI** e **SPA em React + Vite**
 - [Endpoints da API](#-endpoints-da-api)
 - [Decisões de arquitetura (ADRs)](#-decisões-de-arquitetura-adrs)
   - [ADR-001 — Webhook de pagamento via threadpool (não Celery)](#adr-001--webhook-de-pagamento-via-threadpool-não-celery)
+  - [ADR-002 — Validação de assinatura do webhook desligada (portfólio)](#adr-002--validação-de-assinatura-do-webhook-de-pagamento-desligada-portfólio)
 - [Deploy](#-deploy)
 - [Licença](#-licença)
 
@@ -290,7 +291,7 @@ VITE_API_URL=http://localhost:8000/api/v1
 | `ACCESS_TOKEN_EXPIRE_MINUTES` / `REFRESH_TOKEN_EXPIRE_DAYS` | TTL dos tokens |
 | `FRONTEND_URL` / `BACKEND_URL` | URLs usadas em CORS e `back_urls` do MP |
 | `MERCADO_PAGO_ACCESS_TOKEN` / `MERCADO_PAGO_WEBHOOK_SECRET` | Credenciais Mercado Pago |
-| `VALIDATE_WEBHOOK_SIGNATURE` | `true` em produção (ver ADR-001) |
+| `VALIDATE_WEBHOOK_SIGNATURE` | `false` no portfólio (desligada; ver ADR-002) — obrigatório `true` em produção |
 | `MELHOR_ENVIO_API_TOKEN` / `MELHOR_ENVIO_ORIGIN_ZIP` / `MELHOR_ENVIO_SANDBOX` | Cotação de frete |
 | `SMTP_*` | Envio de e-mail de confirmação |
 | `CELERY_BROKER_URL` / `CELERY_RESULT_BACKEND` | Redis para o worker |
@@ -414,10 +415,44 @@ trocar `run_in_threadpool` por uma task Celery com `process_webhook` isolada.
   menos infraestrutura no plano free.
 - ✅ Webhook responde **200** mesmo em falha de processamento (o MP reenvia por
   15 min em caso de 5xx); o erro vai para o log para investigação.
-- ⚠️ A validação de assinatura (`VALIDATE_WEBHOOK_SIGNATURE`) é desativável em
-  sandbox — em produção **mantenha `true`**.
+- ⚠️ A validação de assinatura (`VALIDATE_WEBHOOK_SIGNATURE`) está **desligada** neste projeto de portfólio (ver ADR-002).
 - ⚠️ Se o volume crescer, o caminho de migração é isolar `process_webhook` numa
   task Celery.
+
+---
+
+### ADR-002 — Validação de assinatura do webhook desligada (portfólio)
+
+> A versão completa deste ADR também é mantida localmente em
+> `backend/README_WEBHOOK_SIGNATURE_DECISION.md`.
+
+**Contexto.** O webhook de pagamento valida a assinatura `x-signature` contra o
+segredo `MERCADO_PAGO_WEBHOOK_SECRET`. No ambiente de demonstração, o Mercado
+Pago entrega a notificação mas a assinatura **nunca confere**, e não houve
+disposição para continuar depurando — pois o pagamento **não é usado de verdade**
+(portfólio, sem dinheiro real).
+
+**Decisão.** Manter `VALIDATE_WEBHOOK_SIGNATURE=false` neste ambiente. O
+`WebhookSignatureValidator` **não foi removido** do código (preserva o trabalho e
+a possibilidade de reativar com `true`). O ponto de decisão já existe em
+`app/api/v1/payments.py` e emite uma log explícita "Webhook aceito SEM validar".
+
+**Mitigação de risco.** Desligar a assinatura **não** permite "aprovar pagamento
+fake": o webhook usa `data.id` apenas como gatilho e **consulta o Mercado Pago
+direto** (`gateway.get_payment`) para obter status/valor reais. Um `data.id`
+forjado apenas dispara uma consulta à API inexistente — não marca pedido como
+pago.
+
+**Consequências:**
+- ✅ Fluxo de demonstração funciona; decisão reversível com `true`.
+- ⚠️ **Proibido em produção com pagamentos reais**: sem assinatura, um atacante
+  pode forjar callbacks para disparar chamadas à API do MP (consumo de quota) e
+  gatilhos de processamento.
+- ⚠️ Risco de erro de configuração (esquecer de reativar na produção).
+
+**Como reativar (quando o webhook for usado de verdade):** corrigir o segredo no
+painel do MP, voltar `VALIDATE_WEBHOOK_SIGNATURE=true` e validar o cálculo com
+um teste real. Ver `backend/README_WEBHOOK_SIGNATURE_DECISION.md`.
 
 ---
 

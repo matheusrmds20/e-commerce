@@ -25,6 +25,9 @@ const pythonBin =
 export default defineConfig({
   testDir: './e2e/specs',
   timeout: 30_000,
+  // Recria o banco E2E (drop + migrations + seed) antes da suíte para nunca
+  // herdar estoque zerado/resíduos de execuções anteriores. Idempotente.
+  globalSetup: './e2e/global-setup.js',
   // Testes DENTRO do mesmo arquivo rodam em série (fullyParallel=false). Os
   // specs de carrinho/auth compartilham o backend E2E single-process; com
   // fullyParallel=true os drivers de um mesmo spec competiam entre si e o

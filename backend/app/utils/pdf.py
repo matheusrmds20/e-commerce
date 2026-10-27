@@ -19,11 +19,7 @@ def _fmt_br(value: float) -> str:
     return f"R$ {value:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 
-def generate_receipt(payload: dict, output_path: str | Path) -> Path:
-
-    output_path = Path(output_path)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-
+def _build_story(payload: dict) -> list:
     styles = getSampleStyleSheet()
     title_style = ParagraphStyle(
         "Title2",
@@ -45,15 +41,6 @@ def generate_receipt(payload: dict, output_path: str | Path) -> Path:
     )
 
     items = payload.get("items", [])
-
-    doc = SimpleDocTemplate(
-        str(output_path),
-        pagesize=A4,
-        rightMargin=18 * mm,
-        leftMargin=18 * mm,
-        topMargin=15 * mm,
-        bottomMargin=15 * mm,
-    )
 
     story = []
 
@@ -141,5 +128,29 @@ def generate_receipt(payload: dict, output_path: str | Path) -> Path:
     ]))
     story.append(total_tbl)
 
-    doc.build(story)
+    return story
+
+
+def generate_receipt_bytes(payload: dict) -> bytes:
+    """Gera o PDF do comprovante em memória (sem gravar em disco)."""
+    import io
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        rightMargin=18 * mm,
+        leftMargin=18 * mm,
+        topMargin=15 * mm,
+        bottomMargin=15 * mm,
+    )
+    doc.build(_build_story(payload))
+    return buffer.getvalue()
+
+
+def generate_receipt(payload: dict, output_path: str | Path) -> Path:
+    """Gera o PDF e grava em disco no caminho informado."""
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_bytes(generate_receipt_bytes(payload))
     return output_path

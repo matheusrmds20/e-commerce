@@ -11,6 +11,15 @@ os.environ.setdefault(
 
 os.environ.setdefault("RATE_LIMIT_ENABLED", "false")
 
+# O ambiente de teste roda com DEBUG=false para reproduzir o comportamento de
+# produção (ex.: health check mascara detalhes do banco). Globalização de side
+# effects de debug desligada durante a suíte.
+os.environ.setdefault("DEBUG", "false")
+
+# Lockout por conta (P1-5) desligado no ambiente de teste: evita contagem real
+# no Redis de falhas de login durante a suíte e mantém os testes determinísticos.
+os.environ.setdefault("LOGIN_LOCKOUT_ENABLED", "false")
+
 
 @pytest.fixture
 def db():
@@ -126,8 +135,10 @@ def shipping_gateway():
 
 @pytest.fixture
 def auth_service(db, user_repo):
+    refresh_repo = Mock(name="refresh_repo")
     with (
         patch("app.services.auth_service.UserRepository", return_value=user_repo),
+        patch("app.services.auth_service.RefreshTokenRepository", return_value=refresh_repo),
         patch("app.services.auth_service.hash_password", return_value="hashed-password"),
         patch("app.services.auth_service.verify_password", return_value=True),
         patch("app.services.auth_service.create_access_token", return_value="access-token"),
@@ -135,7 +146,9 @@ def auth_service(db, user_repo):
     ):
         from app.services.auth_service import AuthService
 
-        yield AuthService(db)
+        service = AuthService(db)
+        service.refresh_repo = refresh_repo
+        yield service
 
 
 @pytest.fixture

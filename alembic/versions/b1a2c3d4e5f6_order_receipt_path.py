@@ -9,17 +9,17 @@ arquivo PDF do comprovante/recibo do pedido. A coluna é nullable porque o
 comprovante é gerado de forma assíncrona (task Celery) APÓS a criação do pedido.
 
 """
-from typing import Sequence, Union
+from collections.abc import Sequence
 
-from alembic import op
 import sqlalchemy as sa
 
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = 'b1a2c3d4e5f6'
-down_revision: Union[str, Sequence[str], None] = 'aa6744938b86'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | Sequence[str] | None = 'aa6744938b86'
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:

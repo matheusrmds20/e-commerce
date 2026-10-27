@@ -28,36 +28,41 @@ DbSession = Annotated[Session, Depends(get_db)]
 def get_auth_service(db: DbSession) -> AuthService:
     return AuthService(db)
 
+def _cookie_kwargs() -> dict:
+    settings = get_settings()
+    return {
+        "httponly": True,
+        "secure": settings.COOKIE_SECURE,
+        "samesite": settings.COOKIE_SAMESITE,
+        "path": "/api/v1/auth",
+        "domain": settings.COOKIE_DOMAIN,
+    }
+
+
 def _set_refresh_cookie(response: Response, request: Request, token: str) -> None:
 
     response.set_cookie(
         key=REFRESH_COOKIE_NAME,
         value=token,
-        httponly=True,
-        secure=request.url.scheme == "https",
-        samesite="lax",
-        path="/api/v1/auth",
         max_age=get_settings().REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
+        **_cookie_kwargs(),
     )
 
 def _expire_refresh_cookie(response: Response, request: Request) -> None:
     response.delete_cookie(
         key=REFRESH_COOKIE_NAME,
-        httponly=True,
-        secure=request.url.scheme == "https",
-        samesite="lax",
-        path="/api/v1/auth",
+        **_cookie_kwargs(),
     )
 
 
 @auth_router.post(
     "/register",
-    response_model=AuthResponse,
+    response_model=MessageResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Registra um novo usuário",
 )
 @limiter.limit("10/minute")
-def register(request: Request, data: RegisterRequest, db: DbSession) -> AuthResponse:
+def register(request: Request, data: RegisterRequest, db: DbSession) -> MessageResponse:
 
     return get_auth_service(db).register(data)
 
@@ -112,8 +117,12 @@ def logout(
     db: DbSession,
     request: Request,
     response: Response,
+    data: RefreshRequest | None = None,
 ) -> MessageResponse:
-    get_auth_service(db).logout()
+    refresh_token = request.cookies.get(REFRESH_COOKIE_NAME) or (
+        data.refresh_token if data else None
+    )
+    get_auth_service(db).logout(refresh_token)
     _expire_refresh_cookie(response, request)
     return MessageResponse(message="Sessão encerrada.")
 

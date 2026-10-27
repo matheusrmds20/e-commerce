@@ -29,14 +29,18 @@ def verify_password(password, hashed_password):
     return password_hash.verify(password, hashed_password)
 
 
-def _create_jwt(data: dict, expires_delta: timedelta, token_type: str) -> str:
+def _create_jwt(
+    data: dict,
+    expires_delta: timedelta,
+    token_type: str,
+    jti: str | None = None,
+) -> str:
     """Gera um JWT com claims de segurança (sub, jti, type, iat, exp)."""
     to_encode = data.copy()
     now = datetime.now(UTC)
     to_encode.update(
         {
-
-            "jti": str(uuid4()),
+            "jti": jti or str(uuid4()),
             "type": token_type,
             "iat": now,
             "exp": now + expires_delta,
@@ -51,10 +55,14 @@ def create_access_token(data: dict, expires_delta: timedelta = None):
     return _create_jwt(data, expires_delta, token_type="access")
 
 
-def create_refresh_token(data: dict, expires_delta: timedelta = None):
+def create_refresh_token(
+    data: dict,
+    expires_delta: timedelta = None,
+    jti: str | None = None,
+):
     if expires_delta is None:
         expires_delta = timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
-    return _create_jwt(data, expires_delta, token_type="refresh")
+    return _create_jwt(data, expires_delta, token_type="refresh", jti=jti)
 
 
 def decode_token(token: str) -> dict:

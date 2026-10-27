@@ -24,6 +24,7 @@ from app.models.order import Order as Order
 from app.models.order_item import OrderItem as OrderItem
 from app.models.payment import Payment as Payment
 from app.models.product import Product as Product
+from app.models.refresh_token import RefreshToken as RefreshToken
 from app.models.review import Review as Review
 from app.models.user import User as User
 from app.models.user_coupon import UserCoupon as UserCoupon
@@ -40,6 +41,7 @@ __all__ = [
     "OrderItem",
     "Payment",
     "Product",
+    "RefreshToken",
     "Review",
     "User",
     "UserCoupon",
