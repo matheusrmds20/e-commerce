@@ -192,7 +192,6 @@ E-commerce v1/
 ├── alembic/                      # migrations (na RAIZ do repositório)
 ├── alembic.ini                   # prepend_sys_path = backend
 ├── .github/workflows/ci.yml      # pipeline de CI
-├── SECURITY-AUDIT.md               # auditoria de segurança + status das correções
 ├── MIGRACAO-ESTILO.md              # checklist de padronização pendente
 └── README.md
 ```
@@ -418,10 +417,7 @@ existe com `DEBUG=true`; em produção a referência são os routers em
 
 ## 🔐 Segurança
 
-O projeto passou por uma auditoria estática registrada em
-[`SECURITY-AUDIT.md`](SECURITY-AUDIT.md), e os itens P0/P1 foram corrigidos
-nos commits `feat(security)` (pendências seguem listados no próprio
-documento). Resumo dos controles ativos — detalhes de exploração não são
+Resumo dos controles ativos — detalhes de exploração não são
 documentados aqui de propósito.
 
 ### Controles implementados
