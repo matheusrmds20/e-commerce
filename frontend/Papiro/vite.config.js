@@ -11,7 +11,7 @@ export default defineConfig({
 
   server: {
     allowedHosts: [
-      'e-commerce.matheuslab.xyz',
+      'papiro.matheuslab.xyz',
     ],
 
   }
