@@ -455,8 +455,6 @@ documentados aqui de propósito.
 
 ### Como foi verificado
 
-- **Auditoria estática** → [`SECURITY-AUDIT.md`](SECURITY-AUDIT.md) (P0/P1/P2/P3
-  com checklist por arquivo e checklist de deploy).
 - **Testes dedicados**: `test_login_lockout`, `test_http_health` (não vaza
   detalhes com `DEBUG=false`), `test_transactions`, `test_indexes`.
 - **CI em modo produção**: o job de backend roda com `DEBUG=false`; o job E2E
