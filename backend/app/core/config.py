@@ -14,19 +14,17 @@ class Settings(BaseSettings):
     FRONTEND_URL: str
     BACKEND_URL: str
     CORS_ORIGINS: list[str] = [
-        "http://http://127.0.0.1:8000",
         "http://localhost:5173",
+        "http://127.0.0.1:5173",
         "https://papiro.matheuslab.xyz",
-        "https://e-commerce-de-livros-api.onrender.com",
         "https://e-commerce-nine-nu-59.vercel.app",
     ]
     ALLOWED_HOSTS: list[str] = [
         "testserver",
         "localhost",
         "127.0.0.1",
+        "api-e-commerce.matheuslab.xyz",
         "e-commerce-de-livros-api.onrender.com",
-        "papiro.matheuslab.xyz",
-        "e-commerce-nine-nu-59.vercel.app",
     ]
     FORCE_HTTPS: bool = False
     MERCADO_PAGO_ACCESS_TOKEN: str

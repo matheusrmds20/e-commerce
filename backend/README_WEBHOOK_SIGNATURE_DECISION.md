@@ -1,9 +1,16 @@
-# ADR-002 — Validação de assinatura do webhook de pagamento desligada (portfólio)
+# ADR-002 — Validação de assinatura do webhook de pagamento (decisão histórica)
+
+> **Atualização do estado atual:** o código hoje **valida a assinatura por
+> padrão** (`VALIDATE_WEBHOOK_SIGNATURE=True`), com suporte a múltiplos secrets
+> (`MERCADO_PAGO_WEBHOOK_SECRETS_EXTRA`) e rejeição **401** quando a assinatura
+> não confere. O `false` existe apenas no ambiente de demonstração.
+> A versão resumida e atualizada está no ADR-002 do
+> [`README.md`](../README.md) da raiz.
 
 > Versão canônica desta decisão de arquitetura. O `README.md` da raiz mantém um
 > resumo e aponta para este documento.
 
-- **Status:** Aceito (vigente)
+- **Status:** Aceito (histórico) — ver atualização acima
 - **Data:** atual
 - **Contexto técnico:** FastAPI + Uvicorn (plano free do Render), SDK do Mercado
   Pago, projeto de **portfólio** (sem pagamentos reais), `VALIDATE_WEBHOOK_SIGNATURE`
@@ -19,7 +26,7 @@ fluxo ideal valida o cabeçalho `x-signature` (com `x-request-id` e `data.id`)
 contra o segredo `MERCADO_PAGO_WEBHOOK_SECRET`, com suporte a rotação via
 `MERCADO_PAGO_WEBHOOK_SECRETS_EXTRA`.
 
-Ver `WebhookSignatureValidator` em `app/core/security.py` e a validação em
+O `WebhookSignatureValidator` vem do SDK (`mercadopago.webhook`) e é usado em
 `app/api/v1/payments.py`.
 
 ---

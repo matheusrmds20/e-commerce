@@ -45,7 +45,8 @@ Guia de deploy para o **Render** no plano **gratuito**. Foi desenhado para ser
 
 - **Root Directory:** `backend`
 
-- **Health check path:** `"/"` (o endpoint raiz retorna um JSON simples).
+- **Health check path:** `"/api/v1/health/"` (a raiz `/` responde `204` quando
+  `DEBUG=false`).
 
 ### Variáveis de ambiente (Web Service)
 
@@ -107,8 +108,10 @@ Se mantiver os jobs de e-mail e comprovante:
   subir (cold start). Aceitável para portfolio.
 - **750 horas/mês:** um serviço ligado 24/7 estoura em ~30 dias. Para demo, veja
   sempre que mostrar.
-- **CORS:** o `main.py` já libera os domínios `https://*.matheuslab.xyz`. Se usar
-  outro domínio, adicione à lista `allow_origins` em `backend/app/main.py`.
+- **CORS e hosts:** configure `CORS_ORIGINS` (origem do front, ex.:
+  `["https://papiro.matheuslab.xyz"]`) e `ALLOWED_HOSTS` (host da API, ex.:
+  `["api-e-commerce.matheuslab.xyz"]`) por variável de ambiente — não edite
+  `main.py`. Com `DEBUG=false`, `CORS_ORIGINS` com `*` aborta o startup.
 
 ---
 
@@ -178,7 +181,8 @@ você recria): ao recriar o banco, o deploy aplica o schema do zero.
 Dois itens **não têm default que funcione sozinho** para este projeto e precisam
 ser configurados no painel do Render:
 
-1. **`VALIDATE_WEBHOOK_SIGNATURE=false`** (Web Service → Environment)
+1. **`VALIDATE_WEBHOOK_SIGNATURE=false`** (Web Service → Environment) — **apenas
+   na demo**; em produção com pagamentos reais deixe `true`
 
    O default no código é `true`, mas este projeto opera com o webhook **sem
    validação de assinatura** (decisão de portfólio, ver ADR-002). Se essa

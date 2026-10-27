@@ -11,8 +11,9 @@
 Loja virtual completa de livraria — catálogo, carrinho, cupons, wishlist, checkout,
 frete real e pagamento — com **API REST em FastAPI** e **SPA em React + Vite**.
 
-- 🛍️ **Frontend:** <https://e-commerce.matheuslab.xyz>
-- ⚙️ **API:** <https://api-e-commerce.matheuslab.xyz> · docs interativas em `/docs`
+- 🛍️ **Frontend (demo):** <https://papiro.matheuslab.xyz>
+- ⚙️ **API (demo):** <https://api-e-commerce.matheuslab.xyz>
+- 📖 **Docs interativas (Swagger/ReDoc):** só com `DEBUG=true` — em produção ficam desligadas (ver [Segurança](#-segurança))
 
 ---
 
@@ -28,12 +29,19 @@ frete real e pagamento — com **API REST em FastAPI** e **SPA em React + Vite**
 - [Como rodar](#-como-rodar)
 - [Testes](#-testes)
 - [Endpoints da API](#-endpoints-da-api)
-- [Decisões de arquitetura (ADRs)](#-decisões-de-arquitetura-adrs)
+- [Segurança](#-segurança)
+  - [Controles implementados](#controles-implementados)
+  - [Sessão e anti-abuso](#sessão-e-anti-abuso)
+  - [Como foi verificado](#como-foi-verificado)
+  - [Limites conhecidos](#limites-conhecidos)
+  - [Reportar vulnerabilidades](#reportar-vulnerabilidades)
+- [Decisões técnicas](#-decisões-técnicas)
   - [ADR-001 — Webhook de pagamento via threadpool (não Celery)](#adr-001--webhook-de-pagamento-via-threadpool-não-celery)
-  - [ADR-002 — Validação de assinatura do webhook desligada (portfólio)](#adr-002--validação-de-assinatura-do-webhook-de-pagamento-desligada-portfólio)
+  - [ADR-002 — Validação de assinatura do webhook](#adr-002--validação-de-assinatura-do-webhook)
+  - [ADR-003 — Refresh token rotativo e revogável](#adr-003--refresh-token-rotativo-e-revogável)
+  - [ADR-004 — Rate limit por IP + lockout por conta](#adr-004--rate-limit-por-ip--lockout-por-conta)
 - [Deploy](#-deploy)
 - [Licença](#-licença)
-
 ---
 
 ## ✨ Funcionalidades
@@ -47,8 +55,12 @@ frete real e pagamento — com **API REST em FastAPI** e **SPA em React + Vite**
 - Comprovante do pedido em **PDF** e e-mail de confirmação
 
 **Conta e segurança**
-- Registro/login com **JWT**: access token curto em memória + refresh token **rotativo** em cookie `httpOnly`
-- Senhas com hash **Argon2** (`pwdlib`)
+- Registro/login com **JWT**: access token curto (15 min) em memória + refresh token **rotativo** (7 dias) em cookie `HttpOnly` / `Secure` / `SameSite=Lax`, com `Path=/api/v1/auth`
+- Refresh tokens **persistidos por hash (SHA-256)** e revogáveis: logout invalida o token apresentado; reuso de token já rotacionado revoga a **família inteira** (detecção de replay); troca de senha encerra todas as sessões
+- Senhas com hash **Argon2id** (`pwdlib`), sem enumeração de e-mail no login nem no cadastro
+- **Rate limit por IP** (slowapi) + **lockout por conta** com backoff exponencial em Redis (*fail-open* se o Redis cair)
+- Cabeçalhos de segurança (CSP, HSTS, `nosniff`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`), remoção do header `Server`, CORS e `TrustedHost` com allowlist explícita
+- Swagger/ReDoc/OpenAPI **desligados com `DEBUG=false`**; `SECRET_KEY` fraca e CORS com `*` abortam o startup em produção
 - Soft delete de usuário, controle de papéis (`customer` / `admin`)
 
 **Administração**
@@ -70,6 +82,10 @@ frete real e pagamento — com **API REST em FastAPI** e **SPA em React + Vite**
 | Fila / jobs assíncronos | **Celery** + **Redis** |
 | PDF | **ReportLab** |
 | Integrações | SDK **Mercado Pago**, **httpx** (Melhor Envio) |
+| Rate limiting | **slowapi** (limite global + limites por rota) |
+| Armazenamento de PDFs | **Supabase Storage** (bucket privado, via `httpx`) |
+| Cabeçalhos de segurança | middleware ASGI próprio (`app/core/middleware.py`) |
+| Lockout de login | **Redis** (contador por conta com backoff exponencial) |
 | Qualidade | **pytest**, **ruff**, **black**, **mypy** (strict) |
 
 ### Frontend
@@ -123,30 +139,38 @@ E-commerce v1/
 │   │   ├── main.py               # cria o FastAPI, CORS, Celery e registra o router
 │   │   ├── api/
 │   │   │   ├── deps.py           # dependências (get_db, get_current_user)
+│   │   │   ├── limiter.py        # rate limit por IP (slowapi)
 │   │   │   ├── exceptions.py     # hierarquia de exceções + handlers globais
 │   │   │   ├── router.py         # agrega todos os routers em /api/v1
 │   │   │   └── v1/               # routers por recurso (auth, products, orders, …)
 │   │   ├── core/
 │   │   │   ├── config.py         # Settings (pydantic-settings) + get_settings()
+│   │   │   ├── middleware.py     # headers de segurança (CSP, HSTS, no-store)
 │   │   │   └── security.py       # JWT (access/refresh), hash Argon2, cookie
 │   │   ├── db/
 │   │   │   ├── base.py           # Base declarativa (registry dos models)
-│   │   │   └── database.py       # engine + SessionLocal
+│   │   │   ├── database.py       # engine + SessionLocal
+│   │   │   └── transaction.py    # contexto de transação (begin / savepoint)
 │   │   ├── models/               # tabelas SQLAlchemy (User, Product, Order, …)
 │   │   ├── repositories/         # acesso a dados (uma por agregado)
 │   │   ├── schemas/              # contratos Pydantic (request/response)
-│   │   ├── services/             # regras de negócio (uma por domínio)
+│   │   ├── services/             # regras de negócio (inclui order_state_machine,
+│   │   │                         # pricing e login_lockout)
 │   │   ├── integrations/
 │   │   │   ├── MercadoPago/      # gateway de pagamento
 │   │   │   └── MelhorEnvio/      # gateway de cotação de frete
-│   │   └── utils/                # e-mail (Celery), PDF e tasks de comprovante
+│   │   └── utils/                # e-mail, PDF, tasks Celery e storage (Supabase)
 │   ├── tests/                    # pytest: http_tests, service_tests, schemas_tests,
 │   │                             # integration_tests (Postgres real)
 │   ├── scripts/
 │   │   ├── seed.py               # popula catálogo (idempotente; --reset)
 │   │   └── e2e_server.py         # sobe a API apontando ao banco de teste E2E
 │   ├── docker-compose.yml        # Postgres + Redis (+ serviços api/worker)
+│   ├── Dockerfile                # imagem da API/worker (usada pelo compose)
 │   ├── deploy.md                 # guia de deploy no Render (free)
+│   ├── README_WEBHOOK_DECISION.md           # ADR-001 (decisão do webhook)
+│   ├── README_WEBHOOK_SIGNATURE_DECISION.md # ADR-002 (assinatura do webhook)
+│   ├── README.md                 # ponteiro para a documentação da raiz
 │   ├── pyproject.toml            # deps, pytest, ruff, black, mypy
 │   └── .env.example              # todas as variáveis de ambiente
 │
@@ -208,14 +232,18 @@ models/*.py         Model    → tabelas / relações
 ### Fluxo de compra e pagamento
 
 ```
-1. Cliente monta o carrinho            POST /api/v1/cart/...
+1. Cliente monta o carrinho            POST /api/v1/cart/create + /cart/me
 2. Cota o frete por CEP                POST /api/v1/shipping/quote
-3. Cria o pedido (+ frete/cupom)       POST /api/v1/orders
+3. Cria o pedido (+ frete/cupom)       POST /api/v1/orders/create
 4. Cria o checkout no Mercado Pago     POST /api/v1/payments/checkout/{order_id}
 5. MP redireciona o cliente (back_urls success/failure/pending)
 6. MP notifica o backend               POST /api/v1/payments/webhook
-        └─ valida assinatura → atualiza o pedido → dispara e-mail + PDF (Celery)
+        ├─ valida `x-signature` (com suporte a secrets extras p/ rotação)
+        ├─ 401 se a assinatura for inválida · 503/500 pedem reenvio ao MP
+        └─ consulta o pagamento no MP → atualiza pedido → e-mail + PDF (Celery)
 7. Cliente vê o retorno em /payment/{status}
+8. Comprovante PDF vai para o bucket privado do Supabase Storage e é
+   baixado por GET /api/v1/orders/{order_id}/comprovante
 ```
 
 ---
@@ -237,10 +265,12 @@ docker compose up -d db redis
 ```
 
 > ⚠️ Ajuste o `DATABASE_URL` do seu `.env` para o banco do compose:
-> `postgresql+psycopg2://bookcommerce:<senha>@localhost:5433/bookcommerce-db`
+> `postgresql+psycopg2://postgres:<senha>@localhost:5433/bookcommerce-db`
 > (o `.env.example` aponta para `localhost:5432` por padrão).
-> Os serviços `api` e `worker` também estão declarados no compose para cenários
-> com imagem construída; para o dia a dia, rode a API e o worker localmente.
+> Os serviços `api` e `worker` também sobem pelo compose (`build: .`, usando o
+> `backend/Dockerfile`) e herdam o `backend/.env`; nesse caso o `DATABASE_URL` é
+> sobrescrito para apontar ao serviço `db` (porta interna 5432).
+> O compose exige `POSTGRES_PASSWORD` definido no `.env` (não há default).
 
 ### 2. Backend
 
@@ -284,20 +314,31 @@ VITE_API_URL=http://localhost:8000/api/v1
 
 ### Variáveis de ambiente (principais)
 
-| Variável | Descrição |
-|---|---|
-| `DATABASE_URL` | Conexão PostgreSQL (`postgresql+psycopg2://…`) |
-| `SECRET_KEY` | Chave de assinatura dos JWT (≥ 32 chars) |
-| `ACCESS_TOKEN_EXPIRE_MINUTES` / `REFRESH_TOKEN_EXPIRE_DAYS` | TTL dos tokens |
-| `FRONTEND_URL` / `BACKEND_URL` | URLs usadas em CORS e `back_urls` do MP |
-| `MERCADO_PAGO_ACCESS_TOKEN` / `MERCADO_PAGO_WEBHOOK_SECRET` | Credenciais Mercado Pago |
-| `VALIDATE_WEBHOOK_SIGNATURE` | `false` no portfólio (desligada; ver ADR-002) — obrigatório `true` em produção |
-| `MELHOR_ENVIO_API_TOKEN` / `MELHOR_ENVIO_ORIGIN_ZIP` / `MELHOR_ENVIO_SANDBOX` | Cotação de frete |
-| `SMTP_*` | Envio de e-mail de confirmação |
-| `CELERY_BROKER_URL` / `CELERY_RESULT_BACKEND` | Redis para o worker |
-| `RATE_LIMIT_ENABLED` / `RATE_LIMIT_DEFAULT` / `RATE_LIMIT_STORAGE_URI` | Rate limiting por IP (slowapi). Com multi-worker use `RATE_LIMIT_STORAGE_URI=redis://…`; desligue em testes |
+Tabela resumida. A lista completa e comentada está em [`backend/.env.example`](backend/.env.example).
 
-A lista completa, comentada, está em [`backend/.env.example`](backend/.env.example).
+| Variável | Obrig. | Descrição |
+|---|---|---|
+| `DEBUG` | não (`false`) | Com `false` desliga `/docs`, `/redoc` e `/openapi.json` e mascara detalhes no `/health` |
+| `DATABASE_URL` | sim | Conexão PostgreSQL (`postgresql+psycopg2://…`) |
+| `SECRET_KEY` | sim | Assinatura dos JWT (≥ 32 chars, sem `change-me`); validada no startup em produção |
+| `ALGORITHM` | não (`HS256`) | Algoritmo do JWT |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` / `REFRESH_TOKEN_EXPIRE_DAYS` | não (`15` / `7`) | TTL dos tokens |
+| `COOKIE_SECURE` / `COOKIE_SAMESITE` / `COOKIE_DOMAIN` | não (`true` / `lax` / vazio) | Atributos do cookie de refresh |
+| `FRONTEND_URL` / `BACKEND_URL` | sim | URLs usadas em CORS e nas `back_urls` do MP |
+| `CORS_ORIGINS` | não | Lista JSON de origens; `*` aborta o startup em produção |
+| `ALLOWED_HOSTS` | não | Hosts aceitos pelo `TrustedHostMiddleware` |
+| `FORCE_HTTPS` | não (`false`) | Redireciona HTTP → HTTPS |
+| `RATE_LIMIT_ENABLED` / `RATE_LIMIT_DEFAULT` / `RATE_LIMIT_STORAGE_URI` | não | Rate limit por IP (slowapi); com mais de um worker use Redis em vez de `memory://` |
+| `RATE_LIMIT_HEADERS_ENABLED` / `RATE_LIMIT_TRUST_XFF` | não (`false`) | Headers `X-RateLimit-*`; confiar em `X-Forwarded-For` só atrás de proxy confiável |
+| `LOGIN_LOCKOUT_ENABLED` / `LOGIN_LOCKOUT_MAX_FAILURES` / `LOGIN_LOCKOUT_REDIS_URL` | não | Lockout por conta com backoff; sem URL própria herda o `CELERY_BROKER_URL` |
+| `MERCADO_PAGO_ACCESS_TOKEN` / `MERCADO_PAGO_WEBHOOK_SECRET` | sim | Credenciais Mercado Pago |
+| `MERCADO_PAGO_WEBHOOK_SECRETS_EXTRA` | não | Secrets adicionais (vírgula) para rotação |
+| `VALIDATE_WEBHOOK_SIGNATURE` | não (`true` no código) | `false` apenas na demo de portfólio — ver [ADR-002](#adr-002--validação-de-assinatura-do-webhook) |
+| `MERCADO_PAGO_TIMEOUT` / `MELHOR_ENVIO_TIMEOUT` | não | Timeouts das integrações (segundos) |
+| `MELHOR_ENVIO_API_TOKEN` / `MELHOR_ENVIO_ORIGIN_ZIP` / `MELHOR_ENVIO_SANDBOX` | não | Cotação de frete |
+| `SMTP_*` | sim | Envio de e-mail de confirmação |
+| `CELERY_BROKER_URL` / `CELERY_RESULT_BACKEND` | sim | Redis do worker (e fallback do lockout) |
+| `SUPABASE_URL` / `SUPABASE_SERVICE_KEY` / `SUPABASE_STORAGE_BUCKET` | não | Storage privado dos PDFs; a `SERVICE_KEY` é `service_role` e só pode existir no backend |
 
 ---
 
@@ -308,7 +349,7 @@ A lista completa, comentada, está em [`backend/.env.example`](backend/.env.exam
 ```bash
 cd backend
 pytest                 # suíte padrão: sqlite em memória, sem serviços externos
-pytest -m integration  # requer um PostgreSQL real (bookcommerce_conc)
+pytest -m integration  # requer PostgreSQL real (ex.: bookcommerce_conc; ver docstring do teste)
 ```
 
 - Os testes usam **SQLite em memória** e mocks — nenhum serviço externo é chamado.
@@ -316,6 +357,8 @@ pytest -m integration  # requer um PostgreSQL real (bookcommerce_conc)
   `schemas_tests/` (validação Pydantic) e `integration_tests/` (concorrência com
   Postgres real, marcados com `@pytest.mark.integration`).
 - Lint e tipos: `ruff check .`, `black .`, `mypy` (modo estrito).
+- Testes de segurança e robustez: lockout (`test_login_lockout`), `/health` sem vazamento
+  (`test_http_health`), transações (`test_transactions`) e índices (`test_indexes`).
 
 ### Frontend (Playwright E2E)
 
@@ -334,44 +377,113 @@ retorno de pagamento.
 ### CI
 
 O workflow [`.github/workflows/ci.yml`](.github/workflows/ci.yml) roda em push/PR
-para `main`, `Frontend` e `Backend` (e também via `workflow_dispatch` manual):
+para `main`, `Frontend` e `Backend` (e também via `workflow_dispatch` manual),
+com `concurrency` por ref sem cancelar runs em andamento:
 
-1. **backend** — `ruff` + `pytest`
-2. **frontend** — `eslint` + `vite build`
-3. **e2e** — Playwright com serviços de Postgres e Redis (só roda se 1 e 2 passarem)
+1. **backend** — Python 3.13, `ruff check .` + `pytest` com `DEBUG=false`
+   (reproduzindo produção, inclusive o `/health` mascarado)
+2. **frontend** — Node 22, `eslint` + `vite build`
+3. **e2e** — Playwright com serviços de Postgres 16 e Redis; aplica migrations,
+   roda o seed e publica o relatório como artefato (só roda se 1 e 2 passarem)
 
 ---
 
 ## 🔌 Endpoints da API
 
-Base: `/api/v1` — documentação interativa completa em **`/docs`** (Swagger) e
-**`/redoc`**.
+Base: `/api/v1`. A documentação interativa (`/docs` Swagger e `/redoc`) só
+existe com `DEBUG=true`; em produção a referência são os routers em
+`backend/app/api/v1/`.
 
 | Recurso | Prefixo | Exemplos |
 |---|---|---|
-| Health | `/health` | `GET /health` |
+| Health | `/health` | `GET /health/` — status da API + banco (`503` se o banco falhar) |
 | Auth | `/auth` | `POST /register`, `/login`, `/refresh`, `/logout`, `GET /me` |
-| Usuários | `/users` | CRUD, troca de senha, soft delete |
-| Produtos | `/products` | catálogo paginado, destaques, mais vendidos, por categoria/desconto |
-| Categorias | `/categories` | CRUD |
-| Carrinho | `/cart` | adicionar/atualizar/remover itens, esvaziar |
-| Pedidos | `/orders` | criar, listar, atualizar, comprovante PDF |
-| Pagamentos | `/payments` | `checkout/{order_id}`, `GET /history`, `POST /webhook` |
-| Frete | `/shipping` | `POST /quote` (carrinho), cotação/aplicação por pedido |
-| Endereços | `/addresses` | CRUD, endereço padrão, busca por CEP |
-| Cupons | `/coupons` + `/user-coupons` | CRUD e resgate por usuário |
-| Wishlist | `/wishlists` | adicionar/listar/remover |
-| Avaliações | `/reviews` | CRUD por produto/usuário |
-| Newsletter | `/newsletter` | inscrição pública + listagem (admin) |
-| Admin | `/admin` | métricas (KPIs), pedidos, usuários |
+| Usuários | `/users` | `/create`, `/user_id/{id}`, `/update/{id}`, `/change_password/{id}/change-password`, `/delete/{id}` |
+| Produtos | `/products` | `/paginated`, `/featured`, `/bestsellers`, `/recommendations`, `/category/{id}`, `/discount/{pct}` + CRUD |
+| Categorias | `/categories` | `/list`, `/slug/{slug}`, `/name/{name}` + CRUD |
+| Carrinho | `/cart` | `/cart/me`, `/{cart_id}/items/add`, `/update/{item_id}`, `/delete/{item_id}`, `/clear` |
+| Pedidos | `/orders` | `/create`, `/list`, `/update/{id}`, `/{id}/comprovante`, `/send-confirmation-email` |
+| Pagamentos | `/payments` | `/create`, `/get/{id}`, `/order/{id}`, `/history`, `/checkout/{order_id}`, `POST /webhook/` |
+| Frete | `/shipping` | `POST /quote` (carrinho), `POST /calculate/{order_id}`, `POST /apply` |
+| Endereços | `/addresses` | CRUD, `/default`, `/zip/{cep}` |
+| Cupons | `/coupons` + `/user-coupons` | CRUD de cupons e resgate/atribuição por usuário |
+| Wishlist | `/wishlists` | `/create`, `/list`, `/product/{id}`, `/delete/{id}` |
+| Avaliações | `/reviews` | `/create`, `/product/{id}`, update e delete |
+| Newsletter | `/newsletter` | `POST /subscribe`, `/unsubscribe`, `GET /list` (admin) |
+| Admin | `/admin` | `/dashboard/stats`, `/orders`, `PATCH /orders/{id}/status`, `/users` |
 
 ---
 
-## 🧭 Decisões de arquitetura (ADRs)
+## 🔐 Segurança
+
+Resumo dos controles ativos — detalhes de exploração não são
+documentados aqui de propósito.
+
+### Controles implementados
+
+| Área | Medidas |
+|---|---|
+| Transporte e cabeçalhos | HSTS (só em HTTPS), CSP restritiva na API, `nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy`, `Permissions-Policy`, remoção do header `Server` |
+| Sessão | JWT com `jti`/`type`/`iat`/`exp`, access token de 15 min em memória, refresh de 7 dias rotativo e revogável, cookie `HttpOnly`/`Secure`/`SameSite=Lax` |
+| Senhas | Argon2id, mensagens de erro genéricas, sem enumeração de e-mail no login |
+| Abuso | Rate limit por IP (slowapi) + lockout por conta com backoff exponencial |
+| Superfície | `TrustedHost` com allowlist, CORS explícito (sem `*`), Swagger/OpenAPI desligados com `DEBUG=false`, `no-store` em `/auth` e `/payments` |
+| Configuração | `SECRET_KEY` sem default funcional e validada no startup, `.env` fora do git, secrets de webhook com suporte a rotação |
+| Pagamentos | Assinatura `x-signature` verificada (desligável só por env var), status consultado direto no MP, unicidade em `payments(provider, provider_payment_id)` |
+| Integrações | Timeouts explícitos, tradução de erros do provedor (502/503/422) e TLS obrigatório no broker/backend do Celery |
+| Dados | `/health` não expõe detalhes internos em produção, erros 500 genéricos, PDFs em bucket privado |
+
+### Sessão e anti-abuso
+
+- **Refresh token**: persistido com hash SHA-256, `jti`, `family_id` e `revoked`;
+  rotacionado a cada `/auth/refresh`; replay de um token já revogado derruba a
+  família (ADR-003). `logout` revoga o token apresentado; troca de senha revoga
+  todos os tokens do usuário.
+- **Cookie**: `papiro_refresh`, `HttpOnly` + `Secure` + `SameSite=Lax` +
+  `Path=/api/v1/auth`; o access token fica apenas em memória no frontend.
+- **Rate limit por IP** (`slowapi`): global `200/minute` e por rota — login e
+  registro `10/minute`, refresh `30/minute`, newsletter `5/minute`, cotação de
+  frete `30/minute`, webhook `120/minute` (ADR-004).
+- **Lockout por conta**: chave do e-mail normalizada em SHA-256 (não guarda o
+  e-mail no Redis), bloqueio após 5 falhas com backoff exponencial até 30 min,
+  contador zerado em login bem-sucedido.
+
+### Como foi verificado
+
+- **Testes dedicados**: `test_login_lockout`, `test_http_health` (não vaza
+  detalhes com `DEBUG=false`), `test_transactions`, `test_indexes`.
+- **CI em modo produção**: o job de backend roda com `DEBUG=false`; o job E2E
+  valida o fluxo de token em memória + cookie `httpOnly`.
+- **Teste manual** dos headers de segurança e do bloqueio de `Host` inválido
+  (`TrustedHostMiddleware` → `400`).
+
+### Limites conhecidos
+
+- O rate limit em `memory://` é por processo: com vários workers é preciso
+  Redis (`RATE_LIMIT_STORAGE_URI`).
+- O lockout de login é **fail-open** por desenho: sem Redis, não bloqueia.
+- `VALIDATE_WEBHOOK_SIGNATURE=false` é aceitável **apenas** na demo (ver
+  [ADR-002](#adr-002--validação-de-assinatura-do-webhook)).
+
+### Reportar vulnerabilidades
+
+Não abra issue pública para falhas de segurança. Envie um relatório privado ao
+mantenedor (ou use *Security Advisories* do GitHub) com passos de reprodução e
+impacto. Este é um projeto de portfólio: não deve ser usado com pagamentos
+reais enquanto `VALIDATE_WEBHOOK_SIGNATURE=false`.
+
+---
+
+## 🧭 Decisões técnicas
+
+**ADR-001** e **ADR-002** registam decisões **arquiteturais**, com alternativas
+descartadas. **ADR-003** e **ADR-004** registam decisões de **implementação de
+segurança** no mesmo formato, para preservar o histórico dos trade-offs — os
+detalhes de implementação estão em [Segurança](#-segurança).
 
 ### ADR-001 — Webhook de pagamento via threadpool (não Celery)
 
-> A versão completa deste ADR também é mantida localmente em
+> Versão completa da decisão: `backend/README_WEBHOOK_DECISION.md`.
 > `backend/README_WEBHOOK_DECISION.md`.
 
 **Contexto.** O endpoint `POST /api/v1/payments/webhook` é chamado pelo Mercado
@@ -413,46 +525,89 @@ trocar `run_in_threadpool` por uma task Celery com `process_webhook` isolada.
 **Consequências:**
 - ✅ API única, sem worker obrigatório para o fluxo de pagamento; menos RAM e
   menos infraestrutura no plano free.
-- ✅ Webhook responde **200** mesmo em falha de processamento (o MP reenvia por
-  15 min em caso de 5xx); o erro vai para o log para investigação.
-- ⚠️ A validação de assinatura (`VALIDATE_WEBHOOK_SIGNATURE`) está **desligada** neste projeto de portfólio (ver ADR-002).
+- ✅ O webhook responde **401** para assinatura inválida e **503/500** quando
+  a dependência falha, pedindo reenvio ao provedor; erros de negócio
+  definitivos não são reenviados.
+- ⚠️ A validação de assinatura está **implementada**; na demo ela é desligada por env var (ver ADR-002).
 - ⚠️ Se o volume crescer, o caminho de migração é isolar `process_webhook` numa
   task Celery.
 
 ---
 
-### ADR-002 — Validação de assinatura do webhook desligada (portfólio)
+### ADR-002 — Validação de assinatura do webhook
 
-> A versão completa deste ADR também é mantida localmente em
+> Implementação em `app/api/v1/payments.py`. O histórico da decisão original
+> (quando a validação foi desligada) está em
 > `backend/README_WEBHOOK_SIGNATURE_DECISION.md`.
 
-**Contexto.** O webhook de pagamento valida a assinatura `x-signature` contra o
-segredo `MERCADO_PAGO_WEBHOOK_SECRET`. No ambiente de demonstração, o Mercado
-Pago entrega a notificação mas a assinatura **nunca confere**, e não houve
-disposição para continuar depurando — pois o pagamento **não é usado de verdade**
-(portfólio, sem dinheiro real).
+**Contexto.** O Mercado Pago envia `x-signature` e `x-request-id`, e a assinatura
+é calculada com o `data.id` e um secret da aplicação. A primeira versão do
+projeto não validava a assinatura (decisão de portfólio) e a documentação dizia
+que o validador “ainda existia, mas não era usado”.
 
-**Decisão.** Manter `VALIDATE_WEBHOOK_SIGNATURE=false` neste ambiente. O
-`WebhookSignatureValidator` **não foi removido** do código (preserva o trabalho e
-a possibilidade de reativar com `true`). O ponto de decisão já existe em
-`app/api/v1/payments.py` e emite uma log explícita "Webhook aceito SEM validar".
+**Decisão (estado atual).** A validação está **implementada e ligada por
+omissão** (`VALIDATE_WEBHOOK_SIGNATURE=True` no código):
 
-**Mitigação de risco.** Desligar a assinatura **não** permite "aprovar pagamento
-fake": o webhook usa `data.id` apenas como gatilho e **consulta o Mercado Pago
-direto** (`gateway.get_payment`) para obter status/valor reais. Um `data.id`
-forjado apenas dispara uma consulta à API inexistente — não marca pedido como
-pago.
+- tenta validar com `MERCADO_PAGO_WEBHOOK_SECRET` e com os secrets extras de
+  `MERCADO_PAGO_WEBHOOK_SECRETS_EXTRA` (rotação sem downtime);
+- assinatura inválida → **401**, sem processar nada;
+- a rejeição é logada com motivo, `request_id` e idade do timestamp (ajuda a
+  diagnosticar reenvios antigos da fila do MP).
+
+**Exceção consciente da demo.** No ambiente de portfólio a variável fica
+`VALIDATE_WEBHOOK_SIGNATURE=false` porque a assinatura não conferia no sandbox.
+A rejeição é logada e o fluxo segue.
+
+**Mitigação.** Mesmo com a validação desligada não é possível “aprovar
+pagamento fake”: o webhook usa `data.id` apenas como gatilho e **consulta o
+pagamento direto na API do Mercado Pago** (`gateway.get_payment`) para obter
+status e valor reais. Um id forjado apenas provoca uma consulta a um pagamento
+inexistente.
 
 **Consequências:**
-- ✅ Fluxo de demonstração funciona; decisão reversível com `true`.
-- ⚠️ **Proibido em produção com pagamentos reais**: sem assinatura, um atacante
-  pode forjar callbacks para disparar chamadas à API do MP (consumo de quota) e
-  gatilhos de processamento.
-- ⚠️ Risco de erro de configuração (esquecer de reativar na produção).
+- ✅ Implementação pronta para produção; reativar é só configurar a env var.
+- ⚠️ Com a validação desligada, um atacante pode forjar callbacks e consumir
+  quota da API do MP, além de disparar processamento.
+- ⚠️ Risco de esquecer a variável no deploy. O default do **código** é `true`
+  (seguro); o `false` existe apenas no `.env.example` e no painel da demo.
 
-**Como reativar (quando o webhook for usado de verdade):** corrigir o segredo no
-painel do MP, voltar `VALIDATE_WEBHOOK_SIGNATURE=true` e validar o cálculo com
-um teste real. Ver `backend/README_WEBHOOK_SIGNATURE_DECISION.md`.
+**Como reativar:** corrigir o secret no painel do MP, definir
+`VALIDATE_WEBHOOK_SIGNATURE=true`, garantir que o `notification_url` aponta para
+`/api/v1/payments/webhook/` e validar com uma notificação real.
+
+---
+
+### ADR-003 — Refresh token rotativo e revogável
+
+**Contexto.** JWT é *stateless*: sem estado no servidor um refresh token roubado
+continua válido até expirar e o logout não invalida nada.
+
+**Decisão.** Abrir mão do stateless **só** para o refresh token: cada token é
+persistido (hash SHA-256) com `jti`, `family_id` e `revoked`, rotacionado a cada
+`/auth/refresh`; reapresentar um token já revogado revoga a família inteira.
+O access token continua stateless (15 min).
+
+**Consequências:**
+- ✅ Logout e troca de senha têm efeito real; roubo de refresh é detectável.
+- ⚠️ Exige a migration `79e7e5c655ad_add_refresh_tokens` e limpeza de expirados.
+- ⚠️ Duas abas em corrida podem derrubar a sessão (intencional).
+
+---
+
+### ADR-004 — Rate limit por IP + lockout por conta
+
+**Contexto.** Rate limit por IP sozinho não trava credential stuffing
+distribuído (um IP por tentativa), e ser agressivo por IP penaliza NAT/CGNAT.
+
+**Decisão.** Duas camadas: limite por IP (`slowapi`) e lockout por conta com
+backoff exponencial até 30 min. O lockout é **fail-open** — prioriza
+disponibilidade sobre anti-abuso quando o Redis cai. Limites por rota e
+variáveis estão em [Segurança](#-segurança) e no `.env.example`.
+
+**Consequências:**
+- ✅ Cobre ataque de um único IP e distribuído, sem confiar em `X-Forwarded-For`.
+- ⚠️ Em `memory://` o limite é por processo: vários workers exigem Redis.
+- ⚠️ Sem Redis o lockout não atua (decisão consciente).
 
 ---
 
@@ -465,7 +620,13 @@ O passo a passo detalhado é mantido localmente em `backend/deploy.md`
    Build `pip install .`, Start `uvicorn app.main:app --host 0.0.0.0 --port $PORT`.
 3. **(Opcional)** **Key Value (Redis)** + **Background Worker**
    (`celery -A app.main.celery worker --loglevel=info`) — só se quiser e-mail/PDF.
-4. Configure o Mercado Pago com `notification_url` apontando para
+4. Defina `DEBUG=false`, `SECRET_KEY` forte, `CORS_ORIGINS`/`ALLOWED_HOSTS` com os
+   domínios reais e `VALIDATE_WEBHOOK_SIGNATURE=false` apenas na demo (ADR-002).
+   Com `DEBUG=false` a aplicação **não sobe** se a `SECRET_KEY` for fraca ou se
+   `CORS_ORIGINS` contiver `*`.
+5. **Pre-Deploy Command:** `alembic upgrade head`.
+6. Health check: `/api/v1/health/` (a raiz `/` responde `204` em produção).
+7. Configure o Mercado Pago com `notification_url` apontando para
    `https://<seu-web-service>.onrender.com/api/v1/payments/webhook/`.
 
 > ℹ️ No plano free o serviço hiberna após ~15 min sem tráfego (cold start de ~1 min)

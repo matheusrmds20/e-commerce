@@ -1,15 +1,4 @@
-"""Recria o banco de testes E2E do zero (schema + migrations + seed).
 
-Motivação: o banco local ``bookcommerce-e2e`` PERSISTE entre execuções e
-acumula estado (pedidos, baixas de estoque, reviews...). Isso deixa produtos
-"Esgotados" e quebra os specs E2E em execuções posteriores. No CI o banco já
-nasce limpo (service postgres do GitHub Actions), então este script replica o
-mesmo comportamento para o ambiente local.
-
-Uso (da raiz do repo):
-    DATABASE_URL="postgresql+psycopg2://postgres:postgres@127.0.0.1:5433/bookcommerce-e2e" \\
-        venv/Scripts/python backend/scripts/reset_e2e_db.py
-"""
 
 from __future__ import annotations
 
