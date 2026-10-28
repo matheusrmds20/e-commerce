@@ -39,8 +39,6 @@ def _log_configuracao_rede() -> None:
     logger.info("ALLOWED_HOSTS (%d): %s", len(hosts), ", ".join(hosts))
     logger.info("CORS_ORIGINS (%d): %s", len(origens), ", ".join(origens))
 
-    # Dicas de produção: só alerta (não derruba). O RuntimeError do lifespan
-    # continua sendo o guard duro para SECRET_KEY e CORS com '*'.
     if not settings.DEBUG:
         hosts_locais = {"localhost", "127.0.0.1", "testserver"}
         origens_locais = {
@@ -72,9 +70,6 @@ def _log_configuracao_rede() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     if not settings.DEBUG:
-        # Entropia, não comprimento: com HS256 a SECRET_KEY assina E verifica
-        # os JWT, então uma chave longa porém previsível ("a"*64) permitiria
-        # forjar tokens de admin sem senha. Ver app/core/security.py.
         motivo = motivo_secret_key_insegura(settings.SECRET_KEY)
         if motivo:
             raise RuntimeError(

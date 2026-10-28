@@ -18,25 +18,10 @@ REFRESH_TOKEN_EXPIRE_DAYS = settings.REFRESH_TOKEN_EXPIRE_DAYS
 password_hash = PasswordHash.recommended()
 
 
-# Entropia mínima aceitável para a SECRET_KEY em produção, em bits.
-#
-# Contexto: assinamos JWT com HS256 (HMAC-SHA256), que é SIMÉTRICO — a mesma
-# chave que assina também verifica. Quem descobre a SECRET_KEY forja qualquer
-# token, inclusive um com role=admin, sem precisar de senha nem de banco.
-#
-# 128 bits é o piso recomendado para segredos de longa duração: mesmo com
-# bilhões de tentativas por segundo, o espaço de busca é inviável. Na prática,
-# duas coisas atendem: `secrets.token_urlsafe(32)` (~256 bits) ou 32 bytes
-# aleatórios em hex/base64.
 ENTROPIA_MINIMA_SECRET_KEY_BITS = 128
 
-# Tamanho máximo de padrão considerado ao detectar repetição ("abcabcabc...").
-# Acima disso o custo de verificar não compensa e a chave já é longa.
 _MAX_PADRAO_REPETIDO = 64
 
-# Fração mínima de posições que um período curto precisa explicar para a chave
-# ser considerada previsível. 0.9 cobre `"teste"*6 + "12"` (30/32 = 94%) sem
-# gerar falso positivo em chaves aleatórias (que ficam em ~1/alfabeto).
 _PROPORCAO_PADRAO_REPETIDO = 0.9
 
 
@@ -110,12 +95,10 @@ def tem_padrao_repetido(valor: str) -> bool:
 
     n = len(valor)
 
-    # 1) Repetição exata de prefixo.
     for tamanho in range(1, min(n // 2, _MAX_PADRAO_REPETIDO) + 1):
         if n % tamanho == 0 and valor[:tamanho] * (n // tamanho) == valor:
             return True
 
-    # 2) Período curto que domina a string.
     for tamanho in range(1, min(n // 2, _MAX_PADRAO_REPETIDO) + 1):
         periodo = valor[:tamanho]
         acertos = sum(1 for i, c in enumerate(valor) if c == periodo[i % tamanho])

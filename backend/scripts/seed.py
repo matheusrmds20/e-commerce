@@ -15,14 +15,6 @@ except (AttributeError, ValueError):  # pragma: no cover
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-# O seed lê credenciais via `os.getenv`, então o `.env` precisa estar realmente
-# carregado em `os.environ` ANTES das constantes abaixo serem avaliadas.
-# Antes isso funcionava só por ordem de import (`app.db.database` instancia
-# `Settings`, que popula `os.environ`) — frágil: um reordenamento de imports
-# (ex.: `ruff --fix`) faria `os.getenv` devolver None e o seed cairia
-# silenciosamente na senha default. Carregamos explicitamente e sem override,
-# para que variáveis já presentes no ambiente (Render, CI, shell) vençam o
-# arquivo.
 try:
     from dotenv import load_dotenv
 
@@ -481,29 +473,6 @@ for livro in LIVROS:
     livro["length_cm"] = round(max(1.0, paginas / 100), 1)
 
 
-# ---------------------------------------------------------------------------
-# Usuário administrador
-# ---------------------------------------------------------------------------
-#
-# Credenciais vêm do ambiente para não deixar senha fixa no repositório em
-# produção. Os defaults abaixo são apenas de desenvolvimento local.
-#
-#   ADMIN_EMAIL / ADMIN_PASSWORD / ADMIN_FULL_NAME
-#
-# Os defaults abaixo existem APENAS para desenvolvimento local (DEBUG=true).
-# Com DEBUG=false o seed RECUSA rodar com a senha padrão — ver
-# `_resolver_credenciais_admin()`. Sem isso, um deploy no Render que esquecesse
-# `ADMIN_PASSWORD` criaria um admin com `Admin@123`, senha pública no
-# repositório, numa API exposta na internet.
-#
-# Política CONSERVADORA (diferente da dos produtos):
-#   - no INSERT, tudo é criado;
-#   - em usuário já existente, apenas os campos de perfil são sincronizados
-#     (full_name, role, is_active, email_verified);
-#   - password_hash NUNCA é sobrescrito sem pedido explícito
-#     (`--reset-passwords`). Assim, rodar o seed repetidamente não derruba a
-#     senha que alguém trocou no ambiente real.
-
 ADMIN_EMAIL_PADRAO = "admin@papiro.com"
 ADMIN_PASSWORD_PADRAO = "Admin@123"
 ADMIN_FULL_NAME_PADRAO = "Administrador Papiro"
@@ -537,8 +506,6 @@ def _obter_debug() -> bool:
     try:
         return bool(get_settings().DEBUG)
     except ValidationError as err:
-        # Erro mais comum: variáveis obrigatórias não definidas no painel.
-        # Traduzimos os nomes dos campos para algo acionável.
         faltando: list[str] = []
         invalidos: list[str] = []
         for detalhe in err.errors():
@@ -594,8 +561,6 @@ def _resolver_credenciais_admin() -> tuple[str, str, str]:
     debug = _obter_debug()
 
     if not debug:
-        # Mesmo critério do startup da API: o seed pode criar o admin antes de
-        # a aplicação subir, então não adianta validar só no main.py.
         motivo = motivo_secret_key_insegura(get_settings().SECRET_KEY)
         if motivo:
             raise ErroDeConfiguracaoSeed(
@@ -674,7 +639,6 @@ def _upsert_usuario(
         db.flush()
         return user, "criado"
 
-    # --- Usuário já existe: sincroniza só o perfil ---
     alterado = False
     campos_perfil = {
         "full_name": full_name,
