@@ -70,7 +70,7 @@ def _migrate_and_seed() -> None:
     print_alembic_output(alembic)
 
     seed = subprocess.run(
-        [sys.executable, "-m", "scripts.seed"],
+        [sys.executable, "-m", "scripts.seed", "--no-usuarios"],
         cwd=BACKEND_DIR,
         env=env,
         capture_output=True,
