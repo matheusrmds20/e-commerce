@@ -1,0 +1,118 @@
+# =============================================================================
+# .dockerignore — o que NÃO entra no contexto de build da imagem Docker
+# =============================================================================
+#
+# Por que este arquivo existe:
+#
+# O Dockerfile faz `COPY . .`, que copia TUDO do diretório para dentro da
+# imagem. Sem um .dockerignore, o `.env` (com SECRET_KEY, tokens do Mercado
+# Pago, SMTP, Supabase, Melhor Envio e senha do Postgres) fica COZIDO nas
+# layers da imagem e pode ser extraído por qualquer um com acesso ao registry,
+# ao layer cache ou a um `docker history` / `docker save`.
+#
+# O `.gitignore` NÃO protege contra isso: são mecanismos diferentes. Só o
+# `.dockerignore` controla o contexto de build.
+#
+# Regra de ouro: se não é necessário para rodar a API, não entra na imagem.
+# Segredos vêm SEMPRE do ambiente do runtime (Render/Supabase), nunca do build.
+
+# -----------------------------------------------------------------------------
+# Segredos e arquivos de ambiente  ← o motivo principal deste arquivo
+# -----------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+secrets/
+.secrets
+
+# -----------------------------------------------------------------------------
+# Controle de versão e metadados de ferramentas
+# -----------------------------------------------------------------------------
+.git
+.gitignore
+.gitattributes
+.github
+.vscode
+.idea
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# -----------------------------------------------------------------------------
+# Artefatos de Python / cache de build
+# -----------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+*.whl
+.venv/
+venv/
+env/
+ENV/
+
+# -----------------------------------------------------------------------------
+# Testes, cobertura e caches de ferramentas de dev
+# -----------------------------------------------------------------------------
+tests/
+.pytest_cache/
+.pytest_tmp/
+pytest-of-*/
+.pytest-of-*/
+.ruff_cache/
+.mypy_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.tox/
+.nox/
+conftest.py
+pytest.ini
+tox.ini
+
+# -----------------------------------------------------------------------------
+# Temporários e lixo de desenvolvimento
+# -----------------------------------------------------------------------------
+.tmp/
+tmp/
+*.log
+*.sqlite3
+*.db
+*.db-journal
+
+# Diretórios temporários criados pelo pip durante a instalação (pip-*)
+# Aparecem na raiz do projeto após `pip install` interrompido ou em ambientes
+# com TMPDIR apontando para o cwd. Não têm nada a ver com a aplicação.
+pip-*/
+pip-build-tracker-*/
+pip-ephem-wheel-cache-*/
+pip-install-*/
+pip-metadata-*/
+pip-unpack-*/
+
+# -----------------------------------------------------------------------------
+# Documentação e arquivos de deploy que não são necessários em runtime
+# -----------------------------------------------------------------------------
+*.md
+!README.md
+docker-compose.yml
+.dockerignore
+Dockerfile
+
+# -----------------------------------------------------------------------------
+# Dados locais gerados em runtime
+# -----------------------------------------------------------------------------
+# Os comprovantes em PDF vão para o Supabase Storage, não para o disco da
+# imagem. O diretório local é só resíduo de execuções antigas.
+comprovantes/

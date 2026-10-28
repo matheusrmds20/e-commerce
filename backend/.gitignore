@@ -17,3 +17,6 @@ htmlcov/
 .env
 .env.*
 !.env.example
+
+# Resíduos de instalação do pip (criados na raiz do backend)
+pip-*/

@@ -1,3 +1,4 @@
+import logging
 import ssl
 from contextlib import asynccontextmanager
 
@@ -13,17 +14,72 @@ from app.api.limiter import limiter
 from app.api.router import router
 from app.core.config import get_settings
 from app.core.middleware import SecurityHeadersMiddleware
+from app.core.security import motivo_secret_key_insegura
+
+logger = logging.getLogger(__name__)
 
 settings = get_settings()
+
+
+def _log_configuracao_rede() -> None:
+    """Imprime os hosts e origens efetivos no boot.
+
+    No plano free do Render não há Shell, então o log de startup é a única
+    janela para conferir o que o processo realmente carregou.
+
+    Isso resolve um diagnóstico enganoso: `TrustedHostMiddleware` e
+    `CORSMiddleware` rejeitam com 400 / sem header CORS antes de chegar no
+    handler, então **nada aparece no log da aplicação** — o sintoma vira
+    "a API está fora" quando na verdade é host/origem fora da allowlist.
+    """
+    hosts = list(settings.ALLOWED_HOSTS)
+    origens = list(settings.CORS_ORIGINS)
+
+    logger.info("config de rede efetiva | DEBUG=%s", settings.DEBUG)
+    logger.info("ALLOWED_HOSTS (%d): %s", len(hosts), ", ".join(hosts))
+    logger.info("CORS_ORIGINS (%d): %s", len(origens), ", ".join(origens))
+
+    if not settings.DEBUG:
+        hosts_locais = {"localhost", "127.0.0.1", "testserver"}
+        origens_locais = {
+            o for o in origens if "localhost" in o or "127.0.0.1" in o
+        }
+
+        if all(h in hosts_locais for h in hosts):
+            logger.warning(
+                "ALLOWED_HOSTS contém apenas hosts locais. Em produção o "
+                "TrustedHostMiddleware responde 400 para o domínio público. "
+                'Defina no painel, em JSON: ALLOWED_HOSTS=["sua-api.onrender.com"]'
+            )
+
+        if origens_locais and len(origens_locais) == len(origens):
+            logger.warning(
+                "CORS_ORIGINS contém apenas origens locais. O front em produção "
+                "será bloqueado pelo navegador (No 'Access-Control-Allow-Origin'). "
+                'Defina no painel, em JSON: CORS_ORIGINS=["https://seu-front.vercel.app"]'
+            )
+
+        if any(h in hosts_locais for h in hosts):
+            logger.warning(
+                "ALLOWED_HOSTS inclui host local (%s) com DEBUG=false. "
+                "Não quebra nada, mas amplia a superfície sem necessidade.",
+                ", ".join(sorted(h for h in hosts if h in hosts_locais)),
+            )
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     if not settings.DEBUG:
-        if settings.SECRET_KEY.startswith("change-me") or len(settings.SECRET_KEY) < 32:
-            raise RuntimeError("SECRET_KEY insegura para produção (fora do default e min. 32 chars).")
+        motivo = motivo_secret_key_insegura(settings.SECRET_KEY)
+        if motivo:
+            raise RuntimeError(
+                f"SECRET_KEY insegura para produção: {motivo}\n"
+                'Gere uma nova com: python -c "import secrets; '
+                'print(secrets.token_urlsafe(32))"'
+            )
         if "*" in settings.CORS_ORIGINS:
             raise RuntimeError("CORS_ORIGINS não pode conter '*' em produção.")
+    _log_configuracao_rede()
     yield
 
 

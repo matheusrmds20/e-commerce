@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -14,10 +15,21 @@ except (AttributeError, ValueError):  # pragma: no cover
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+try:
+    from dotenv import load_dotenv
 
+    load_dotenv(Path(__file__).resolve().parents[1] / ".env", override=False)
+except ImportError:  # pragma: no cover - python-dotenv é dependência do projeto
+    pass
+
+from pydantic import ValidationError
+
+from app.core.config import get_settings
+from app.core.security import hash_password, motivo_secret_key_insegura, verify_password
 from app.db.database import SessionLocal
 from app.models.category import Category
 from app.models.product import Product
+from app.models.user import User, UserRole
 
 IMG = {
     "biblioteca": "https://images.unsplash.com/photo-1507842217343-583bb7270b66?auto=format&fit=crop&w=800&q=80",
@@ -461,8 +473,223 @@ for livro in LIVROS:
     livro["length_cm"] = round(max(1.0, paginas / 100), 1)
 
 
-def seed(reset: bool = False) -> None:
-    """Cria categorias e produtos. Idempotente por `slug`."""
+ADMIN_EMAIL_PADRAO = "admin@papiro.com"
+ADMIN_PASSWORD_PADRAO = "Admin@123"
+ADMIN_FULL_NAME_PADRAO = "Administrador Papiro"
+
+ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", ADMIN_EMAIL_PADRAO)
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", ADMIN_PASSWORD_PADRAO)
+ADMIN_FULL_NAME = os.getenv("ADMIN_FULL_NAME", ADMIN_FULL_NAME_PADRAO)
+
+
+class ErroDeConfiguracaoSeed(SystemExit):
+    """Falha de configuração do ambiente do seed (não é erro de dados).
+
+    Subclasse de `SystemExit` para manter o comportamento anterior (mensagem
+    limpa, sem traceback, exit code != 0) e continuar sendo capturável do
+    mesmo jeito por quem já chama o seed programaticamente.
+    """
+
+
+def _obter_debug() -> bool:
+    """Determina DEBUG sem esconder erros de configuração.
+
+    Antes era `try: get_settings().DEBUG / except Exception: debug = False`,
+    o que transformava QUALQUER falha de settings (11 campos obrigatórios
+    ausentes, CORS mal formado, etc.) na mensagem "ADMIN_PASSWORD não
+    definida" — diagnóstico errado, pois a senha podia estar correta e o
+    problema era outro.
+
+    Agora a causa real é propagada. Como o seed roda num processo próprio
+    (CLI/Start Command), um erro de settings deve ser fatal e visível.
+    """
+    try:
+        return bool(get_settings().DEBUG)
+    except ValidationError as err:
+        faltando: list[str] = []
+        invalidos: list[str] = []
+        for detalhe in err.errors():
+            campo = ".".join(str(p) for p in detalhe.get("loc", ())) or "?"
+            if detalhe.get("type") == "missing":
+                faltando.append(campo)
+            else:
+                invalidos.append(f"{campo} ({detalhe.get('type')})")
+
+        linhas = [
+            "[seed] As configurações da aplicação são inválidas, então não é "
+            "possível saber se DEBUG=true ou false.",
+            "",
+        ]
+        if faltando:
+            linhas.append("Variáveis obrigatórias ausentes no ambiente:")
+            linhas += [f"  - {nome}" for nome in faltando]
+            linhas.append("")
+        if invalidos:
+            linhas.append("Variáveis com valor inválido:")
+            linhas += [f"  - {nome}" for nome in invalidos]
+            linhas.append("")
+        linhas += [
+            "Defina-as no painel do Render (Environment) e rode o seed de novo.",
+            "Isto NÃO é um problema de ADMIN_PASSWORD: o seed nem chegou a avaliar "
+            "as credenciais do admin.",
+            "",
+            "Detalhe original do pydantic:",
+            *[f"  {linha}" for linha in str(err).splitlines()[:20]],
+        ]
+        raise ErroDeConfiguracaoSeed("\n".join(linhas)) from err
+    except Exception as err:  # noqa: BLE001 - queremos a causa, não engolir
+        raise ErroDeConfiguracaoSeed(
+            "[seed] Falha ao carregar as configurações da aplicação "
+            f"({type(err).__name__}: {err}).\n"
+            "Corrija o ambiente antes de rodar o seed."
+        ) from err
+
+
+def _resolver_credenciais_admin() -> tuple[str, str, str]:
+    """Lê e valida as credenciais do admin no momento do uso.
+
+    Reavalia o ambiente a cada chamada (em vez de confiar só nas constantes de
+    import) e aplica a mesma postura do `app/main.py` para `SECRET_KEY`:
+    fora de DEBUG, recusa valores default que estão versionados no repositório.
+
+    Retorna `(email, password, full_name)`.
+    """
+    email = os.getenv("ADMIN_EMAIL", ADMIN_EMAIL_PADRAO)
+    password = os.getenv("ADMIN_PASSWORD", ADMIN_PASSWORD_PADRAO)
+    full_name = os.getenv("ADMIN_FULL_NAME", ADMIN_FULL_NAME_PADRAO)
+
+    debug = _obter_debug()
+
+    if not debug:
+        motivo = motivo_secret_key_insegura(get_settings().SECRET_KEY)
+        if motivo:
+            raise ErroDeConfiguracaoSeed(
+                f"[seed] SECRET_KEY insegura para produção: {motivo}\n"
+                'Gere uma nova com: python -c "import secrets; '
+                'print(secrets.token_urlsafe(32))"'
+            )
+
+        if password == ADMIN_PASSWORD_PADRAO:
+            raise ErroDeConfiguracaoSeed(
+                "[seed] ADMIN_PASSWORD não definida (ou igual ao default público "
+                "'Admin@123') com DEBUG=false.\n"
+                "Defina ADMIN_PASSWORD no ambiente antes de rodar o seed em "
+                "produção — recusar aqui evita criar um admin com senha "
+                "conhecida numa API pública."
+            )
+        if email == ADMIN_EMAIL_PADRAO:
+            raise ErroDeConfiguracaoSeed(
+                "[seed] ADMIN_EMAIL está no valor default público "
+                f"'{ADMIN_EMAIL_PADRAO}' com DEBUG=false.\n"
+                "Defina ADMIN_EMAIL com um endereço real antes de rodar em produção."
+            )
+
+    return email, password, full_name
+
+
+def _validate_password(label: str, password: str) -> None:
+    """Reproduz as regras de `UserCreate`/`PasswordResetRequest`.
+
+    Manter a mesma validação do schema evita criar um usuário que o próprio
+    back-end recusaria aceitar, e falha cedo (antes de tocar no banco).
+    """
+    problemas = []
+    if len(password) < 8:
+        problemas.append("mínimo de 8 caracteres")
+    if len(password) > 128:
+        problemas.append("máximo de 128 caracteres")
+    if not any(c.isalpha() for c in password):
+        problemas.append("ao menos uma letra")
+    if not any(c.isdigit() for c in password):
+        problemas.append("ao menos um número")
+    if problemas:
+        raise SystemExit(
+            f"[seed] senha inválida para {label}: {', '.join(problemas)}.\n"
+            "Defina uma senha forte via variável de ambiente."
+        )
+
+
+def _upsert_usuario(
+    db,
+    *,
+    email: str,
+    password: str,
+    full_name: str,
+    role: UserRole,
+    reset_password: bool,
+) -> tuple[User, str]:
+    """Cria ou sincroniza um usuário de forma conservadora.
+
+    Retorna `(usuario, acao)`, onde `acao` é "criado", "atualizado" ou
+    "mantido" (nada mudou).
+    """
+    existente = db.query(User).filter(User.email == email).first()
+
+    if existente is None:
+        _validate_password(email, password)
+        user = User(
+            email=email,
+            password_hash=hash_password(password),
+            full_name=full_name,
+            role=role,
+            is_active=True,
+            email_verified=True,
+        )
+        db.add(user)
+        db.flush()
+        return user, "criado"
+
+    alterado = False
+    campos_perfil = {
+        "full_name": full_name,
+        "role": role,
+        "is_active": True,
+        "email_verified": True,
+    }
+    for campo, valor in campos_perfil.items():
+        if getattr(existente, campo) != valor:
+            setattr(existente, campo, valor)
+            alterado = True
+
+    if reset_password:
+        _validate_password(email, password)
+        if not verify_password(password, existente.password_hash):
+            existente.password_hash = hash_password(password)
+            alterado = True
+
+    return existente, ("atualizado" if alterado else "mantido")
+
+
+def seed_usuarios(db, reset_password: bool = False) -> None:
+    """Cria/sincroniza o usuário administrador."""
+    email, password, full_name = _resolver_credenciais_admin()
+
+    admin, acao = _upsert_usuario(
+        db,
+        email=email,
+        password=password,
+        full_name=full_name,
+        role=UserRole.ADMIN,
+        reset_password=reset_password,
+    )
+
+    print(f"  admin:      {admin.email} ({acao})")
+    if acao == "criado" or reset_password:
+        print("              senha definida pelo seed")
+    else:
+        print("              senha preservada (use --reset-passwords para trocar)")
+
+
+def seed(
+    reset: bool = False,
+    *,
+    usuarios: bool = True,
+    reset_password: bool = False,
+) -> None:
+    """Cria categorias, produtos e usuários de demonstração.
+
+    Idempotente por `slug` (catálogo) e por `email` (usuários).
+    """
     db = SessionLocal()
     try:
         if reset:
@@ -524,6 +751,11 @@ def seed(reset: bool = False) -> None:
 
             db.add(Product(**dados_produto))
             inseridos += 1
+
+        # --- Usuário administrador ---
+        if usuarios:
+            seed_usuarios(db, reset_password=reset_password)
+
         db.commit()
 
         total_p = db.query(Product).count()
@@ -533,8 +765,10 @@ def seed(reset: bool = False) -> None:
             f"  produtos:   {inseridos} inseridos, {atualizados} atualizados "
             f"(total {total_p})"
         )
+        if usuarios:
+            print(f"  usuários:   {db.query(User).count()} no total")
         if not inseridos and not atualizados and not criadas:
-            print("  (nada a fazer - o seed ja havia sido aplicado)")
+            print("  (catálogo sem mudanças - o seed ja havia sido aplicado)")
     except Exception:
         db.rollback()
         raise
@@ -549,8 +783,53 @@ def main() -> None:
         action="store_true",
         help="apaga produtos e categorias antes de reinserir",
     )
+    parser.add_argument(
+        "--no-usuarios",
+        "--no-admin",
+        dest="usuarios",
+        action="store_false",
+        help="não cria/sincroniza o admin (útil para bancos de teste E2E)",
+    )
+    parser.add_argument(
+        "--only-usuarios",
+        "--admin-only",
+        dest="only_usuarios",
+        action="store_true",
+        help="cria apenas o admin, sem tocar no catálogo",
+    )
+    parser.add_argument(
+        "--reset-passwords",
+        action="store_true",
+        help=(
+            "sobrescreve a senha do admin com a do ambiente "
+            "(por padrão a senha existente é preservada)"
+        ),
+    )
     args = parser.parse_args()
-    seed(reset=args.reset)
+
+    if args.only_usuarios:
+        _only_usuarios(reset_password=args.reset_passwords)
+        return
+
+    seed(
+        reset=args.reset,
+        usuarios=args.usuarios,
+        reset_password=args.reset_passwords,
+    )
+
+
+def _only_usuarios(*, reset_password: bool) -> None:
+    """Atalho para sincronizar só os usuários de demonstração."""
+    db = SessionLocal()
+    try:
+        seed_usuarios(db, reset_password=reset_password)
+        db.commit()
+        print(f"  usuários:   {db.query(User).count()} no total")
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
 
 
 if __name__ == "__main__":

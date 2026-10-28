@@ -1,6 +1,7 @@
-# Deploy no Render (plano free)
+# Deploy no Render (API) + Supabase (banco)
 
-Guia de deploy para o **Render** no plano **gratuito**. Foi desenhado para ser
+Guia de deploy para a **API no Render** (plano **gratuito**) e o **banco
+PostgreSQL no Supabase** (plano **free**). Foi desenhado para ser
 **leve** (1 serviço web) — adequado para um projeto de portfolio que não fica
 24/7.
 
@@ -20,7 +21,7 @@ Guia de deploy para o **Render** no plano **gratuito**. Foi desenhado para ser
 | Serviço | Tipo | Necessário? |
 |---|---|---|
 | Web API (FastAPI) | **Web Service** (free) | Sim |
-| Postgres | **PostgreSQL** (free) | Sim |
+| Postgres | **Supabase** (free) | Sim |
 | Redis (para Celery de e-mail/PDF) | **Key Value** (free) | Só se usar Celery |
 | Celery Worker | **Background Worker** | Só se usar Celery |
 
@@ -53,7 +54,7 @@ Guia de deploy para o **Render** no plano **gratuito**. Foi desenhado para ser
 Preencha no painel **Environment** (valores de produção):
 
 ```
-DATABASE_URL=<connection string do Render Postgres>
+DATABASE_URL=<connection string do Supabase (pooler, porta 6543)>
 SECRET_KEY=<string longa e aleatória>
 ACCESS_TOKEN_EXPIRE_MINUTES=15
 REFRESH_TOKEN_EXPIRE_DAYS=7
@@ -77,13 +78,24 @@ CELERY_RESULT_BACKEND=<redis://... do Key Value>
 
 ---
 
-## 3. Postgres (free)
+## 3. Banco — PostgreSQL no Supabase (free)
 
-- **Novo Postgres** → plano **Free**.
-- Use a **Internal Database URL / connection string** como `DATABASE_URL` do web service.
-- ⚠️ **Limitações do free:** 1 GB de storage e **expira em 30 dias**. Para um
-  projeto de demonstração isso costuma ser suficiente, mas programe um `pg_dump`
-  periódico ou recrie o banco quando expirar.
+- Crie um **projeto no Supabase** → plano **Free**.
+- Copie a **Connection String** (Project Settings → Database) — prefira o
+  **pooler** (porta 6543) para usar com a API.
+- Use essa connection string como `DATABASE_URL` do web service.
+- ⚠️ **Limitações do free:** o projeto é **pausado após ~7 dias de inatividade**
+  (volta com um clique no painel) e tem limite de storage/bandas. Para um
+  projeto de demonstração isso costuma ser suficiente; se o projeto pausar, só
+  reative no dashboard do Supabase.
+- ⚠️ Tráfego entre a API (Render, região padrão US) e o Supabase é externo —
+  use a **connection string de pooler externa** (`aws-0-<região>.pooler.supabase.com`),
+  não a interna.
+
+> ℹ️ **Nota sobre pg_dump:** o Supabase free não "expira" como o Postgres free
+> da Render fazia — o maior risco é a pausa por inatividade, que não apaga
+> dados. Mesmo assim, mantenha backups (`pg_dump`) ou exports do projeto se os
+> dados forem importantes.
 
 ---
 
@@ -154,18 +166,12 @@ uvicorn app.main:app --host 0.0.0.0 --port $PORT
 
 Assim, **toda vez que você faz deploy**, as migrations pendentes são aplicadas
 automaticamente — sem precisar de acesso manual ao banco. É idempotente
-(`upgrade head` só aplica o que falta) e respeita o Postgres free (que expira e
-você recria): ao recriar o banco, o deploy aplica o schema do zero.
+(`upgrade head` só aplica o que falta): se o banco do Supabase for recriado do
+zero, o deploy aplica o schema automaticamente.
 
 ### Alternativas (se não usar Pre-Deploy Command)
 
 - **Render Shell** (web service): `alembic upgrade head`.
-- **Local apontando pra produção** (só se o Postgres free aceitar conexão
-  externa):
-  ```bash
-  DATABASE_URL="postgresql+psycopg2://<user>:<pass>@<host>:<porta>/<db>" alembic upgrade head
-  ```
-  ⚠️ Mexer no banco real da sua máquina exige cuidado.
 
 ### Boas práticas desta base
 
@@ -210,7 +216,7 @@ ser configurados no painel do Render:
 
 ## 6. Ordem recomendada de criação
 
-1. **Postgres** (para pegar a `DATABASE_URL`).
+1. **Projeto no Supabase** (para pegar a `DATABASE_URL`).
 2. **Web Service** (com as env vars, apontando pra `DATABASE_URL`).
 3. **(Opcional)** **Key Value (Redis)** + **Worker** se quiser e-mail/PDF.
 4. Configure o **Mercado Pago** com `notification_url` apontando para
