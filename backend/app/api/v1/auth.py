@@ -79,7 +79,6 @@ def login(
     response: Response,
     request: Request,
 ) -> TokenResponse:
-    """Publico e alvo clássico de brute force: limite por IP."""
     result = get_auth_service(db).login(form_data)
     if result.refresh_token:
         _set_refresh_cookie(response, request, result.refresh_token)

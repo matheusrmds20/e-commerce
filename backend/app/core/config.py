@@ -9,7 +9,7 @@ ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
 
 class Settings(BaseSettings):
     APP_NAME: str = "E-commerce"
-    DEBUG: bool = False
+    DEBUG: bool = True
 
     FRONTEND_URL: str
     BACKEND_URL: str
@@ -40,7 +40,7 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
-    COOKIE_SECURE: bool = True
+    COOKIE_SECURE: bool = False
     COOKIE_SAMESITE: str = "lax"
     COOKIE_DOMAIN: str | None = None
     SMTP_HOST: str
