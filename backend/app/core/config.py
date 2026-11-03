@@ -17,13 +17,14 @@ class Settings(BaseSettings):
         "http://localhost:5173",
         "http://127.0.0.1:5173",
         "https://papiro.matheuslab.xyz",
-        "https://e-commerce-nine-nu-59.vercel.app",
     ]
     ALLOWED_HOSTS: list[str] = [
         "testserver",
         "localhost",
         "127.0.0.1",
-        "api-e-commerce.matheuslab.xyz",
+        # Domínio customizado da API (same-site com o front `papiro.matheuslab.xyz`).
+        "api.papiro.matheuslab.xyz",
+        # Host de origem do Render (health checks internos / fallback).
         "e-commerce-de-livros-api.onrender.com",
     ]
     FORCE_HTTPS: bool = False
@@ -40,7 +41,10 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
-    COOKIE_SECURE: bool = False
+    COOKIE_SECURE: bool = True
+    # `lax` basta porque front e API são same-site (matheuslab.xyz).
+    # Se um dia a API sair para outro domínio registrável, use `none`
+    # (o navegador exige `Secure` junto — ver `_cookie_kwargs`).
     COOKIE_SAMESITE: str = "lax"
     COOKIE_DOMAIN: str | None = None
     SMTP_HOST: str

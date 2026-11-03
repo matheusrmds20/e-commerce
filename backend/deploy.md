@@ -122,7 +122,7 @@ Se mantiver os jobs de e-mail e comprovante:
   sempre que mostrar.
 - **CORS e hosts:** configure `CORS_ORIGINS` (origem do front, ex.:
   `["https://papiro.matheuslab.xyz"]`) e `ALLOWED_HOSTS` (host da API, ex.:
-  `["api-e-commerce.matheuslab.xyz"]`) por variável de ambiente — não edite
+  `["api.papiro.matheuslab.xyz"]`) por variável de ambiente — não edite
   `main.py`. Com `DEBUG=false`, `CORS_ORIGINS` com `*` aborta o startup.
 
 ---

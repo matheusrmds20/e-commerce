@@ -116,3 +116,9 @@ desktop.ini
 *.sw?
 
 test.py
+# ===== Restos de instalação do pip (tmp dirs na raiz) =====
+pip-build-tracker-*/
+pip-ephem-wheel-cache-*/
+pip-install-*/
+pip-metadata-*/
+pip-unpack-*/
