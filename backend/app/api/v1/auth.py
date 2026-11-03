@@ -30,12 +30,18 @@ def get_auth_service(db: DbSession) -> AuthService:
 
 def _cookie_kwargs() -> dict:
     settings = get_settings()
+    # Normaliza porque a env var pode vir como "None"/"Lax" e o Starlette
+    # repassa o valor cru para o header ``SameSite=...``.
+    samesite = (settings.COOKIE_SAMESITE or "lax").strip().lower()
+    # ``SameSite=None`` sem ``Secure`` faz o navegador DESCARTAR o cookie em
+    # silêncio — o refresh quebraria de novo sem nenhum erro visível.
+    secure = settings.COOKIE_SECURE or samesite == "none"
     return {
         "httponly": True,
-        "secure": settings.COOKIE_SECURE,
-        "samesite": settings.COOKIE_SAMESITE,
+        "secure": secure,
+        "samesite": samesite,
         "path": "/api/v1/auth",
-        "domain": settings.COOKIE_DOMAIN,
+        "domain": settings.COOKIE_DOMAIN or None,
     }
 
 
