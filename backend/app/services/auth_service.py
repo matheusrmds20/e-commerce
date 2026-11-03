@@ -80,9 +80,6 @@ class AuthService:
         login_lockout.record_success(data.username)
 
         result = self._issue_tokens(user.id)
-        # O refresh token só fica utilizável se a transação for confirmada;
-        # sem commit o flush() é revertido no fechamento da sessão e o token
-        # vira órfão (refresh sempre 401). Garantimos aqui o persistir real.
         try:
             self.session.commit()
         except IntegrityError as err:
