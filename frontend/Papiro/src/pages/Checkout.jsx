@@ -39,8 +39,11 @@ export default function Checkout() {
  const [erroGeral, setErroGeral] = useState(null)
  const [enviando, setEnviando] = useState(false)
  const [pedido, setPedido] = useState(null)
-  const [snapshotResumo, setSnapshotResumo] = useState(null)
-  const [checkoutUrl, setCheckoutUrl] = useState(null)
+  // Resumo congelado no submit. O backend esvazia a sacola no checkout e o
+  // `recarregar()` logo abaixo zera `itens` — sem o snapshot o resumo
+  // zerava enquanto o cliente ainda está na tela aguardando o redirect ao
+  // Mercado Pago.
+  const [resumoEnviado, setResumoEnviado] = useState(null)
 
  // Estados de Frete (Melhor Envio)
  const [ofertasFrete, setOfertasFrete] = useState([])
@@ -292,6 +295,16 @@ export default function Checkout() {
  })
 
  setPedido(criado)
+ // Congela o resumo ANTES do recarregar: `itens`/`subtotal`/`desconto`/
+ // `total` são derivados da sacola, que o backend acabou de esvaziar.
+ setResumoEnviado({
+ itens: itens.map((item) => ({ ...item })),
+ subtotal,
+ frete,
+ desconto,
+ total,
+ cupom: cupomAplicado,
+ })
  // O backend esvazia o carrinho no checkout; sincroniza o badge/estado.
  await recarregar()
 
@@ -343,12 +356,12 @@ export default function Checkout() {
 
  <div className="mt-10 grid gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] lg:gap-16">
  <ResumoPedido
- itens={itens}
- subtotal={subtotal}
- frete={frete}
- desconto={desconto}
- cupom={cupomAplicado}
- total={total}
+ itens={resumoEnviado?.itens ?? itens}
+ subtotal={resumoEnviado?.subtotal ?? subtotal}
+ frete={resumoEnviado?.frete ?? frete}
+ desconto={resumoEnviado?.desconto ?? desconto}
+ cupom={resumoEnviado?.cupom ?? cupomAplicado}
+ total={resumoEnviado?.total ?? total}
  formatarPreco={formatarPreco}
  />
 
