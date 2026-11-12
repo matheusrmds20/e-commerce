@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import AppLayout from './AppLayout'
+import ErrorBoundary from '../components/ErrorBoundary'
 
 // Páginas da loja — carregadas sob demanda (code-splitting por rota).
 const Home = lazy(() => import('../pages/Home'))
@@ -30,16 +31,31 @@ function AdminRota() {
   return <Admin />
 }
 
-/** Fallback de carregamento do lazy. */
+/** Fallback de carregamento do lazy — esqueleto, não tela vazia. */
 function Carregando() {
-  return <div className="min-h-svh bg-cream-deep" aria-busy="true" />
+  return (
+    <div
+      className="min-h-svh bg-cream-deep"
+      role="status"
+      aria-busy="true"
+      aria-label="Carregando página"
+    >
+      <div className="mx-auto flex h-56 max-w-none items-center justify-center pt-8">
+        <p className="font-body text-xs font-semibold uppercase tracking-[0.18em] text-coffee-faint animate-pulse">
+          Carregando…
+        </p>
+      </div>
+    </div>
+  )
 }
+
 
 
 export default function Rotas() {
   return (
-    <Suspense fallback={<Carregando />}>
-      <Routes>
+    <ErrorBoundary>
+      <Suspense fallback={<Carregando />}>
+        <Routes>
         {/* Páginas da loja — dentro da moldura (Navbar + Footer). */}
         <Route element={<AppLayout />}>
           <Route index element={<Home />} />
@@ -64,6 +80,7 @@ export default function Rotas() {
         {/* Rota desconhecida → loja */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-    </Suspense>
+      </Suspense>
+    </ErrorBoundary>
   )
 }

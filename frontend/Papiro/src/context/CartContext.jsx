@@ -3,11 +3,13 @@ import cartService from '../api/cart'
 import productService from '../api/products'
 import { itensParaView, produtoParaRecomendacao } from '../api/adapters'
 import { useAuth } from './auth-context'
+import { useToast } from './toast-context'
 import CartContext from './cart-context'
 
 
 export function CartProvider({ children }) {
   const { usuario, autenticado } = useAuth()
+  const { sucesso } = useToast()
 
   const [itens, setItens] = useState([])
   const [cartId, setCartId] = useState(null)
@@ -125,14 +127,16 @@ export function CartProvider({ children }) {
           }
           return [...atual, { ...produto, quantidade }]
         })
+        sucesso(`${produto.titulo} adicionado à sacola`)
         return
       }
 
       const id = await idDoCarrinho()
       await cartService.adicionarItem(id, produto.id, quantidade)
       await recarregar()
+      sucesso(`${produto.titulo} adicionado à sacola`)
     },
-    [userId, idDoCarrinho, recarregar],
+    [userId, idDoCarrinho, recarregar, sucesso],
   )
 
   const alterarQuantidade = useCallback(

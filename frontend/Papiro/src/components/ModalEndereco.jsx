@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import CampoFormulario from './CampoFormulario'
+import ConfirmDialog from './ConfirmDialog'
 import { CloseIcon } from './Icons'
 import addressService from '../api/addresses'
 
@@ -62,6 +63,7 @@ function ModalEnderecoDialog({
   const [carregandoCep, setCarregandoCep] = useState(false)
   const [salvando, setSalvando] = useState(false)
   const [excluindoId, setExcluindoId] = useState(null)
+  const [enderecoAExcluir, setEnderecoAExcluir] = useState(null)
 
   // Fecha no ESC
   useEffect(() => {
@@ -187,8 +189,6 @@ function ModalEnderecoDialog({
   const handleExcluir = async (id, e) => {
     e.stopPropagation()
     if (excluindoId) return
-    if (!window.confirm('Tem certeza que deseja excluir este endereço?')) return
-
     try {
       setExcluindoId(id)
       await addressService.excluir(id)
@@ -215,7 +215,7 @@ function ModalEnderecoDialog({
       role="dialog"
       aria-modal="true"
       aria-labelledby="modal-endereco-titulo"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-coffee/60 backdrop-blur-sm transition-all"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-coffee/60 backdrop-blur-sm"
     >
       <div className="relative w-full max-w-2xl max-h-[90vh] flex flex-col rounded-md border border-line bg-cream-soft shadow-2xl overflow-hidden">
         {/* Cabeçalho */}
@@ -328,7 +328,7 @@ function ModalEnderecoDialog({
                           onSelecionarEndereco?.(end)
                           onClose()
                         }}
-                        className={`group relative flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 rounded-md border transition-all cursor-pointer ${
+                        className={`group relative flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 rounded-md border transition-[border-color,background-color] duration-150 cursor-pointer ${
                           isSelected
                             ? 'border-forest bg-forest/[0.04] ring-1 ring-forest/30'
                             : 'border-line-strong bg-cream-soft hover:border-gold/60 hover:bg-cream'
@@ -352,12 +352,12 @@ function ModalEnderecoDialog({
                                 {end.complement ? ` - ${end.complement}` : ''}
                               </p>
                               {end.is_default && (
-                                <span className="rounded-full bg-gold/15 px-2.5 py-0.5 font-body text-[0.7rem] font-semibold text-gold-dark uppercase tracking-wider">
+                                <span className="rounded-full bg-gold/15 px-2.5 py-0.5 font-body text-2xs font-semibold text-gold-dark uppercase tracking-wider">
                                   Padrão
                                 </span>
                               )}
                               {isSelected && (
-                                <span className="rounded-full bg-forest/15 px-2.5 py-0.5 font-body text-[0.7rem] font-semibold text-forest uppercase tracking-wider">
+                                <span className="rounded-full bg-forest/15 px-2.5 py-0.5 font-body text-2xs font-semibold text-forest uppercase tracking-wider">
                                   Selecionado
                                 </span>
                               )}
@@ -374,7 +374,7 @@ function ModalEnderecoDialog({
                             <button
                               type="button"
                               onClick={(e) => handleDefinirPadrao(end.id, e)}
-                              className="font-body text-[0.75rem] font-medium text-coffee-faint hover:text-coffee px-2 py-1 rounded transition-colors"
+                              className="font-body text-2xs font-medium text-coffee-faint hover:text-coffee px-2 py-1 rounded transition-colors"
                               title="Tornar endereço padrão"
                             >
                               Tornar padrão
@@ -386,15 +386,18 @@ function ModalEnderecoDialog({
                               e.stopPropagation()
                               handleIniciarEdicao(end)
                             }}
-                            className="font-body text-[0.75rem] font-medium text-forest hover:text-forest-soft px-2 py-1 rounded transition-colors"
+                            className="font-body text-2xs font-medium text-forest hover:text-forest-soft px-2 py-1 rounded transition-colors"
                           >
                             Editar
                           </button>
                           <button
                             type="button"
                             disabled={excluindoId === end.id}
-                            onClick={(e) => handleExcluir(end.id, e)}
-                            className="font-body text-[0.75rem] font-medium text-[#a4533f] hover:text-[#823d2d] px-2 py-1 rounded transition-colors disabled:opacity-50"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setEnderecoAExcluir(end)
+                            }}
+                            className="font-body text-2xs font-medium text-[#a4533f] hover:text-[#823d2d] px-2 py-1 rounded transition-colors disabled:opacity-50"
                           >
                             {excluindoId === end.id ? 'Excluindo…' : 'Excluir'}
                           </button>
@@ -418,7 +421,7 @@ function ModalEnderecoDialog({
                     erro={erros.zip_code}
                   />
                   {carregandoCep && (
-                    <span className="absolute right-3 top-3.5 font-body text-[0.75rem] text-coffee-faint animate-pulse">
+                    <span className="absolute right-3 top-3.5 font-body text-2xs text-coffee-faint animate-pulse">
                       Buscando…
                     </span>
                   )}
@@ -475,7 +478,7 @@ function ModalEnderecoDialog({
                     name="state"
                     value={form.state}
                     onChange={atualizarCampo('state')}
-                    className={`w-full appearance-none rounded-sm border bg-cream-soft px-4 py-3.5 font-body text-[0.95rem] text-coffee transition-colors duration-300 focus:outline-none ${
+                    className={`w-full appearance-none rounded-sm border bg-cream-soft px-4 py-3.5 font-body text-sm text-coffee transition-colors duration-150 focus:not-focus-visible:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest ${
                       erros.state
                         ? 'border-caramel-dark focus:border-caramel-dark'
                         : 'border-line-strong focus:border-forest'
@@ -489,7 +492,7 @@ function ModalEnderecoDialog({
                     ))}
                   </select>
                   {erros.state && (
-                    <p className="mt-1 font-body text-[0.8rem] font-medium text-caramel-dark">
+                    <p className="mt-1 font-body text-xs font-medium text-caramel-dark">
                       {erros.state}
                     </p>
                   )}
@@ -547,6 +550,21 @@ function ModalEnderecoDialog({
           )}
         </div>
       </div>
+
+      {/* Confirmação de exclusão */}
+      <ConfirmDialog
+        aberto={Boolean(enderecoAExcluir)}
+        titulo="Excluir endereço"
+        mensagem={`Tem certeza que deseja excluir ${enderecoAExcluir ? `${enderecoAExcluir.street}, ${enderecoAExcluir.number}` : 'este endereço'}? Essa ação não pode ser desfeita.`}
+        confirmarTexto="Excluir"
+        cancelarTexto="Cancelar"
+        perigo
+        onCancelar={() => setEnderecoAExcluir(null)}
+        onConfirmar={() => {
+          if (enderecoAExcluir) handleExcluir(enderecoAExcluir.id)
+          setEnderecoAExcluir(null)
+        }}
+      />
     </div>
   )
 }
