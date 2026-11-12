@@ -174,7 +174,7 @@ export default function RecomendacaoDestaque({
  </div>
 
  {/* Título e Autor */}
- <h3 className="mt-3.5 font-display text-$1$2">
+ <h3 className="mt-3.5 font-display text-3xl font-normal leading-tight text-coffee sm:text-4xl">
  <a
  href="#"
  onClick={(e) => {

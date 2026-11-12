@@ -58,7 +58,7 @@ export default function SobreNos() {
         <div className="grid gap-12 lg:grid-cols-12 lg:items-center">
           <div className="lg:col-span-7">
             <span className="label-caps text-gold">O Manifesto Papiro</span>
-            <h2 className="mt-3 font-display text-$1$2">
+            <h2 className="mt-3 font-display text-3xl leading-snug text-coffee sm:text-4xl">
               Uma livraria feita à mão, para mentes que apreciam a pausa.
             </h2>
             <div className="mt-6 space-y-4 font-body text-sm leading-relaxed text-coffee-soft">
@@ -124,7 +124,7 @@ export default function SobreNos() {
         <div className="mt-20">
           <div className="text-center">
             <span className="label-caps text-gold">Nossos Princípios</span>
-            <h2 className="mt-2 font-display text-$1$2">
+            <h2 className="mt-2 font-display text-3xl text-forest sm:text-4xl">
               O que nos move a cada página
             </h2>
           </div>

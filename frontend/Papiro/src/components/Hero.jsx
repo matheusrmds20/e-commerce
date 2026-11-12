@@ -9,7 +9,7 @@ export default function Hero() {
  <div className="max-w-[34rem] lg:py-6">
  <p className="label-caps text-caramel-dark">Livraria independente · desde 2026</p>
 
- <h1 className="mt-5 font-display text-3xl font-semibold leading-[1.05] tracking-[-0.04em] text-forest sm:text-$1$2">
+ <h1 className="mt-5 font-display text-3xl font-semibold leading-[1.05] tracking-[-0.04em] text-forest sm:text-4xl lg:text-5xl">
  Histórias que merecem ficar por perto.
  </h1>
 

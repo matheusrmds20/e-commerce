@@ -147,7 +147,7 @@ export default function Carrinho() {
         {/* Recomendações — vindas do catálogo real */}
         {recomendadosLista.length > 0 && (
           <section className="mt-20 border-t border-line pt-14 sm:mt-24">
-            <h2 className="text-center font-display text-$1$2">
+            <h2 className="text-center font-display text-3xl leading-tight font-normal text-forest sm:text-4xl">
               Você também pode gostar destes momentos tranquilos
             </h2>
 

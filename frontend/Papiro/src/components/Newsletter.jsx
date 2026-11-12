@@ -62,7 +62,7 @@ export default function Newsletter() {
  </span>
  </div>
 
- <h2 className="mt-4 font-display text-$1$2">
+ <h2 className="mt-4 font-display text-3xl font-light leading-tight tracking-[-0.01em] text-forest sm:text-4xl">
  Carta do Livreiro
  </h2>
 
@@ -70,7 +70,7 @@ export default function Newsletter() {
  “Uma carta por mês, nada mais. Para ler com calma no domingo de manhã.”
  </p>
 
- <p className="mt-4 font-body text-$1$2">
+ <p className="mt-4 font-body text-sm font-light leading-relaxed text-coffee-soft sm:text-base">
  Sem spam, promoções agressivas ou algoritmos. Todo início de mês enviamos uma correspondência escrita à mão pelos nossos livreiros com reflexões literárias, recomendações fora do radar e trechos de livros que nos marcaram.
  </p>
 

@@ -33,7 +33,7 @@ export default function ItemCarrinho({
 
  {/* Título e autor */}
  <div className="min-w-0">
- <h3 className="font-display text-$1$2">
+ <h3 className="font-display text-xl font-medium leading-snug tracking-[0.01em] text-coffee sm:text-2xl">
  <a
  href="#"
  onClick={(event) => event.preventDefault()}
@@ -74,7 +74,7 @@ export default function ItemCarrinho({
  </div>
 
  {/* Subtotal */}
- <p className="col-span-3 text-right font-body text-$1$2">
+ <p className="col-span-3 text-right font-body text-lg font-semibold text-coffee sm:col-span-1 sm:min-w-[92px] sm:text-xl">
  {formatarPreco(subtotal)}
  </p>
  </div>
