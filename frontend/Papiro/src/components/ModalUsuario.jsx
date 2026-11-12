@@ -147,7 +147,7 @@ export default function ModalUsuario({
               className="w-full campo py-2"
             />
             {erros.full_name && (
-              <p className="mt-1 text-[0.75rem] text-red-600">{erros.full_name}</p>
+              <p className="mt-1 text-2xs text-red-600">{erros.full_name}</p>
             )}
           </div>
 
@@ -165,7 +165,7 @@ export default function ModalUsuario({
               className="w-full campo py-2"
             />
             {erros.email && (
-              <p className="mt-1 text-[0.75rem] text-red-600">{erros.email}</p>
+              <p className="mt-1 text-2xs text-red-600">{erros.email}</p>
             )}
           </div>
 
@@ -182,9 +182,9 @@ export default function ModalUsuario({
               className="w-full campo py-2"
             />
             {erros.password && (
-              <p className="mt-1 text-[0.75rem] text-red-600">{erros.password}</p>
+              <p className="mt-1 text-2xs text-red-600">{erros.password}</p>
             )}
-            <p className="mt-1 text-[0.7rem] text-coffee-faint">
+            <p className="mt-1 text-2xs text-coffee-faint">
               Requisitos: mínimo de 8 caracteres, contendo letras e números.
             </p>
           </div>

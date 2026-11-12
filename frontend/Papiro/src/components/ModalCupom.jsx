@@ -209,7 +209,7 @@ export default function ModalCupom({
                 className={inputClasse}
               />
               {erros.code && (
-                <p className="mt-1 text-[0.7rem] text-caramel-dark font-medium">
+                <p className="mt-1 text-2xs text-caramel-dark font-medium">
                   {erros.code}
                 </p>
               )}
@@ -262,7 +262,7 @@ export default function ModalCupom({
                 className={inputClasse}
               />
               {erros.discount_value && (
-                <p className="mt-1 text-[0.7rem] text-caramel-dark font-medium">
+                <p className="mt-1 text-2xs text-caramel-dark font-medium">
                   {erros.discount_value}
                 </p>
               )}
@@ -278,7 +278,7 @@ export default function ModalCupom({
                 className={inputClasse}
               />
               {erros.valid_until && (
-                <p className="mt-1 text-[0.7rem] text-caramel-dark font-medium">
+                <p className="mt-1 text-2xs text-caramel-dark font-medium">
                   {erros.valid_until}
                 </p>
               )}
@@ -360,11 +360,11 @@ export default function ModalCupom({
           <div className="pt-4 border-t border-line">
             <div className="flex items-baseline justify-between gap-3">
               <label className={rotuloCampo}>Atribuir a usuários</label>
-              <span className="text-[0.7rem] text-coffee-faint">
+              <span className="text-2xs text-coffee-faint">
                 {usuariosSelecionados.size} selecionado(s)
               </span>
             </div>
-            <p className="font-body text-[0.72rem] text-coffee-faint mb-2">
+            <p className="font-body text-2xs text-coffee-faint mb-2">
               O cupom só aparece no checkout para os leitores marcados.
             </p>
 
@@ -389,7 +389,7 @@ export default function ModalCupom({
                       <span className="block text-xs font-medium text-coffee truncate">
                         {u.full_name || u.email}
                       </span>
-                      <span className="block text-[0.68rem] text-coffee-faint truncate">
+                      <span className="block text-2xs text-coffee-faint truncate">
                         {u.email}
                       </span>
                     </span>

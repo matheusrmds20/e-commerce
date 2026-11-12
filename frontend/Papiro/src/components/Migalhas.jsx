@@ -2,7 +2,7 @@
 export default function Migalhas({ itens }) {
   return (
     <nav aria-label="Trilha de navegação">
-      <ol className="flex flex-wrap items-center gap-2 font-body text-[0.82rem] font-medium text-coffee-faint">
+      <ol className="flex flex-wrap items-center gap-2 font-body text-xs font-medium text-coffee-faint">
         {itens.map((item, i) => {
           const ultimo = i === itens.length - 1
           return (
@@ -14,7 +14,7 @@ export default function Migalhas({ itens }) {
               ) : (
                 <a
                   href="#"
-                  className="transition-colors duration-300 hover:text-gold"
+                  className="transition-colors duration-150 hover:text-gold"
                 >
                   {item.rotulo}
                 </a>

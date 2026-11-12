@@ -4,7 +4,7 @@ export default function Field({ label, id, error, children }) {
     <div className="group">
       <label
         htmlFor={id}
-        className="mb-2 block font-display text-[1.125rem] font-medium text-coffee transition-colors duration-300 group-focus-within:text-gold"
+        className="mb-2 block font-display text-lg font-medium text-coffee transition-colors duration-150 group-focus-within:text-gold"
       >
         {label}
       </label>

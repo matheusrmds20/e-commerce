@@ -38,7 +38,7 @@ export default function Confirmacao({
     >
       <div
         onClick={(event) => event.stopPropagation()}
-        className="w-full max-w-sm rounded-md bg-cream-soft p-8 text-center shadow-[0_18px_50px_-20px_rgba(75,54,33,0.35)] ring-1 ring-line"
+        className="w-full max-w-sm rounded-md bg-cream-soft p-8 text-center shadow-float ring-1 ring-line"
       >
         <h2
           id="confirmacao-titulo"
@@ -47,14 +47,14 @@ export default function Confirmacao({
           {titulo}
         </h2>
 
-        <p className="mt-3 font-body text-[0.92rem] leading-relaxed text-coffee-soft">
+        <p className="mt-3 font-body text-sm leading-relaxed text-coffee-soft">
           {descricao}
         </p>
 
         {erro && (
           <p
             role="alert"
-            className="mt-4 rounded-sm border border-[#a4533f]/30 bg-[#a4533f]/[0.06] px-3 py-2 font-body text-[0.8rem] font-medium text-[#a4533f]"
+            className="mt-4 rounded-sm border border-[#a4533f]/30 bg-[#a4533f]/[0.06] px-3 py-2 font-body text-xs font-medium text-[#a4533f]"
           >
             {erro.message}
           </p>
@@ -65,7 +65,7 @@ export default function Confirmacao({
             type="button"
             ref={botaoCancelarRef}
             onClick={onCancelar}
-            className="rounded-sm border border-line-strong px-6 py-3 font-body text-[0.7rem] font-semibold uppercase tracking-[0.2em] text-coffee-soft transition-colors duration-300 hover:border-coffee-soft"
+            className="rounded-sm border border-line-strong px-6 py-3 font-body text-2xs font-semibold uppercase tracking-[0.2em] text-coffee-soft transition-colors duration-150 hover:border-coffee-soft"
           >
             {textoCancelar}
           </button>
@@ -74,7 +74,7 @@ export default function Confirmacao({
             type="button"
             disabled={ocupado}
             onClick={onConfirmar}
-            className="rounded-sm bg-[#a4533f] px-6 py-3 font-body text-[0.7rem] font-semibold uppercase tracking-[0.2em] text-cream-soft shadow-md transition-all duration-300 hover:bg-[#8f4636] disabled:cursor-not-allowed disabled:opacity-60"
+            className="rounded-sm bg-[#a4533f] px-6 py-3 font-body text-2xs font-semibold uppercase tracking-[0.2em] text-cream-soft shadow-md transition-colors duration-150 hover:bg-[#8f4636] disabled:cursor-not-allowed disabled:opacity-60"
           >
             {ocupado ? textoOcupado : textoConfirmar}
           </button>

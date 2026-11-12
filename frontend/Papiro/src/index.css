@@ -13,9 +13,15 @@
   --color-coffee-soft: #6b5238;
   --color-coffee-faint: #9c8b74;
 
-  /* Caramelo / Couro */
+  /* Caramelo / Couro.
+   * `caramel` é acento, não texto: sobre creme dá ~2.8:1 e reprova em WCAG AA.
+   * Use em ícones, bordas, hovers de superfície e fundos — nunca em palavra.
+   * `caramel-dark` é o tom para texto: #96601f mede 4.7–5.1:1 sobre as quatro
+   * superfícies creme (cream, cream-deep, cream-soft, cream-tint), ou seja
+   * passa AA em texto pequeno. O valor anterior (#a86f33) ficava em 3.7–4.0:1,
+   * abaixo dos 4.5:1 exigidos para `text-xs`. */
   --color-caramel: #c68642;
-  --color-caramel-dark: #a86f33;
+  --color-caramel-dark: #96601f;
 
   /* Verde Floresta Profundo */
   --color-forest: #013220;
@@ -25,6 +31,12 @@
   /* Dourado Antigo */
   --color-gold: #b8860b;
   --color-gold-dark: #96690a;
+  /* Fundo de CTA dourado.
+   * `gold` puro (#b8860b) dá 4.36:1 com texto em `forest` — reprova AA por
+   * 0.14. Este tom é o mesmo matiz clareado até 5.36:1, então o botão
+   * continua dourado e o texto continua verde. Use `gold` para bordas,
+   * ícones e acentos; `gold-cta` quando houver texto em cima. */
+  --color-gold-cta: #c9971a;
 
   /* Hairlines e superfícies neutras */
   --color-line: #e2dcc8;
@@ -34,15 +46,70 @@
   --font-display: "Inter", system-ui, sans-serif;
   --font-body: "Inter", system-ui, sans-serif;
 
-  /* Pesos levemente mais altos para uma leitura mais presente em toda a interface. */
-  --font-weight-light: 500;
-  --font-weight-normal: 500;
-  --font-weight-medium: 600;
-  --font-weight-semibold: 700;
-  --font-weight-bold: 800;
+  /* ---------- Pesos ----------
+   * Escala nominal. A tentativa anterior de "encorpar" a interface subia
+   * light/normal para 500, e o efeito colateral era o site inteiro sem texto
+   * leve: `font-light` e `font-normal` viravam o mesmo peso, e sobre as seções
+   * escuras (floresta) o texto claro ficava pesado. Corpo de texto é 400;
+   * 500 fica para ênfase, não para tudo. */
+  --font-weight-light: 300;
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
 
-  /* ---------- Motion ---------- */
+  /* ---------- Escala tipográfica ----------
+   * Uma escala só para o produto inteiro. Um tamanho fora desta lista é
+   * ruído: se precisar de um valor novo, a hierarquia está errada.
+   *   2xs 12 · xs 13 · sm 14 · base 16 · lg 18 · xl 20
+   *   2xl 24 · 3xl 32 · 4xl 42 · 5xl 56
+   * line-height embutido para o corpo de texto já nascer legível. */
+  --text-2xs: 0.75rem;
+  --text-2xs--line-height: 1.45;
+  --text-xs: 0.8125rem;
+  --text-xs--line-height: 1.5;
+  --text-sm: 0.875rem;
+  --text-sm--line-height: 1.55;
+  --text-base: 1rem;
+  --text-base--line-height: 1.6;
+  --text-lg: 1.125rem;
+  --text-lg--line-height: 1.55;
+  --text-xl: 1.25rem;
+  --text-xl--line-height: 1.45;
+  --text-2xl: 1.5rem;
+  --text-2xl--line-height: 1.35;
+  --text-3xl: 2rem;
+  --text-3xl--line-height: 1.2;
+  --text-4xl: 2.625rem;
+  --text-4xl--line-height: 1.12;
+  --text-5xl: 3.5rem;
+  --text-5xl--line-height: 1.05;
+
+  /* ---------- Motion ----------
+   * Duas curvas, dois tempos. Hover é rápido porque a resposta precisa ser
+   * imediata; overlay (modal, menu) pode respirar. 300ms como padrão para tudo
+   * é o que fazia o site parecer "borrachudo": hover não deve ter a mesma
+   * duração de uma transição de tela. */
   --ease-cozy: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --duration-fast: 150ms; /* hover, foco, cor */
+  --duration-base: 250ms; /* overlay, menu, toast */
+
+  /* ---------- Sombras ----------
+   * Antes eram 12 sombras inline com 6 alphas diferentes de rgba(75,54,33,…).
+   * Três papéis cobrem tudo: `card` (superfície apoiada), `float` (overlay que
+   * precisa descolar do fundo) e `cover` (capa de livro, mais dramática no
+   * contato com o papel). */
+  --shadow-card: 0 1px 2px rgba(75, 54, 33, 0.05), 0 10px 24px -14px rgba(75, 54, 33, 0.38);
+  --shadow-float: 0 1px 2px rgba(75, 54, 33, 0.04), 0 18px 40px -18px rgba(75, 54, 33, 0.28);
+  --shadow-cover: 0 10px 28px -16px rgba(75, 54, 33, 0.55);
+
+  /* ---------- Anel de foco ----------
+   * Um valor para o site inteiro. Regra aplicada em @layer base, abaixo.
+   * Sobre fundo claro, forest dá ~12:1 (folgado sobre os 3:1 de WCAG 1.4.11).
+   * Sobre superfície florestal, o mesmo anel sumiria: por isso as classes
+   * utilitárias `anel-foco-claro` / `anel-foco-escuro` em @utility. */
+  --focus-ring-width: 2px;
+  --focus-ring-offset: 2px;
 
   /* ---------- Raios ----------
    * Escala curta e discreta: cantos suavizados, sem virar "app".
@@ -54,7 +121,7 @@
 
 @layer base {
   body {
-    @apply bg-cream-deep font-body text-[16px] font-normal text-coffee antialiased;
+    @apply bg-cream-deep font-body text-base font-normal text-coffee antialiased;
   }
 
   /* Grão de papel sutil */
@@ -71,14 +138,57 @@
   ::selection {
     @apply bg-gold/30;
   }
+
 }
 
-/* Rótulo em caixa alta, encorpado e espaçado — usado sobre seções */
+/* Foco: uma regra, não 35 componentes.
+ * - mouse/clique: nada pintado (`:focus-visible` só existe no teclado)
+ * - teclado: anel de 2px em forest (~12:1 sobre creme, acima dos 3:1 de
+ *   WCAG 1.4.11). Vale para todo controle nativo, inclusive os que ainda
+ *   não têm classe nenhuma de foco.
+ * - `outline-style` é declarado de propósito: o `focus:outline-none` do
+ *   Tailwind v4 grava `--tw-outline-style: none` numa custom property
+ *   compartilhada, e sem esta linha o anel herdaria `none` e sumiria.
+ * - Nada de `border-radius` aqui: o outline já segue o raio do elemento, e
+ *   forçar um valor vazaria para `[tabindex="-1"]` (contêineres de modal).
+ * - O offset de 2px mantém o anel colado ao elemento, sem vazar do layout.
+ * Sobre superfície florestal, use `anel-foco-claro` (dourado) para o anel
+ * não desaparecer. */
+:where(
+  a[href],
+  button,
+  input:not([type="hidden"]),
+  select,
+  textarea,
+  summary,
+  [tabindex]:not([tabindex="-1"])
+):focus-visible {
+  outline: 2px solid var(--color-forest);
+  outline-style: solid;
+  outline-width: 2px;
+  outline-color: var(--color-forest);
+  outline-offset: 2px;
+}
+
+/* Anel de foco sobre superfície escura (floresta): forest sobre forest é
+ * invisível, então sobe para dourado (~4.4:1) — ou creme quando pedido.
+ * Classe normal (não @utility) para ficar junto da regra global no fim da
+ * folha e ganhar no cascade: mesma especificidade, mais tarde. */
+.anel-foco-claro:focus-visible {
+  outline-color: var(--color-gold);
+}
+
+.anel-foco-escuro:focus-visible {
+  outline-color: var(--color-cream-deep);
+}
+
+/* Rótulo em caixa alta, encorpado e espaçado — um tamanho, um peso, para o
+ * site inteiro (rótulo de seção). Botão e selo usam a escala direto. */
 @utility label-caps {
-  @apply font-body text-[0.78rem] font-semibold uppercase tracking-[0.24em];
+  @apply font-body text-xs font-semibold uppercase tracking-[0.24em];
 }
 
 /* Campos de formulário — mesma aparência em todo o site */
 @utility campo {
-  @apply rounded-sm border border-line-strong bg-cream-soft px-4 font-body text-[0.95rem] font-normal text-coffee placeholder:text-coffee-faint transition-colors duration-300 focus:border-forest focus:outline-none;
+  @apply rounded-sm border border-line-strong bg-cream-soft px-4 font-body text-sm font-normal text-coffee placeholder:text-coffee-faint transition-colors duration-150 focus:outline-none focus-visible:border-forest focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest;
 }

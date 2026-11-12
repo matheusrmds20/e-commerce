@@ -8,6 +8,7 @@ from app.models.coupon import Coupon, DiscountType
 from app.services.pricing import (
     calcular_desconto,
     calcular_totais,
+    preco_com_desconto_produto,
     quantize,
     to_decimal,
 )
@@ -179,3 +180,30 @@ class TestQuantize:
     def test_half_up(self):
 
         assert quantize(Decimal("2.345")) == Decimal("2.35")
+
+
+class TestPrecoComDescontoProduto:
+    """Preço unitário gravado no pedido — o valor que o cliente paga."""
+
+    def test_sem_desconto_mantem_o_preco(self):
+        assert preco_com_desconto_produto(Decimal("50.00"), None) == Decimal("50.00")
+
+    def test_discount_pct_zero_nao_altera(self):
+        assert preco_com_desconto_produto(Decimal("50.00"), 0) == Decimal("50.00")
+
+    def test_aplica_percentual(self):
+        assert preco_com_desconto_produto(Decimal("100.00"), 10) == Decimal("90.00")
+
+    def test_quantiza_em_centavos(self):
+        # 33.33 com 15% = 28.3305 -> 28.33
+        assert preco_com_desconto_produto(Decimal("33.33"), 15) == Decimal("28.33")
+
+    def test_desconto_total_zera(self):
+        assert preco_com_desconto_produto(Decimal("50.00"), 100) == Decimal("0.00")
+
+    def test_aceita_float_do_modelo(self):
+        # `product.price` chega como float do SQLAlchemy.
+        assert preco_com_desconto_produto(50.0, 20) == Decimal("40.00")
+
+    def test_desconto_negativo_e_ignorado(self):
+        assert preco_com_desconto_produto(Decimal("50.00"), -10) == Decimal("50.00")

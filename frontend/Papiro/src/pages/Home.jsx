@@ -39,17 +39,17 @@ export default function Home() {
         <Hero />
         <section className="bg-cream-soft py-20">
           <div className="mx-auto max-w-[640px] px-5 text-center sm:px-8">
-            <p className="label-caps text-caramel">Catálogo indisponível</p>
-            <h2 className="mt-3 font-display text-[2rem] font-normal text-forest">
+            <p className="label-caps text-caramel-dark">Catálogo indisponível</p>
+            <h2 className="mt-3 font-display text-3xl font-normal text-forest">
               Não conseguimos carregar os livros agora
             </h2>
-            <p className="mt-3 font-body text-[0.95rem] text-coffee-soft">
+            <p className="mt-3 font-body text-sm text-coffee-soft">
               {erro.message ?? 'Verifique sua conexão e tente novamente.'}
             </p>
             <button
               type="button"
               onClick={carregar}
-              className="mt-7 inline-flex items-center justify-center rounded-sm bg-forest px-8 py-4 font-body text-xs font-semibold uppercase tracking-[0.2em] text-cream-soft transition-colors duration-300 hover:bg-forest-soft"
+              className="mt-7 inline-flex items-center justify-center rounded-sm bg-forest px-8 py-4 font-body text-xs font-semibold uppercase tracking-[0.2em] text-cream-soft transition-colors duration-150 hover:bg-forest-soft"
             >
               Tentar de novo
             </button>

@@ -12,7 +12,7 @@ export default function SeletorFrete({
     return (
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h3 className="font-body text-[1rem] font-semibold text-coffee">
+          <h3 className="font-body text-base font-semibold text-coffee">
             Frete
           </h3>
         </div>
@@ -29,7 +29,7 @@ export default function SeletorFrete({
     return (
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h3 className="font-body text-[1rem] font-semibold text-coffee">
+          <h3 className="font-body text-base font-semibold text-coffee">
             Frete
           </h3>
         </div>
@@ -47,10 +47,10 @@ export default function SeletorFrete({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="font-body text-[1rem] font-semibold text-coffee">
+        <h3 className="font-body text-base font-semibold text-coffee">
           Frete
         </h3>
-        <span className="font-body text-[0.72rem] uppercase tracking-[0.14em] text-coffee-faint">
+        <span className="font-body text-2xs uppercase tracking-[0.14em] text-coffee-faint">
           {ofertas.length} opção(oes)
         </span>
       </div>
@@ -61,7 +61,7 @@ export default function SeletorFrete({
           return (
             <label
               key={`${oferta.service_id}-${index}`}
-              className={`relative flex items-center justify-between gap-3 p-4 rounded-md border transition-all cursor-pointer ${
+              className={`relative flex items-center justify-between gap-3 p-4 rounded-md border transition-[border-color,background-color] duration-150 cursor-pointer ${
                 isSelected
                   ? 'border-forest bg-forest/[0.04] ring-1 ring-forest/30 shadow-xs'
                   : 'border-line-strong bg-cream-soft hover:border-gold/60 hover:bg-cream'
@@ -77,11 +77,11 @@ export default function SeletorFrete({
                 />
                 <div>
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-body text-[0.95rem] font-semibold text-coffee">
+                    <span className="font-body text-sm font-semibold text-coffee">
                       {oferta.name || oferta.company_name || `Opção ${index + 1}`}
                     </span>
                     {isSelected && (
-                      <span className="rounded-full bg-forest/15 px-2 py-0.5 font-body text-[0.68rem] font-bold text-forest uppercase tracking-wider">
+                      <span className="rounded-full bg-forest/15 px-2 py-0.5 font-body text-2xs font-bold text-forest uppercase tracking-wider">
                         Selecionado
                       </span>
                     )}

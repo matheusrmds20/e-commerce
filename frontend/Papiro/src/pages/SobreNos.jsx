@@ -41,11 +41,11 @@ export default function SobreNos() {
             ]}
           />
 
-          <p className="label-caps mt-6 text-caramel">Nossa Filosofia & Origem</p>
-          <h1 className="mt-3 font-display text-[2.5rem] font-normal leading-tight tracking-[-0.01em] text-forest sm:text-[3.5rem]">
+          <p className="label-caps mt-6 text-caramel-dark">Nossa Filosofia & Origem</p>
+          <h1 className="mt-3 font-display text-3xl font-normal leading-tight tracking-[-0.01em] text-forest sm:text-4xl">
             Conforto alinhado à personalidade.
           </h1>
-          <p className="mt-3 max-w-[42rem] font-body text-[0.98rem] font-normal leading-relaxed text-coffee-soft sm:text-[1.1rem]">
+          <p className="mt-3 max-w-[42rem] font-body text-sm font-normal leading-relaxed text-coffee-soft sm:text-lg">
             A Papiro nasceu do desejo de criar um refúgio para leitores que buscam
             mais do que comprar livros: buscam momentos de tranquilidade, estética
             cuidada e obras com alma.
@@ -58,10 +58,10 @@ export default function SobreNos() {
         <div className="grid gap-12 lg:grid-cols-12 lg:items-center">
           <div className="lg:col-span-7">
             <span className="label-caps text-gold">O Manifesto Papiro</span>
-            <h2 className="mt-3 font-display text-[2rem] leading-snug text-coffee sm:text-[2.6rem]">
+            <h2 className="mt-3 font-display text-3xl leading-snug text-coffee sm:text-4xl">
               Uma livraria feita à mão, para mentes que apreciam a pausa.
             </h2>
-            <div className="mt-6 space-y-4 font-body text-[0.95rem] font-light leading-relaxed text-coffee-soft">
+            <div className="mt-6 space-y-4 font-body text-sm leading-relaxed text-coffee-soft">
               <p>
                 Vivemos em uma época que exige velocidade constante. Na contramão
                 da pressa, a Papiro propõe uma volta ao essencial: o prazer tátil do
@@ -95,23 +95,23 @@ export default function SobreNos() {
               <h3 className="mt-6 font-display text-2xl text-forest">
                 Livraria Papiro
               </h3>
-              <p className="mt-1 font-body text-xs uppercase tracking-[0.2em] text-caramel">
+              <p className="mt-1 font-body text-xs uppercase tracking-[0.2em] text-caramel-dark">
                 Fundada para Dias Lentos
               </p>
-              <p className="mt-4 font-body text-sm font-light leading-relaxed text-coffee-soft">
+              <p className="mt-4 font-body text-sm leading-relaxed text-coffee-soft">
                 Curadoria independente, respeito ao tempo de cada obra e carinho
                 artesanal em cada entrega realizada.
               </p>
               <div className="mt-6 grid grid-cols-2 gap-4 border-t border-line/60 pt-5 text-center">
                 <div>
                   <p className="font-display text-2xl font-medium text-coffee">100%</p>
-                  <p className="text-[0.7rem] uppercase tracking-wider text-coffee-faint">
+                  <p className="text-2xs uppercase tracking-wider text-coffee-faint">
                     Humana & Independente
                   </p>
                 </div>
                 <div>
                   <p className="font-display text-2xl font-medium text-coffee">Zero</p>
-                  <p className="text-[0.7rem] uppercase tracking-wider text-coffee-faint">
+                  <p className="text-2xs uppercase tracking-wider text-coffee-faint">
                     Pressa ou Algoritmos
                   </p>
                 </div>
@@ -124,7 +124,7 @@ export default function SobreNos() {
         <div className="mt-20">
           <div className="text-center">
             <span className="label-caps text-gold">Nossos Princípios</span>
-            <h2 className="mt-2 font-display text-[2rem] text-forest sm:text-[2.5rem]">
+            <h2 className="mt-2 font-display text-3xl text-forest sm:text-4xl">
               O que nos move a cada página
             </h2>
           </div>
@@ -133,7 +133,7 @@ export default function SobreNos() {
             {pilares.map((pilar) => (
               <div
                 key={pilar.numero}
-                className="relative rounded-sm border border-line bg-cream-soft p-8 transition-all duration-300 hover:-translate-y-1 hover:border-gold/60 hover:shadow-md"
+                className="relative rounded-sm border border-line bg-cream-soft p-8 transition-[transform,box-shadow,border-color] duration-250 hover:-translate-y-1 hover:border-gold/60 hover:shadow-md"
               >
                 <span className="font-display text-5xl font-light text-coffee/10">
                   {pilar.numero}
@@ -141,10 +141,10 @@ export default function SobreNos() {
                 <h3 className="mt-3 font-display text-xl text-coffee">
                   {pilar.titulo}
                 </h3>
-                <p className="mt-1 font-body text-xs font-semibold uppercase tracking-wider text-caramel">
+                <p className="mt-1 font-body text-xs font-semibold uppercase tracking-wider text-caramel-dark">
                   {pilar.subtitulo}
                 </p>
-                <p className="mt-4 font-body text-sm font-light leading-relaxed text-coffee-soft">
+                <p className="mt-4 font-body text-sm leading-relaxed text-coffee-soft">
                   {pilar.descricao}
                 </p>
               </div>
@@ -157,7 +157,7 @@ export default function SobreNos() {
           <h2 className="font-display text-2xl text-cream sm:text-3xl">
             Pronto para encontrar sua próxima leitura?
           </h2>
-          <p className="mx-auto mt-3 max-w-xl font-body text-sm font-light text-cream/80 sm:text-base">
+          <p className="mx-auto mt-3 max-w-xl font-body text-sm text-cream/80 sm:text-base">
             Explore nossos livros selecionados a dedo e monte uma biblioteca
             que reflita verdadeiramente o seu aconchego e personalidade.
           </p>
@@ -165,7 +165,7 @@ export default function SobreNos() {
             <button
               type="button"
               onClick={() => navigate('/acervo')}
-              className="rounded-sm bg-gold px-8 py-3.5 font-body text-xs font-semibold uppercase tracking-[0.2em] text-forest transition-colors duration-300 hover:bg-gold-light shadow-sm"
+              className="rounded-sm bg-gold-cta px-8 py-3.5 font-body text-xs font-semibold uppercase tracking-[0.2em] text-forest transition-colors duration-150 hover:bg-gold shadow-sm"
             >
               Explorar o Acervo
             </button>

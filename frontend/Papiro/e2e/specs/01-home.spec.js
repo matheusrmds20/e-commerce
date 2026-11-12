@@ -12,7 +12,10 @@ test.describe('Home', () => {
   }) => {
     await page.goto('/')
 
-    // A sacola só aparece para usuários autenticados, então logamos primeiro.
+    // Sacola e busca são affordances permanentes: visíveis antes do login.
+    await expect(page.getByTestId('navbar-sacola')).toBeVisible()
+    await expect(page.getByRole('search')).toBeVisible()
+
     await registrarPelaUi({ email: emailUnico('home') })
 
     // Infra: navbar com sacola (navegação agora via react-router).

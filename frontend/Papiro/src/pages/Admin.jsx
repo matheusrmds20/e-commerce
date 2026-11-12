@@ -1,10 +1,12 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/auth-context'
+import { useToast } from '../context/toast-context'
 import { CloseIcon, SearchIcon } from '../components/Icons'
 import ModalCupom from '../components/ModalCupom'
 import ModalCategoria from '../components/ModalCategoria'
 import ModalUsuario from '../components/ModalUsuario'
+import ConfirmDialog from '../components/ConfirmDialog'
 import productService from '../api/products'
 import categoryService from '../api/categories'
 import adminService from '../api/admin'
@@ -178,6 +180,7 @@ function formatarStatus(st) {
 export default function Admin() {
   const navigate = useNavigate()
   const { usuario } = useAuth()
+  const { toast } = useToast()
   const ehAdmin = usuario?.role === 'admin'
 
   const [abaAtiva, setAbaAtiva] = useState('visao-geral')
@@ -186,6 +189,8 @@ export default function Admin() {
   const [livros, setLivros] = useState(LIVROS_FALLBACK)
   const [clientes, setClientes] = useState(CLIENTES_FALLBACK)
   const [categorias, setCategorias] = useState([])
+  // Diálogo de confirmação (substitui window.confirm)
+  const [confirmacao, setConfirmacao] = useState(null)
   // Estados de Newsletter
   const [inscritos, setInscritos] = useState([])
   // Estados de Cupons
@@ -533,15 +538,21 @@ export default function Admin() {
     await recarregarCupons()
   }
 
-  // Exclui um cupom
-  const handleExcluirCupom = async (cupom) => {
-    if (!window.confirm(`Excluir o cupom "${cupom.code}"?`)) return
-    try {
-      await couponService.excluir(cupom.id)
-      await recarregarCupons()
-    } catch (err) {
-      setErroAviso(err.message || 'Erro ao excluir o cupom.')
-    }
+  // Exclui um cupom (pede confirmação antes)
+  const handleExcluirCupom = (cupom) => {
+    setConfirmacao({
+      chave: `cupom-${cupom.id}`,
+      titulo: 'Excluir cupom',
+      mensagem: `Excluir o cupom "${cupom.code}"? Essa ação não pode ser desfeita.`,
+      confirmarTexto: 'Excluir',
+      perigo: true,
+      executar: async () => {
+        await couponService.excluir(cupom.id)
+        await recarregarCupons()
+        toast(`Cupom "${cupom.code}" excluído.`, { tipo: 'sucesso' })
+      },
+      mensagemFalha: 'Erro ao excluir o cupom.',
+    })
   }
 
   // ===================== Categorias =====================
@@ -575,15 +586,21 @@ export default function Admin() {
     setModalCategoria(false)
   }
 
-  // Exclui uma categoria
-  const handleExcluirCategoria = async (categoria) => {
-    if (!window.confirm(`Excluir a categoria "${categoria.name}"?`)) return
-    try {
-      await categoryService.excluir(categoria.id)
-      await recarregarCategorias()
-    } catch (err) {
-      setErroAviso(err.message || 'Erro ao excluir a categoria.')
-    }
+  // Exclui uma categoria (pede confirmação antes)
+  const handleExcluirCategoria = (categoria) => {
+    setConfirmacao({
+      chave: `categoria-${categoria.id}`,
+      titulo: 'Excluir categoria',
+      mensagem: `Excluir a categoria "${categoria.name}"? Essa ação não pode ser desfeita.`,
+      confirmarTexto: 'Excluir',
+      perigo: true,
+      executar: async () => {
+        await categoryService.excluir(categoria.id)
+        await recarregarCategorias()
+        toast(`Categoria "${categoria.name}" excluída.`, { tipo: 'sucesso' })
+      },
+      mensagemFalha: 'Erro ao excluir a categoria.',
+    })
   }
 
   // ===================== Usuários / Leitores =====================
@@ -643,19 +660,25 @@ export default function Admin() {
     await recarregarUsuarios().catch(() => null)
   }
 
-  // Desativa / exclui um usuário
-  const handleExcluirUsuario = async (usuario) => {
+  // Desativa / exclui um usuário (pede confirmação antes)
+  const handleExcluirUsuario = (usuario) => {
     const acao = usuario.is_active === false ? 'remover' : 'desativar'
-    if (!window.confirm(`Deseja realmente ${acao} o usuário "${usuario.full_name}"?`)) return
-    try {
-      await userService.excluir(usuario.id).catch(() => null)
-      setClientes((prev) =>
-        prev.map((u) => (u.id === usuario.id ? { ...u, is_active: false } : u)),
-      )
-      await recarregarUsuarios().catch(() => null)
-    } catch (err) {
-      setErroAviso(err.message || 'Erro ao desativar o usuário.')
-    }
+    setConfirmacao({
+      chave: `usuario-${usuario.id}`,
+      titulo: acao === 'remover' ? 'Remover usuário' : 'Desativar usuário',
+      mensagem: `Deseja realmente ${acao} o usuário "${usuario.full_name}"?`,
+      confirmarTexto: acao === 'remover' ? 'Remover' : 'Desativar',
+      perigo: true,
+      executar: async () => {
+        await userService.excluir(usuario.id).catch(() => null)
+        setClientes((prev) =>
+          prev.map((u) => (u.id === usuario.id ? { ...u, is_active: false } : u)),
+        )
+        await recarregarUsuarios().catch(() => null)
+        toast(`Usuário "${usuario.full_name}" ${acao === 'remover' ? 'removido' : 'desativado'}.`, { tipo: 'sucesso' })
+      },
+      mensagemFalha: 'Erro ao desativar o usuário.',
+    })
   }
 
   // Atualizar status do pedido
@@ -774,6 +797,18 @@ export default function Admin() {
     )
   }
 
+  /** Executa a ação confirmada no diálogo e fecha. */
+  const executarConfirmacao = async () => {
+    if (!confirmacao) return
+    const { executar, mensagemFalha } = confirmacao
+    setConfirmacao(null)
+    try {
+      await executar()
+    } catch (err) {
+      toast(err.message || mensagemFalha || 'Não foi possível concluir a ação.', { tipo: 'erro' })
+    }
+  }
+
   return (
     <div className="flex min-h-screen bg-cream-deep text-coffee">
       {/* Sidebar Administrativa */}
@@ -789,7 +824,7 @@ export default function Admin() {
                 <h1 className="font-display text-xl font-medium tracking-wide text-cream">
                   Papiro
                 </h1>
-                <p className="font-body text-[0.68rem] tracking-[0.22em] uppercase text-gold font-semibold">
+                <p className="font-body text-2xs tracking-[0.22em] uppercase text-gold font-semibold">
                   Curadoria & Gestão
                 </p>
               </div>
@@ -797,14 +832,14 @@ export default function Admin() {
           </div>
 
           {/* Links de navegação */}
-          <nav className="p-4 space-y-1 font-body text-[0.88rem]">
+          <nav className="p-4 space-y-1 font-body text-xs">
             <button
               type="button"
               onClick={() => setAbaAtiva('visao-geral')}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-sm text-left transition-colors duration-200 ${
                 abaAtiva === 'visao-geral'
-                  ? 'bg-gold text-forest font-semibold shadow-sm'
-                  : 'text-cream-soft hover:bg-forest-soft hover:text-cream'
+                  ? 'bg-gold-cta text-forest font-semibold shadow-sm anel-foco-escuro'
+                  : 'text-cream-soft hover:bg-forest-soft hover:text-cream anel-foco-claro'
               }`}
             >
               <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -818,8 +853,8 @@ export default function Admin() {
               onClick={() => setAbaAtiva('acervo')}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-sm text-left transition-colors duration-200 ${
                 abaAtiva === 'acervo'
-                  ? 'bg-gold text-forest font-semibold shadow-sm'
-                  : 'text-cream-soft hover:bg-forest-soft hover:text-cream'
+                  ? 'bg-gold-cta text-forest font-semibold shadow-sm anel-foco-escuro'
+                  : 'text-cream-soft hover:bg-forest-soft hover:text-cream anel-foco-claro'
               }`}
             >
               <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -836,8 +871,8 @@ export default function Admin() {
               onClick={() => setAbaAtiva('pedidos')}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-sm text-left transition-colors duration-200 ${
                 abaAtiva === 'pedidos'
-                  ? 'bg-gold text-forest font-semibold shadow-sm'
-                  : 'text-cream-soft hover:bg-forest-soft hover:text-cream'
+                  ? 'bg-gold-cta text-forest font-semibold shadow-sm anel-foco-escuro'
+                  : 'text-cream-soft hover:bg-forest-soft hover:text-cream anel-foco-claro'
               }`}
             >
               <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -854,8 +889,8 @@ export default function Admin() {
               onClick={() => setAbaAtiva('clientes')}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-sm text-left transition-colors duration-200 ${
                 abaAtiva === 'clientes'
-                  ? 'bg-gold text-forest font-semibold shadow-sm'
-                  : 'text-cream-soft hover:bg-forest-soft hover:text-cream'
+                  ? 'bg-gold-cta text-forest font-semibold shadow-sm anel-foco-escuro'
+                  : 'text-cream-soft hover:bg-forest-soft hover:text-cream anel-foco-claro'
               }`}
             >
               <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -872,8 +907,8 @@ export default function Admin() {
               onClick={() => setAbaAtiva('descontos')}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-sm text-left transition-colors duration-200 ${
                 abaAtiva === 'descontos'
-                  ? 'bg-gold text-forest font-semibold shadow-sm'
-                  : 'text-cream-soft hover:bg-forest-soft hover:text-cream'
+                  ? 'bg-gold-cta text-forest font-semibold shadow-sm anel-foco-escuro'
+                  : 'text-cream-soft hover:bg-forest-soft hover:text-cream anel-foco-claro'
               }`}
             >
               <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -890,8 +925,8 @@ export default function Admin() {
               onClick={() => setAbaAtiva('categorias')}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-sm text-left transition-colors duration-200 ${
                 abaAtiva === 'categorias'
-                  ? 'bg-gold text-forest font-semibold shadow-sm'
-                  : 'text-cream-soft hover:bg-forest-soft hover:text-cream'
+                  ? 'bg-gold-cta text-forest font-semibold shadow-sm anel-foco-escuro'
+                  : 'text-cream-soft hover:bg-forest-soft hover:text-cream anel-foco-claro'
               }`}
             >
               <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -908,8 +943,8 @@ export default function Admin() {
               onClick={() => setAbaAtiva('newsletter')}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-sm text-left transition-colors duration-200 ${
                 abaAtiva === 'newsletter'
-                  ? 'bg-gold text-forest font-semibold shadow-sm'
-                  : 'text-cream-soft hover:bg-forest-soft hover:text-cream'
+                  ? 'bg-gold-cta text-forest font-semibold shadow-sm anel-foco-escuro'
+                  : 'text-cream-soft hover:bg-forest-soft hover:text-cream anel-foco-claro'
               }`}
             >
               <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -938,7 +973,7 @@ export default function Admin() {
             </div>
             <div className="overflow-hidden">
               <p className="text-xs font-semibold text-cream truncate">Curador Geral</p>
-              <p className="text-[0.7rem] text-gold truncate">admin@papiro.com.br</p>
+              <p className="text-2xs text-gold truncate">admin@papiro.com.br</p>
             </div>
           </div>
         </div>
@@ -981,7 +1016,7 @@ export default function Admin() {
                   value={termoBusca}
                   onChange={(e) => setTermoBusca(e.target.value)}
                   placeholder="Filtrar nesta página..."
-                  className="w-60 sm:w-72 rounded-sm border border-line-strong bg-cream-soft pl-9 pr-3 py-1.5 font-body text-xs text-coffee placeholder:text-coffee-faint focus:border-forest focus:outline-none"
+                  className="w-60 sm:w-72 rounded-sm border border-line-strong bg-cream-soft pl-9 pr-3 py-1.5 font-body text-xs text-coffee placeholder:text-coffee-faint focus:border-forest focus:not-focus-visible:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest"
                 />
                 <span className="absolute left-2.5 top-2 text-coffee-faint pointer-events-none">
                   <SearchIcon />
@@ -1170,14 +1205,14 @@ export default function Admin() {
                     ]).map((sem, idx) => (
                       <div key={sem.label} className="flex-1 flex flex-col items-center gap-2">
                         <div
-                          className={`w-full rounded-t transition-all ${
+                          className={`w-full rounded-t transition-colors duration-150 ${
                             idx === 3 ? 'bg-gold hover:bg-gold-dark shadow-sm' : 'bg-forest-soft/40 hover:bg-forest'
                           }`}
                           style={{
                             height: `${Math.max(20, Math.min(100, (sem.amount / 1500) * 100))}%`,
                           }}
                         ></div>
-                        <span className={`text-[0.7rem] ${idx === 3 ? 'font-bold text-forest' : 'text-coffee-faint'}`}>
+                        <span className={`text-2xs ${idx === 3 ? 'font-bold text-forest' : 'text-coffee-faint'}`}>
                           {sem.label}
                         </span>
                       </div>
@@ -1212,7 +1247,7 @@ export default function Admin() {
                             <h4 className="font-display font-bold text-sm text-coffee truncate">
                               {l.title || l.titulo}
                             </h4>
-                            <p className="font-body text-[0.7rem] text-coffee-faint">
+                            <p className="font-body text-2xs text-coffee-faint">
                               {l.author || l.autor}
                             </p>
                           </div>
@@ -1259,7 +1294,7 @@ export default function Admin() {
 
               <div className="overflow-x-auto">
                 <table className="w-full text-left font-body text-sm">
-                  <thead className="bg-cream-tint/60 text-[0.72rem] uppercase tracking-[0.16em] text-coffee-faint border-b border-line">
+                  <thead className="bg-cream-tint/60 text-2xs uppercase tracking-[0.16em] text-coffee-faint border-b border-line">
                     <tr>
                       <th className="py-3.5 px-6 font-semibold">Título</th>
                       <th className="py-3.5 px-6 font-semibold">Autor</th>
@@ -1276,12 +1311,12 @@ export default function Admin() {
                         <td className="py-4 px-6 font-display font-bold text-coffee text-base">
                           {livro.titulo}
                           {livro.destaque && (
-                            <span className="ml-2 text-[0.65rem] uppercase tracking-wider px-2 py-0.5 bg-gold/20 text-gold-dark rounded font-body font-semibold">
+                            <span className="ml-2 text-2xs uppercase tracking-wider px-2 py-0.5 bg-gold/20 text-gold-dark rounded font-body font-semibold">
                               Destaque
                             </span>
                           )}
                           {livro.bestseller && (
-                            <span className="ml-1.5 text-[0.65rem] uppercase tracking-wider px-2 py-0.5 bg-forest-tint text-forest rounded font-body font-semibold">
+                            <span className="ml-1.5 text-2xs uppercase tracking-wider px-2 py-0.5 bg-forest-tint text-forest rounded font-body font-semibold">
                               Mais Vendido
                             </span>
                           )}
@@ -1355,7 +1390,7 @@ export default function Admin() {
 
               <div className="overflow-x-auto">
                 <table className="w-full text-left font-body text-sm">
-                  <thead className="bg-cream-tint/60 text-[0.72rem] uppercase tracking-[0.16em] text-coffee-faint border-b border-line">
+                  <thead className="bg-cream-tint/60 text-2xs uppercase tracking-[0.16em] text-coffee-faint border-b border-line">
                     <tr>
                       <th className="py-3.5 px-6 font-semibold">Código</th>
                       <th className="py-3.5 px-6 font-semibold">Cliente</th>
@@ -1375,7 +1410,7 @@ export default function Admin() {
                         </td>
                         <td className="py-4 px-6">
                           <p className="font-medium text-coffee">{pedido.cliente}</p>
-                          <p className="text-[0.7rem] text-coffee-faint">{pedido.email}</p>
+                          <p className="text-2xs text-coffee-faint">{pedido.email}</p>
                         </td>
                         <td className="py-4 px-6 text-xs">{pedido.itens}</td>
                         <td className="py-4 px-6 text-xs text-coffee-faint">{pedido.data}</td>
@@ -1407,7 +1442,7 @@ export default function Admin() {
                           <select
                             value={pedido.status}
                             onChange={(e) => handleAtualizarStatusPedido(pedido.rawId, pedido.id, e.target.value)}
-                            className="text-xs bg-cream-deep border border-line-strong rounded px-2 py-1 text-coffee focus:outline-none focus:border-forest"
+                            className="text-xs bg-cream-deep border border-line-strong rounded px-2 py-1 text-coffee focus:not-focus-visible:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest focus:border-forest"
                           >
                             <option value="pending">Aguardando Envio</option>
                             <option value="processing">Em Separação</option>
@@ -1489,7 +1524,7 @@ export default function Admin() {
 
               <div className="overflow-x-auto">
                 <table className="w-full text-left font-body text-sm">
-                  <thead className="bg-cream-tint/60 text-[0.72rem] uppercase tracking-[0.16em] text-coffee-faint border-b border-line">
+                  <thead className="bg-cream-tint/60 text-2xs uppercase tracking-[0.16em] text-coffee-faint border-b border-line">
                     <tr>
                       <th className="py-3.5 px-6 font-semibold">Leitor / Usuário</th>
                       <th className="py-3.5 px-6 font-semibold">E-mail</th>
@@ -1521,7 +1556,7 @@ export default function Admin() {
                                 <p className="font-display font-bold text-coffee text-base leading-tight">
                                   {cli.full_name}
                                 </p>
-                                <p className="font-mono text-[0.7rem] text-coffee-faint">
+                                <p className="font-mono text-2xs text-coffee-faint">
                                   ID #{cli.id}
                                 </p>
                               </div>
@@ -1530,7 +1565,7 @@ export default function Admin() {
                           <td className="py-4 px-6 text-xs text-coffee-soft">{cli.email}</td>
                           <td className="py-4 px-6">
                             <span
-                              className={`text-[0.68rem] uppercase tracking-wider font-semibold px-2 py-0.5 rounded ${
+                              className={`text-2xs uppercase tracking-wider font-semibold px-2 py-0.5 rounded ${
                                 cli.role === 'admin'
                                   ? 'bg-forest text-cream'
                                   : 'bg-gold/20 text-gold-dark'
@@ -1541,7 +1576,7 @@ export default function Admin() {
                           </td>
                           <td className="py-4 px-6">
                             <span
-                              className={`text-[0.68rem] uppercase tracking-wider font-semibold px-2 py-0.5 rounded ${
+                              className={`text-2xs uppercase tracking-wider font-semibold px-2 py-0.5 rounded ${
                                 cli.is_active !== false
                                   ? 'bg-forest-tint text-forest'
                                   : 'bg-red-100 text-red-700'
@@ -1617,7 +1652,7 @@ export default function Admin() {
 
               <div className="overflow-x-auto">
                 <table className="w-full text-left font-body text-sm">
-                  <thead className="bg-cream-tint/60 text-[0.72rem] uppercase tracking-[0.16em] text-coffee-faint border-b border-line">
+                  <thead className="bg-cream-tint/60 text-2xs uppercase tracking-[0.16em] text-coffee-faint border-b border-line">
                     <tr>
                       <th className="py-3.5 px-6 font-semibold">Código</th>
                       <th className="py-3.5 px-6 font-semibold">Desconto</th>
@@ -1644,7 +1679,7 @@ export default function Admin() {
                             <td className="py-4 px-6 font-mono text-xs font-semibold text-coffee">
                               {cupom.code}
                               {cupom.product_id && (
-                                <span className="ml-2 text-[0.65rem] uppercase tracking-wider px-2 py-0.5 bg-cream-deep text-coffee-faint rounded font-body font-semibold">
+                                <span className="ml-2 text-2xs uppercase tracking-wider px-2 py-0.5 bg-cream-deep text-coffee-faint rounded font-body font-semibold">
                                   Produto #{cupom.product_id}
                                 </span>
                               )}
@@ -1654,7 +1689,7 @@ export default function Admin() {
                                 ? `R$ ${Number(cupom.discount_value).toFixed(2).replace('.', ',')}`
                                 : `${cupom.discount_value}%`}
                               {cupom.max_discount != null && cupom.discount_type === 'percentage' && (
-                                <span className="block text-[0.65rem] font-body font-normal text-coffee-faint">
+                                <span className="block text-2xs font-body font-normal text-coffee-faint">
                                   máx. R$ {Number(cupom.max_discount).toFixed(2).replace('.', ',')}
                                 </span>
                               )}
@@ -1734,7 +1769,7 @@ export default function Admin() {
 
               <div className="overflow-x-auto">
                 <table className="w-full text-left font-body text-sm">
-                  <thead className="bg-cream-tint/60 text-[0.72rem] uppercase tracking-[0.16em] text-coffee-faint border-b border-line">
+                  <thead className="bg-cream-tint/60 text-2xs uppercase tracking-[0.16em] text-coffee-faint border-b border-line">
                     <tr>
                       <th className="py-3.5 px-6 font-semibold">ID</th>
                       <th className="py-3.5 px-6 font-semibold">Nome</th>
@@ -1810,7 +1845,7 @@ export default function Admin() {
 
               <div className="overflow-x-auto">
                 <table className="w-full text-left font-body text-sm">
-                  <thead className="bg-cream-tint/60 text-[0.72rem] uppercase tracking-[0.16em] text-coffee-faint border-b border-line">
+                  <thead className="bg-cream-tint/60 text-2xs uppercase tracking-[0.16em] text-coffee-faint border-b border-line">
                     <tr>
                       <th className="py-3.5 px-6 font-semibold">ID</th>
                       <th className="py-3.5 px-6 font-semibold">E-mail</th>
@@ -2057,6 +2092,18 @@ export default function Admin() {
           usuarioParaEditar={usuarioEditando}
         />
       )}
+
+      {/* Confirmação de exclusão (substitui window.confirm) */}
+      <ConfirmDialog
+        key={confirmacao?.chave}
+        aberto={Boolean(confirmacao)}
+        titulo={confirmacao?.titulo}
+        mensagem={confirmacao?.mensagem}
+        confirmarTexto={confirmacao?.confirmarTexto}
+        perigo={confirmacao?.perigo}
+        onCancelar={() => setConfirmacao(null)}
+        onConfirmar={executarConfirmacao}
+      />
     </div>
   )
 }

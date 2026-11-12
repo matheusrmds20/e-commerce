@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { ArrowRightIcon } from './Icons'
+import { atributosCapa } from '../lib/imagemCapa'
 
 /** Imagens de fallback quando a categoria não tem `image_url` no backend. */
 const IMAGENS_FALLBACK = [
@@ -23,13 +24,13 @@ export default function ProximaLeitura({ colecoes = [], carregando = false }) {
       <div className="mx-auto max-w-[1400px] px-5 sm:px-8">
         {/* Cabeçalho */}
         <div className="text-center">
-          <p className="label-caps text-caramel">Por atmosfera & humor</p>
+          <p className="label-caps text-caramel-dark">Por atmosfera & humor</p>
 
-          <h2 className="mt-3 font-display text-[2.5rem] font-normal leading-tight tracking-[-0.01em] text-forest sm:text-[3.25rem]">
+          <h2 className="mt-3 font-display text-3xl font-normal leading-tight tracking-[-0.01em] text-forest sm:text-4xl">
             Encontre sua próxima leitura
           </h2>
 
-          <p className="mx-auto mt-4 max-w-[36rem] font-body text-[0.98rem] font-normal leading-relaxed text-coffee-soft sm:text-[1.05rem]">
+          <p className="mx-auto mt-4 max-w-[36rem] font-body text-sm font-normal leading-relaxed text-coffee-soft sm:text-base">
             Escolha o sentimento que você deseja cultivar hoje e descubra obras selecionadas para cada estado de espírito.
           </p>
         </div>
@@ -57,14 +58,14 @@ export default function ProximaLeitura({ colecoes = [], carregando = false }) {
                     e.preventDefault()
                     navigate({ pathname: '/acervo', search: `?categoria=${col.id}` })
                   }}
-                  className="group relative flex min-h-[380px] flex-col justify-end overflow-hidden rounded-md border border-line bg-coffee p-6 transition-all duration-500 ease-[var(--ease-cozy)] hover:-translate-y-1 hover:border-gold hover:shadow-xl sm:min-h-[420px]"
+                  className="group relative flex min-h-[380px] flex-col justify-end overflow-hidden rounded-md border border-line bg-coffee p-6 transition-[transform,box-shadow,border-color] duration-250 ease-[var(--ease-cozy)] hover:-translate-y-1 hover:border-gold hover:shadow-xl sm:min-h-[420px]"
                 >
                   {/* Foto de fundo */}
                   <img
                     src={imagem}
                     alt={col.titulo}
                     className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 ease-[var(--ease-cozy)] group-hover:scale-110"
-                    loading="lazy"
+                  {...atributosCapa(imagem, { larguraExibida: 420, ajuste: 'cover-paisagem' })}
                   />
 
                   {/* Degradê escuro para legibilidade */}
@@ -73,26 +74,26 @@ export default function ProximaLeitura({ colecoes = [], carregando = false }) {
                   {/* Conteúdo do cartão */}
                   <div className="relative z-10 flex flex-col">
                     <div className="flex items-center justify-between">
-                      <span className="rounded-full bg-cream-soft/25 px-3 py-0.5 font-body text-[0.7rem] font-semibold uppercase tracking-[0.16em] text-cream-soft backdrop-blur-sm">
+                      <span className="rounded-full bg-cream-soft/25 px-3 py-0.5 font-body text-2xs font-semibold uppercase tracking-[0.16em] text-cream-soft backdrop-blur-sm">
                         Coleção
                       </span>
-                      <span className="font-body text-[0.78rem] font-medium text-cream/85">
+                      <span className="font-body text-xs font-medium text-cream/85">
                         {col.total}{' '}
                         {col.total === 1 ? 'livro' : 'livros'}
                       </span>
                     </div>
 
-                    <h3 className="mt-4 font-display text-[1.95rem] font-medium leading-snug text-cream-soft transition-colors duration-300 group-hover:text-gold">
+                    <h3 className="mt-4 font-display text-2xl font-medium leading-snug text-cream-soft transition-colors duration-150 group-hover:text-gold">
                       {col.titulo}
                     </h3>
 
                     {col.subtitulo && (
-                      <p className="mt-2 font-body text-[0.82rem] font-normal leading-relaxed text-cream/90">
+                      <p className="mt-2 font-body text-xs font-normal leading-relaxed text-cream/90">
                         {col.subtitulo}
                       </p>
                     )}
 
-                    <div className="mt-5 inline-flex items-center gap-2 font-body text-[0.75rem] font-semibold uppercase tracking-[0.2em] text-gold transition-all duration-300 group-hover:translate-x-1">
+                    <div className="mt-5 inline-flex items-center gap-2 font-body text-2xs font-semibold uppercase tracking-[0.2em] text-gold transition-transform duration-150 group-hover:translate-x-1">
                       <span>Ver coleção</span>
                       <ArrowRightIcon className="h-3.5 w-3.5" />
                     </div>

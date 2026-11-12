@@ -60,20 +60,20 @@ export default function Carrinho() {
   return (
     <main className="bg-cream-deep">
       <div className="mx-auto max-w-[1400px] px-5 py-12 sm:px-8 sm:py-16">
-        <h1 className="font-display text-[2.5rem] leading-tight font-normal text-coffee sm:text-[3.25rem]">
+        <h1 className="font-display text-3xl leading-tight font-normal text-coffee sm:text-4xl">
           Sacola de compras
         </h1>
 
         {/* Visitante — a sacola ainda não persiste no servidor */}
         {!autenticado && itens.length > 0 && (
           <div className="mt-6 flex flex-wrap items-center gap-x-3 gap-y-2 border-y border-line py-4">
-            <p className="font-body text-[0.9rem] text-coffee-soft">
+            <p className="font-body text-sm text-coffee-soft">
               Sua sacola ainda não está salva.
             </p>
             <button
               type="button"
               onClick={() => navigate('/login')}
-              className="font-body text-[0.8rem] font-semibold uppercase tracking-[0.16em] text-gold transition-colors duration-300 hover:text-caramel-dark"
+              className="font-body text-xs font-semibold uppercase tracking-[0.16em] text-gold transition-colors duration-150 hover:text-caramel-dark"
             >
               Entrar para salvar
             </button>
@@ -83,14 +83,14 @@ export default function Carrinho() {
         {(erro || acaoErro) && (
           <div
             role="alert"
-            className="mt-6 rounded-sm border border-[#a4533f]/30 bg-[#a4533f]/[0.06] px-4 py-3 font-body text-[0.86rem] font-medium tracking-wide text-[#a4533f]"
+            className="mt-6 rounded-sm border border-[#a4533f]/30 bg-[#a4533f]/[0.06] px-4 py-3 font-body text-xs font-medium tracking-wide text-[#a4533f]"
           >
             {acaoErro?.message ?? erro?.message}
           </div>
         )}
 
         {carregando && itens.length === 0 ? (
-          <p className="mt-10 border-y border-line py-16 text-center font-body text-[0.95rem] tracking-wide text-coffee-soft">
+          <p className="mt-10 border-y border-line py-16 text-center font-body text-sm tracking-wide text-coffee-soft">
             Abrindo sua sacola…
           </p>
         ) : itens.length === 0 ? (
@@ -103,16 +103,16 @@ export default function Carrinho() {
             <div>
               {/* Cabeçalho da tabela — só no desktop */}
               <div className="hidden border-b border-line pb-4 sm:grid sm:grid-cols-[96px_1fr_auto_auto] sm:gap-6">
-                <span className="font-body text-[0.95rem] font-semibold text-coffee">
+                <span className="font-body text-sm font-semibold text-coffee">
                   Livro
                 </span>
-                <span className="font-body text-[0.95rem] font-semibold text-coffee">
+                <span className="font-body text-sm font-semibold text-coffee">
                   Título
                 </span>
-                <span className="font-body text-[0.95rem] font-semibold text-coffee">
+                <span className="font-body text-sm font-semibold text-coffee">
                   Quantidade
                 </span>
-                <span className="min-w-[92px] text-right font-body text-[0.95rem] font-semibold text-coffee">
+                <span className="min-w-[92px] text-right font-body text-sm font-semibold text-coffee">
                   Preço
                 </span>
               </div>
@@ -129,7 +129,7 @@ export default function Carrinho() {
                 ))}
               </ul>
 
-              <p className="mt-6 font-body text-[0.88rem] font-medium italic text-coffee-faint">
+              <p className="mt-6 font-body text-xs font-medium italic text-coffee-faint">
                 {totalItens}{' '}
                 {totalItens === 1 ? 'exemplar' : 'exemplares'} na sacola
               </p>
@@ -147,7 +147,7 @@ export default function Carrinho() {
         {/* Recomendações — vindas do catálogo real */}
         {recomendadosLista.length > 0 && (
           <section className="mt-20 border-t border-line pt-14 sm:mt-24">
-            <h2 className="text-center font-display text-[2rem] leading-tight font-normal text-forest sm:text-[2.6rem]">
+            <h2 className="text-center font-display text-3xl leading-tight font-normal text-forest sm:text-4xl">
               Você também pode gostar destes momentos tranquilos
             </h2>
 
