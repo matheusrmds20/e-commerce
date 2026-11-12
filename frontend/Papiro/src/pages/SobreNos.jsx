@@ -165,7 +165,7 @@ export default function SobreNos() {
             <button
               type="button"
               onClick={() => navigate('/acervo')}
-              className="rounded-sm bg-gold px-8 py-3.5 font-body text-xs font-semibold uppercase tracking-[0.2em] text-forest transition-colors duration-150 hover:bg-gold-light shadow-sm"
+              className="rounded-sm bg-gold-cta px-8 py-3.5 font-body text-xs font-semibold uppercase tracking-[0.2em] text-forest transition-colors duration-150 hover:bg-gold shadow-sm"
             >
               Explorar o Acervo
             </button>

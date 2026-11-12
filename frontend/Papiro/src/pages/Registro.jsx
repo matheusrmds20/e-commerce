@@ -222,7 +222,7 @@ export default function Registro() {
  type="submit"
  data-testid="btn-registrar"
  disabled={enviando || sucesso}
- className="mt-2 w-full rounded-sm bg-gold py-4 font-body text-xs font-semibold uppercase tracking-[0.28em] text-forest shadow-md transition-[background-color,box-shadow] duration-150 ease-[var(--ease-cozy)] hover:bg-caramel hover:shadow-lg focus-visible:outline-gold disabled:cursor-not-allowed disabled:opacity-60"
+ className="mt-2 w-full rounded-sm bg-gold-cta py-4 font-body text-xs font-semibold uppercase tracking-[0.28em] text-forest shadow-md transition-[background-color,box-shadow] duration-150 ease-[var(--ease-cozy)] hover:bg-caramel hover:shadow-lg focus-visible:outline-gold disabled:cursor-not-allowed disabled:opacity-60"
  >
  {sucesso ? 'Conta criada' : enviando ? 'Criando…' : 'Criar conta'}
  </button>

@@ -31,6 +31,12 @@
   /* Dourado Antigo */
   --color-gold: #b8860b;
   --color-gold-dark: #96690a;
+  /* Fundo de CTA dourado.
+   * `gold` puro (#b8860b) dá 4.36:1 com texto em `forest` — reprova AA por
+   * 0.14. Este tom é o mesmo matiz clareado até 5.36:1, então o botão
+   * continua dourado e o texto continua verde. Use `gold` para bordas,
+   * ícones e acentos; `gold-cta` quando houver texto em cima. */
+  --color-gold-cta: #c9971a;
 
   /* Hairlines e superfícies neutras */
   --color-line: #e2dcc8;

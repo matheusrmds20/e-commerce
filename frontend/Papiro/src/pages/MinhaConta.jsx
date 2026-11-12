@@ -129,7 +129,7 @@ export default function MinhaConta() {
         <button
           type="button"
           onClick={() => navigate('/login')}
-          className="mt-8 rounded-sm bg-gold px-10 py-4 font-body text-xs font-semibold uppercase tracking-[0.28em] text-forest shadow-md transition-colors duration-150 hover:bg-caramel"
+          className="mt-8 rounded-sm bg-gold-cta px-10 py-4 font-body text-xs font-semibold uppercase tracking-[0.28em] text-forest shadow-md transition-colors duration-150 hover:bg-caramel"
         >
           Entrar
         </button>
@@ -442,7 +442,7 @@ function LeituraDados({ usuario, aoEditar }) {
       <button
         type="button"
         onClick={aoEditar}
-        className="mt-8 w-fit rounded-sm bg-gold px-10 py-3.5 font-body text-xs font-semibold uppercase tracking-[0.24em] text-forest shadow-md transition-colors duration-150 hover:bg-caramel"
+        className="mt-8 w-fit rounded-sm bg-gold-cta px-10 py-3.5 font-body text-xs font-semibold uppercase tracking-[0.24em] text-forest shadow-md transition-colors duration-150 hover:bg-caramel"
       >
         Editar dados
       </button>
@@ -544,7 +544,7 @@ function FormDados({ usuario, aoSalvar, aoCancelar }) {
         <button
           type="submit"
           disabled={salvando}
-          className="w-fit rounded-sm bg-gold px-10 py-3.5 font-body text-xs font-semibold uppercase tracking-[0.24em] text-forest shadow-md transition-colors duration-150 hover:bg-caramel disabled:opacity-60"
+          className="w-fit rounded-sm bg-gold-cta px-10 py-3.5 font-body text-xs font-semibold uppercase tracking-[0.24em] text-forest shadow-md transition-colors duration-150 hover:bg-caramel disabled:opacity-60"
         >
           {salvando ? 'Salvando…' : 'Salvar alterações'}
         </button>
@@ -732,7 +732,7 @@ function SecaoSenha({ usuario }) {
         <button
           type="submit"
           disabled={salvando}
-          className="w-fit rounded-sm bg-gold px-10 py-3.5 font-body text-xs font-semibold uppercase tracking-[0.24em] text-forest shadow-md transition-colors duration-150 hover:bg-caramel disabled:opacity-60"
+          className="w-fit rounded-sm bg-gold-cta px-10 py-3.5 font-body text-xs font-semibold uppercase tracking-[0.24em] text-forest shadow-md transition-colors duration-150 hover:bg-caramel disabled:opacity-60"
         >
           {salvando ? 'Alterando…' : 'Alterar senha'}
         </button>

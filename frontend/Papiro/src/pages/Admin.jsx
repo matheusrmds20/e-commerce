@@ -838,7 +838,7 @@ export default function Admin() {
               onClick={() => setAbaAtiva('visao-geral')}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-sm text-left transition-colors duration-200 ${
                 abaAtiva === 'visao-geral'
-                  ? 'bg-gold text-forest font-semibold shadow-sm anel-foco-escuro'
+                  ? 'bg-gold-cta text-forest font-semibold shadow-sm anel-foco-escuro'
                   : 'text-cream-soft hover:bg-forest-soft hover:text-cream anel-foco-claro'
               }`}
             >
@@ -853,7 +853,7 @@ export default function Admin() {
               onClick={() => setAbaAtiva('acervo')}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-sm text-left transition-colors duration-200 ${
                 abaAtiva === 'acervo'
-                  ? 'bg-gold text-forest font-semibold shadow-sm anel-foco-escuro'
+                  ? 'bg-gold-cta text-forest font-semibold shadow-sm anel-foco-escuro'
                   : 'text-cream-soft hover:bg-forest-soft hover:text-cream anel-foco-claro'
               }`}
             >
@@ -871,7 +871,7 @@ export default function Admin() {
               onClick={() => setAbaAtiva('pedidos')}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-sm text-left transition-colors duration-200 ${
                 abaAtiva === 'pedidos'
-                  ? 'bg-gold text-forest font-semibold shadow-sm anel-foco-escuro'
+                  ? 'bg-gold-cta text-forest font-semibold shadow-sm anel-foco-escuro'
                   : 'text-cream-soft hover:bg-forest-soft hover:text-cream anel-foco-claro'
               }`}
             >
@@ -889,7 +889,7 @@ export default function Admin() {
               onClick={() => setAbaAtiva('clientes')}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-sm text-left transition-colors duration-200 ${
                 abaAtiva === 'clientes'
-                  ? 'bg-gold text-forest font-semibold shadow-sm anel-foco-escuro'
+                  ? 'bg-gold-cta text-forest font-semibold shadow-sm anel-foco-escuro'
                   : 'text-cream-soft hover:bg-forest-soft hover:text-cream anel-foco-claro'
               }`}
             >
@@ -907,7 +907,7 @@ export default function Admin() {
               onClick={() => setAbaAtiva('descontos')}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-sm text-left transition-colors duration-200 ${
                 abaAtiva === 'descontos'
-                  ? 'bg-gold text-forest font-semibold shadow-sm anel-foco-escuro'
+                  ? 'bg-gold-cta text-forest font-semibold shadow-sm anel-foco-escuro'
                   : 'text-cream-soft hover:bg-forest-soft hover:text-cream anel-foco-claro'
               }`}
             >
@@ -925,7 +925,7 @@ export default function Admin() {
               onClick={() => setAbaAtiva('categorias')}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-sm text-left transition-colors duration-200 ${
                 abaAtiva === 'categorias'
-                  ? 'bg-gold text-forest font-semibold shadow-sm anel-foco-escuro'
+                  ? 'bg-gold-cta text-forest font-semibold shadow-sm anel-foco-escuro'
                   : 'text-cream-soft hover:bg-forest-soft hover:text-cream anel-foco-claro'
               }`}
             >
@@ -943,7 +943,7 @@ export default function Admin() {
               onClick={() => setAbaAtiva('newsletter')}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-sm text-left transition-colors duration-200 ${
                 abaAtiva === 'newsletter'
-                  ? 'bg-gold text-forest font-semibold shadow-sm anel-foco-escuro'
+                  ? 'bg-gold-cta text-forest font-semibold shadow-sm anel-foco-escuro'
                   : 'text-cream-soft hover:bg-forest-soft hover:text-cream anel-foco-claro'
               }`}
             >
