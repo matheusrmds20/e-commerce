@@ -189,6 +189,45 @@ class TestCreate:
         assert created.total == 100.0
         coupon_repo.get_by_id.assert_not_called()
 
+    def test_grava_preco_unitario_com_desconto_do_produto(
+        self,
+        order_service,
+        address_repo,
+        product_repo,
+        order_item_repo,
+        order_repo,
+        coupon_repo,
+    ):
+        """O item do pedido tem de registrar o preço que o cliente paga.
+
+        O bug corrigido em 7485ce2: gravava `product.price` cheio e ignorava
+        `discount_pct`, então a vitrine mostrava um valor e o Mercado Pago
+        cobrava outro.
+        """
+        address_repo.get_by_id.return_value = make_address()
+        product_repo.get_by_id.return_value = make_product(price=50.0, discount_pct=20)
+        order_item_repo.create_order_item.return_value = make_order_item()
+        order_repo.create.return_value = make_order()
+
+        order_service.create(1, order_create_payload())
+
+        assert order_item_repo.create_order_item.call_args.kwargs["price"] == 40.0
+
+    def test_sem_discount_pct_grava_preco_cheio(
+        self,
+        order_service,
+        address_repo,
+        product_repo,
+        order_item_repo,
+        order_repo,
+        coupon_repo,
+    ):
+        self._setup(address_repo, product_repo, order_item_repo, order_repo)
+
+        order_service.create(1, order_create_payload())
+
+        assert order_item_repo.create_order_item.call_args.kwargs["price"] == 50.0
+
     def test_success_with_percentage_coupon(
         self,
         order_service,
