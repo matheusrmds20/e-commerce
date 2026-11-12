@@ -169,11 +169,11 @@ export default function Acervo() {
             itens={[{ rotulo: 'Início' }, { rotulo: 'Acervo' }]}
           />
 
-          <p className="label-caps mt-6 text-caramel">Catálogo completo</p>
-          <h1 className="mt-3 font-display text-[2.5rem] font-normal leading-tight tracking-[-0.01em] text-forest sm:text-[3.25rem]">
+          <p className="label-caps mt-6 text-caramel-dark">Catálogo completo</p>
+          <h1 className="mt-3 font-display text-3xl font-normal leading-tight tracking-[-0.01em] text-forest sm:text-4xl">
             O Acervo
           </h1>
-          <p className="mt-3 max-w-[38rem] font-body text-[0.98rem] font-normal leading-relaxed text-coffee-soft sm:text-[1.05rem]">
+          <p className="mt-3 max-w-[38rem] font-body text-sm font-normal leading-relaxed text-coffee-soft sm:text-base">
             Todos os títulos disponíveis na livraria. Percorra com calma — aqui
             nada tem pressa.
           </p>
@@ -196,7 +196,7 @@ export default function Acervo() {
               onChange={(e) => setTermoBusca(e.target.value)}
               placeholder="Buscar por título, autor ou ISBN…"
               aria-label="Buscar no acervo"
-              className="w-full rounded-sm border border-line-strong bg-cream-soft px-4 py-2.5 pr-10 font-body text-[0.9rem] text-coffee placeholder:text-coffee-faint focus:border-forest focus:outline-none"
+              className="w-full rounded-sm border border-line-strong bg-cream-soft px-4 py-2.5 pr-10 font-body text-sm text-coffee placeholder:text-coffee-faint focus:not-focus-visible:outline-none focus-visible:border-forest focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest"
             />
             {termoBusca && (
               <button
@@ -213,7 +213,7 @@ export default function Acervo() {
 
         {/* Barra de estado + filtros */}
         <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
-          <p className="font-body text-[0.85rem] text-coffee-soft">
+          <p className="font-body text-xs text-coffee-soft">
             {carregando
               ? 'Carregando títulos…'
               : totalItens > 0
@@ -237,9 +237,9 @@ export default function Acervo() {
               <button
                 type="button"
                 onClick={() => filtrarPor(null)}
-                className={`rounded-sm px-4 py-2 font-body text-[0.72rem] font-semibold uppercase tracking-wider transition-all duration-300 ${
+                className={`rounded-sm px-4 py-2 font-body text-2xs font-semibold uppercase tracking-wider transition-colors duration-150 ${
                   !filtrando
-                    ? 'bg-forest text-cream-soft shadow-sm'
+                    ? 'bg-forest text-cream-soft shadow-sm anel-foco-claro'
                     : 'border border-line-strong bg-cream-soft text-coffee-soft hover:border-forest hover:text-forest'
                 }`}
               >
@@ -253,9 +253,9 @@ export default function Acervo() {
                     key={cat.id}
                     type="button"
                     onClick={() => filtrarPor(cat.id)}
-                    className={`rounded-sm px-4 py-2 font-body text-[0.72rem] font-semibold uppercase tracking-wider transition-all duration-300 ${
+                    className={`rounded-sm px-4 py-2 font-body text-2xs font-semibold uppercase tracking-wider transition-colors duration-150 ${
                       ativo
-                        ? 'bg-forest text-cream-soft shadow-sm'
+                        ? 'bg-forest text-cream-soft shadow-sm anel-foco-claro'
                         : 'border border-line-strong bg-cream-soft text-coffee-soft hover:border-forest hover:text-forest'
                     }`}
                   >
@@ -268,7 +268,11 @@ export default function Acervo() {
         </div>
 
         {/* Grade */}
-        <div className="mt-10 grid gap-8 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div
+          role="status"
+          aria-busy={carregando}
+          className="mt-10 grid gap-8 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+        >
           {carregando &&
             Array.from({ length: ITENS_POR_PAGINA }).map((_, i) => (
               <div key={`skeleton-${i}`} className="flex flex-col">

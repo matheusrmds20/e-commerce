@@ -294,16 +294,16 @@ export default function DetalheLivro() {
       <main className="bg-cream-deep">
         <div className="mx-auto max-w-[1400px] px-5 pt-7 sm:px-8">
           <div className="py-24 text-center">
-            <p className="font-display text-[1.8rem] text-coffee">
+            <p className="font-display text-2xl text-coffee">
               Não encontramos este livro.
             </p>
-            <p className="mt-3 font-body text-[0.95rem] text-coffee-soft">
+            <p className="mt-3 font-body text-sm text-coffee-soft">
               {erro?.message ?? 'Tente novamente em instantes.'}
             </p>
             <button
               type="button"
               onClick={carregar}
-              className="mt-6 rounded-sm bg-forest px-6 py-3 font-body text-xs font-semibold uppercase tracking-[0.2em] text-cream-soft transition-colors duration-300 hover:bg-forest-soft"
+              className="mt-6 rounded-sm bg-forest px-6 py-3 font-body text-xs font-semibold uppercase tracking-[0.2em] text-cream-soft transition-colors duration-150 hover:bg-forest-soft"
             >
               Tentar de novo
             </button>
@@ -321,11 +321,11 @@ export default function DetalheLivro() {
           <GaleriaLivro imagens={produto.imagens} titulo={produto.titulo} />
 
           <div>
-            <h1 className="font-display text-[2.5rem] leading-[1.1] font-normal tracking-[-0.01em] text-coffee sm:text-[3.2rem]">
+            <h1 className="font-display text-3xl leading-[1.1] font-normal tracking-[-0.01em] text-coffee sm:text-4xl">
               {produto.titulo}
             </h1>
 
-            <p className="mt-3 font-body text-[1rem] font-medium text-coffee-soft">
+            <p className="mt-3 font-body text-base font-medium text-coffee-soft">
               por{' '}
               <span className="text-coffee font-semibold">{produto.autor}</span>{' '}
               (Autor)
@@ -333,19 +333,19 @@ export default function DetalheLivro() {
 
             <div className="mt-3.5 flex flex-wrap items-center gap-3">
               <Estrelas nota={produto.nota} />
-              <span className="font-body text-[0.88rem] font-medium text-coffee-soft">
+              <span className="font-body text-xs font-medium text-coffee-soft">
                 {produto.nota} ({produto.totalAvaliacoes.toLocaleString('pt-BR')}{' '}
                 avaliações)
               </span>
               <a
                 href="#avaliacoes"
-                className="font-body text-[0.88rem] font-medium text-coffee transition-colors duration-300 hover:text-gold"
+                className="font-body text-xs font-medium text-coffee transition-colors duration-150 hover:text-gold"
               >
                 Ler avaliações
               </a>
             </div>
 
-            <p className="mt-6 max-w-[38rem] font-body text-[0.98rem] font-normal leading-relaxed text-coffee-soft">
+            <p className="mt-6 max-w-[38rem] font-body text-sm font-normal leading-relaxed text-coffee-soft">
               {produto.subtitulo}
             </p>
 

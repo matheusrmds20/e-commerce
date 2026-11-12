@@ -123,11 +123,11 @@ export default function MaisVendidos() {
             ]}
           />
 
-          <p className="label-caps mt-6 text-caramel">Os preferidos dos leitores</p>
-          <h1 className="mt-3 font-display text-[2.5rem] font-normal leading-tight tracking-[-0.01em] text-forest sm:text-[3.25rem]">
+          <p className="label-caps mt-6 text-caramel-dark">Os preferidos dos leitores</p>
+          <h1 className="mt-3 font-display text-3xl font-normal leading-tight tracking-[-0.01em] text-forest sm:text-4xl">
             Mais Vendidos
           </h1>
-          <p className="mt-3 max-w-[38rem] font-body text-[0.98rem] font-normal leading-relaxed text-coffee-soft sm:text-[1.05rem]">
+          <p className="mt-3 max-w-[38rem] font-body text-sm font-normal leading-relaxed text-coffee-soft sm:text-base">
             As obras mais lidas, celebradas e procuradas na Papiro. Seleção de
             leituras fundamentais que conquistaram nossa comunidade de leitores.
           </p>
@@ -148,7 +148,7 @@ export default function MaisVendidos() {
               }}
               placeholder="Buscar entre os mais vendidos…"
               aria-label="Buscar entre os mais vendidos"
-              className="w-full rounded-sm border border-line-strong bg-cream-soft px-4 py-2.5 pr-10 font-body text-[0.9rem] text-coffee placeholder:text-coffee-faint focus:border-forest focus:outline-none"
+              className="w-full rounded-sm border border-line-strong bg-cream-soft px-4 py-2.5 pr-10 font-body text-sm text-coffee placeholder:text-coffee-faint focus:border-forest focus:not-focus-visible:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest"
             />
             {termoBusca && (
               <button
@@ -170,9 +170,9 @@ export default function MaisVendidos() {
               <button
                 type="button"
                 onClick={() => filtrarPor(null)}
-                className={`rounded-sm px-4 py-2 font-body text-[0.72rem] font-semibold uppercase tracking-wider transition-all duration-300 ${
+                className={`rounded-sm px-4 py-2 font-body text-2xs font-semibold uppercase tracking-wider transition-colors duration-150 ${
                   categoriaId === null
-                    ? 'bg-forest text-cream-soft shadow-sm'
+                    ? 'bg-forest text-cream-soft shadow-sm anel-foco-claro'
                     : 'border border-line-strong bg-cream-soft text-coffee-soft hover:border-forest hover:text-forest'
                 }`}
               >
@@ -186,9 +186,9 @@ export default function MaisVendidos() {
                     key={cat.id}
                     type="button"
                     onClick={() => filtrarPor(cat.id)}
-                    className={`rounded-sm px-4 py-2 font-body text-[0.72rem] font-semibold uppercase tracking-wider transition-all duration-300 ${
+                    className={`rounded-sm px-4 py-2 font-body text-2xs font-semibold uppercase tracking-wider transition-colors duration-150 ${
                       ativo
-                        ? 'bg-forest text-cream-soft shadow-sm'
+                        ? 'bg-forest text-cream-soft shadow-sm anel-foco-claro'
                         : 'border border-line-strong bg-cream-soft text-coffee-soft hover:border-forest hover:text-forest'
                     }`}
                   >
@@ -202,7 +202,7 @@ export default function MaisVendidos() {
 
         {/* Informação de contagem */}
         <div className="mt-6 flex items-center justify-between">
-          <p className="font-body text-[0.85rem] text-coffee-soft">
+          <p className="font-body text-xs text-coffee-soft">
             {carregando
               ? 'Carregando os mais vendidos…'
               : totalItens > 0
@@ -218,7 +218,11 @@ export default function MaisVendidos() {
         </div>
 
         {/* Grade de Livros */}
-        <div className="mt-8 grid gap-8 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div
+          role="status"
+          aria-busy={carregando}
+          className="mt-8 grid gap-8 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+        >
           {carregando &&
             Array.from({ length: ITENS_POR_PAGINA }).map((_, i) => (
               <div key={`skeleton-${i}`} className="flex flex-col">
@@ -321,7 +325,7 @@ export default function MaisVendidos() {
             <button
               type="button"
               onClick={() => navigate('/acervo')}
-              className="mt-6 inline-block rounded-sm bg-forest px-8 py-3.5 font-body text-xs font-semibold uppercase tracking-[0.2em] text-cream-soft transition-colors duration-300 hover:bg-forest-soft shadow-sm"
+              className="mt-6 inline-block rounded-sm bg-forest px-8 py-3.5 font-body text-xs font-semibold uppercase tracking-[0.2em] text-cream-soft transition-colors duration-150 hover:bg-forest-soft shadow-sm"
             >
               Ver Todo o Acervo
             </button>

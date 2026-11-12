@@ -14,7 +14,7 @@ export default function SeletorEndereco({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="font-body text-[1rem] font-semibold text-coffee flex items-center gap-2">
+        <h3 className="font-body text-base font-semibold text-coffee flex items-center gap-2">
           <span>1. Endereço de Entrega</span>
         </h3>
         <button
@@ -54,7 +54,7 @@ export default function SeletorEndereco({
             return (
               <label
                 key={end.id}
-                className={`relative flex items-start justify-between gap-3 p-4 rounded-md border transition-all cursor-pointer ${
+                className={`relative flex items-start justify-between gap-3 p-4 rounded-md border transition-[border-color,background-color] duration-150 cursor-pointer ${
                   isSelected
                     ? 'border-forest bg-forest/[0.04] ring-1 ring-forest/30 shadow-xs'
                     : 'border-line-strong bg-cream-soft hover:border-gold/60 hover:bg-cream'
@@ -70,17 +70,17 @@ export default function SeletorEndereco({
                   />
                   <div>
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-body text-[0.95rem] font-semibold text-coffee">
+                      <span className="font-body text-sm font-semibold text-coffee">
                         {end.street}, {end.number}
                         {end.complement ? ` - ${end.complement}` : ''}
                       </span>
                       {end.is_default && (
-                        <span className="rounded-full bg-gold/15 px-2 py-0.5 font-body text-[0.68rem] font-bold text-gold-dark uppercase tracking-wider">
+                        <span className="rounded-full bg-gold/15 px-2 py-0.5 font-body text-2xs font-bold text-gold-dark uppercase tracking-wider">
                           Padrão
                         </span>
                       )}
                       {isSelected && (
-                        <span className="rounded-full bg-forest/15 px-2 py-0.5 font-body text-[0.68rem] font-bold text-forest uppercase tracking-wider">
+                        <span className="rounded-full bg-forest/15 px-2 py-0.5 font-body text-2xs font-bold text-forest uppercase tracking-wider">
                           Selecionado
                         </span>
                       )}

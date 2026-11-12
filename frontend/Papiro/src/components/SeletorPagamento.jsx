@@ -5,7 +5,7 @@ export default function SeletorPagamento({
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
-        <h3 className="font-body text-[1rem] font-semibold text-coffee">
+        <h3 className="font-body text-base font-semibold text-coffee">
           2. Método de Pagamento
         </h3>
       </div>
@@ -15,7 +15,7 @@ export default function SeletorPagamento({
         <button
           type="button"
           onClick={() => onMudarTipoPagamento('cartao')}
-          className={`flex flex-col items-center justify-center p-3 rounded-md border text-center transition-all ${
+          className={`flex flex-col items-center justify-center p-3 rounded-md border text-center transition-[border-color,background-color] duration-150 ${
             tipoPagamento === 'cartao'
               ? 'border-forest bg-forest/[0.05] ring-1 ring-forest/30 text-forest font-semibold shadow-xs'
               : 'border-line-strong bg-cream-soft text-coffee-soft hover:border-gold/60 hover:bg-cream'
@@ -28,7 +28,7 @@ export default function SeletorPagamento({
         <button
           type="button"
           onClick={() => onMudarTipoPagamento('pix')}
-          className={`flex flex-col items-center justify-center p-3 rounded-md border text-center transition-all ${
+          className={`flex flex-col items-center justify-center p-3 rounded-md border text-center transition-[border-color,background-color] duration-150 ${
             tipoPagamento === 'pix'
               ? 'border-forest bg-forest/[0.05] ring-1 ring-forest/30 text-forest font-semibold shadow-xs'
               : 'border-line-strong bg-cream-soft text-coffee-soft hover:border-gold/60 hover:bg-cream'
@@ -41,7 +41,7 @@ export default function SeletorPagamento({
         <button
           type="button"
           onClick={() => onMudarTipoPagamento('boleto')}
-          className={`flex flex-col items-center justify-center p-3 rounded-md border text-center transition-all ${
+          className={`flex flex-col items-center justify-center p-3 rounded-md border text-center transition-[border-color,background-color] duration-150 ${
             tipoPagamento === 'boleto'
               ? 'border-forest bg-forest/[0.05] ring-1 ring-forest/30 text-forest font-semibold shadow-xs'
               : 'border-line-strong bg-cream-soft text-coffee-soft hover:border-gold/60 hover:bg-cream'
@@ -68,7 +68,7 @@ export default function SeletorPagamento({
                 ambiente seguro do Mercado Pago para informar os dados do cartão. Nenhum
                 dado de cartão é armazenado por nós.
               </p>
-              <div className="mt-3 inline-flex items-center gap-1.5 rounded-sm bg-forest/10 px-2.5 py-1 text-[0.75rem] font-medium text-forest">
+              <div className="mt-3 inline-flex items-center gap-1.5 rounded-sm bg-forest/10 px-2.5 py-1 text-2xs font-medium text-forest">
                 ✓ Parcelamento e aprovação em tempo real
               </div>
             </div>
@@ -89,7 +89,7 @@ export default function SeletorPagamento({
               <p className="font-body text-xs text-coffee-soft mt-1 leading-relaxed">
                 O QR Code e o código Copia e Cola serão gerados imediatamente após clicar em <strong>Concluir compra</strong>. A confirmação do pagamento é instantânea.
               </p>
-              <div className="mt-3 inline-flex items-center gap-1.5 rounded-sm bg-forest/10 px-2.5 py-1 text-[0.75rem] font-medium text-forest">
+              <div className="mt-3 inline-flex items-center gap-1.5 rounded-sm bg-forest/10 px-2.5 py-1 text-2xs font-medium text-forest">
                 ✓ Desconto especial de até 5% e aprovação imediata
               </div>
             </div>
@@ -110,7 +110,7 @@ export default function SeletorPagamento({
               <p className="font-body text-xs text-coffee-soft mt-1 leading-relaxed">
                 O boleto será exibido para impressão ou cópia da linha digitável após a confirmação. O prazo de compensação é de até <strong>3 dias úteis</strong>.
               </p>
-              <p className="font-body text-[0.75rem] text-coffee-faint mt-2">
+              <p className="font-body text-2xs text-coffee-faint mt-2">
                 * O pedido será separado para envio somente após a confirmação bancária.
               </p>
             </div>

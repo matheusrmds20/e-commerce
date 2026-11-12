@@ -113,7 +113,7 @@ export default function ModalCategoria({
 
         <form onSubmit={enviar} className="mt-6 space-y-4 font-body">
           {erroGeral && (
-            <p className="rounded-sm bg-caramel-dark/10 px-4 py-2.5 text-[0.88rem] text-caramel-dark">
+            <p className="rounded-sm bg-caramel-dark/10 px-4 py-2.5 text-xs text-caramel-dark">
               {erroGeral}
             </p>
           )}
@@ -151,7 +151,7 @@ export default function ModalCategoria({
             {erros.slug ? (
               <p className="mt-1 text-xs text-caramel-dark">{erros.slug}</p>
             ) : (
-              <p className="mt-1 text-[0.7rem] text-coffee-faint">
+              <p className="mt-1 text-2xs text-coffee-faint">
                 Identificador na URL. Precisa ser único.
               </p>
             )}

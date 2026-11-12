@@ -12,6 +12,7 @@ import { toApiError } from '../api/client'
 import Field from '../components/Field'
 import ModalEndereco from '../components/ModalEndereco'
 import Confirmacao from '../components/Confirmacao'
+import { atributosCapa } from '../lib/imagemCapa'
 
 /* ------------------------------------------------------------------ */
 /* Ícones simples da navegação lateral                                 */
@@ -72,7 +73,7 @@ const ROTULOS_STATUS = {
 
 const CORES_STATUS = {
   pending: 'border-line-strong text-coffee-soft',
-  processing: 'border-gold/50 text-caramel',
+  processing: 'border-gold/50 text-caramel-dark',
   shipped: 'border-forest/40 text-forest',
   delivered: 'border-forest/40 text-forest',
   completed: 'border-forest/40 text-forest',
@@ -128,7 +129,7 @@ export default function MinhaConta() {
         <button
           type="button"
           onClick={() => navigate('/login')}
-          className="mt-8 rounded-sm bg-gold px-10 py-4 font-body text-xs font-semibold uppercase tracking-[0.28em] text-cream-soft shadow-md transition-all duration-300 hover:bg-caramel"
+          className="mt-8 rounded-sm bg-gold px-10 py-4 font-body text-xs font-semibold uppercase tracking-[0.28em] text-forest shadow-md transition-colors duration-150 hover:bg-caramel"
         >
           Entrar
         </button>
@@ -138,17 +139,17 @@ export default function MinhaConta() {
 
   return (
     <main className="mx-auto w-full max-w-6xl px-5 py-14 sm:py-20">
-      <div className="flex flex-col overflow-hidden rounded-md bg-cream-soft shadow-[0_18px_50px_-20px_rgba(75,54,33,0.22)] ring-1 ring-line md:flex-row">
+      <div className="flex flex-col overflow-hidden rounded-md bg-cream-soft shadow-float ring-1 ring-line md:flex-row">
         {/* Coluna lateral */}
         <aside className="border-b border-line bg-cream md:w-[280px] md:border-b-0 md:border-r">
           <div className="flex items-center gap-4 px-8 py-10">
             <div className="grid h-16 w-16 shrink-0 place-items-center rounded-full bg-gold/15 ring-1 ring-gold/40">
-              <span className="font-display text-2xl font-medium text-caramel">
+              <span className="font-display text-2xl font-medium text-caramel-dark">
                 {usuario?.full_name?.[0]?.toUpperCase() ?? '?'}
               </span>
             </div>
             <div>
-              <p className="font-body text-[0.78rem] uppercase tracking-[0.2em] text-coffee-faint">
+              <p className="font-body text-xs uppercase tracking-[0.2em] text-coffee-faint">
                 Bem-vindo,
               </p>
               <p className="mt-1 font-display text-xl text-coffee">
@@ -163,10 +164,10 @@ export default function MinhaConta() {
                 key={id}
                 type="button"
                 onClick={() => setAba(id)}
-                className={`flex items-center gap-3 rounded-sm px-4 py-3 text-left font-body text-[0.92rem] transition-colors duration-300 ${
+                className={`flex items-center gap-3 rounded-sm px-4 py-3 text-left font-body text-sm transition-colors duration-150 ${
                   aba === id
-                    ? 'bg-gold/12 font-semibold text-caramel'
-                    : 'text-coffee-soft hover:bg-gold/[0.06] hover:text-caramel'
+                    ? 'bg-gold/12 font-semibold text-caramel-dark'
+                    : 'text-coffee-soft hover:bg-gold/[0.06] hover:text-caramel-dark'
                 }`}
               >
                 <Icone />
@@ -270,7 +271,7 @@ function AbaPedidos() {
       <h2 className="font-display text-3xl text-coffee">Meus pedidos</h2>
 
       {erro && (
-        <div role="alert" className="mt-6 rounded-sm border border-[#a4533f]/30 bg-[#a4533f]/[0.06] px-4 py-3 font-body text-[0.86rem] text-[#a4533f]">
+        <div role="alert" className="mt-6 rounded-sm border border-[#a4533f]/30 bg-[#a4533f]/[0.06] px-4 py-3 font-body text-xs text-[#a4533f]">
           {erro.message}
         </div>
       )}
@@ -294,11 +295,11 @@ function AbaPedidos() {
         {pedidos?.map((pedido) => (
           <li
             key={pedido.id}
-            className="rounded-sm border border-line bg-cream-soft/60 px-6 py-5 transition-shadow duration-300 hover:shadow-md"
+            className="rounded-sm border border-line bg-cream-soft/60 px-6 py-5 transition-shadow duration-150 hover:shadow-md"
           >
             <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
               <div className="min-w-[130px]">
-                <p className="font-body text-[0.72rem] uppercase tracking-[0.18em] text-coffee-faint">
+                <p className="font-body text-2xs uppercase tracking-[0.18em] text-coffee-faint">
                   Pedido #{pedido.id}
                 </p>
                 <p className="mt-1 font-display text-lg text-coffee">
@@ -307,7 +308,7 @@ function AbaPedidos() {
               </div>
 
               <span
-                className={`rounded-full border px-4 py-1 font-body text-[0.74rem] font-medium uppercase tracking-[0.14em] ${corStatus(pedido.status)}`}
+                className={`rounded-full border px-4 py-1 font-body text-2xs font-medium uppercase tracking-[0.14em] ${corStatus(pedido.status)}`}
               >
                 {rotuloStatus(pedido.status)}
               </span>
@@ -319,7 +320,7 @@ function AbaPedidos() {
               <button
                 type="button"
                 onClick={() => alternar(pedido)}
-                className="ml-auto rounded-sm bg-forest px-5 py-2.5 font-body text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-cream-soft transition-colors duration-300 hover:bg-forest-soft"
+                className="ml-auto rounded-sm bg-forest px-5 py-2.5 font-body text-2xs font-semibold uppercase tracking-[0.18em] text-cream-soft transition-colors duration-150 hover:bg-forest-soft"
               >
                 {expandido === pedido.id ? 'Ocultar' : 'Ver detalhes'}
               </button>
@@ -328,7 +329,7 @@ function AbaPedidos() {
                 <button
                   type="button"
                   onClick={() => setParaCancelar(pedido)}
-                  className="rounded-sm border border-[#a4533f]/40 px-5 py-2.5 font-body text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-[#a4533f] transition-colors duration-300 hover:bg-[#a4533f]/[0.08]"
+                  className="rounded-sm border border-[#a4533f]/40 px-5 py-2.5 font-body text-2xs font-semibold uppercase tracking-[0.18em] text-[#a4533f] transition-colors duration-150 hover:bg-[#a4533f]/[0.08]"
                 >
                   Cancelar pedido
                 </button>
@@ -343,14 +344,14 @@ function AbaPedidos() {
                     className="flex items-center justify-between gap-4 py-3"
                   >
                     <div>
-                      <p className="font-body text-[0.92rem] text-coffee">
+                      <p className="font-body text-sm text-coffee">
                         {titulos[item.product_id] ?? `Livro #${item.product_id}`}
                       </p>
-                      <p className="mt-0.5 font-body text-[0.78rem] text-coffee-faint">
+                      <p className="mt-0.5 font-body text-xs text-coffee-faint">
                         {item.quantity} × {formatarPreco(item.price)}
                       </p>
                     </div>
-                    <p className="font-body text-[0.9rem] font-medium text-coffee">
+                    <p className="font-body text-sm font-medium text-coffee">
                       {formatarPreco(item.quantity * item.price)}
                     </p>
                   </li>
@@ -416,10 +417,10 @@ function AbaDados() {
 function LinhaDado({ rotulo, valor }) {
   return (
     <div className="flex flex-col gap-1 border-b border-line py-4 sm:flex-row sm:items-baseline sm:justify-between sm:gap-6">
-      <dt className="font-body text-[0.75rem] font-medium uppercase tracking-[0.18em] text-coffee-faint">
+      <dt className="font-body text-2xs font-medium uppercase tracking-[0.18em] text-coffee-faint">
         {rotulo}
       </dt>
-      <dd className="font-display text-[1.05rem] text-coffee">{valor}</dd>
+      <dd className="font-display text-base text-coffee">{valor}</dd>
     </div>
   )
 }
@@ -441,7 +442,7 @@ function LeituraDados({ usuario, aoEditar }) {
       <button
         type="button"
         onClick={aoEditar}
-        className="mt-8 w-fit rounded-sm bg-gold px-10 py-3.5 font-body text-xs font-semibold uppercase tracking-[0.24em] text-cream-soft shadow-md transition-all duration-300 hover:bg-caramel"
+        className="mt-8 w-fit rounded-sm bg-gold px-10 py-3.5 font-body text-xs font-semibold uppercase tracking-[0.24em] text-forest shadow-md transition-colors duration-150 hover:bg-caramel"
       >
         Editar dados
       </button>
@@ -507,7 +508,7 @@ function FormDados({ usuario, aoSalvar, aoCancelar }) {
   return (
     <form onSubmit={handleSubmit} noValidate className="mt-8 flex max-w-md flex-col gap-7">
       {erro && !erro.details && (
-        <div role="alert" className="rounded-sm border border-[#a4533f]/30 bg-[#a4533f]/[0.06] px-4 py-3 font-body text-[0.86rem] text-[#a4533f]">
+        <div role="alert" className="rounded-sm border border-[#a4533f]/30 bg-[#a4533f]/[0.06] px-4 py-3 font-body text-xs text-[#a4533f]">
           {erro.message}
         </div>
       )}
@@ -522,7 +523,7 @@ function FormDados({ usuario, aoSalvar, aoCancelar }) {
           onChange={handleChange}
           required
           minLength={3}
-          className="w-full bg-transparent pb-2 font-display text-[1.05rem] text-coffee focus:outline-none"
+          className="w-full bg-transparent focus-visible:outline-offset-[-2px] pb-2 font-display text-base text-coffee focus:not-focus-visible:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest"
         />
       </Field>
 
@@ -535,7 +536,7 @@ function FormDados({ usuario, aoSalvar, aoCancelar }) {
           value={form.email}
           onChange={handleChange}
           required
-          className="w-full bg-transparent pb-2 font-display text-[1.05rem] text-coffee focus:outline-none"
+          className="w-full bg-transparent focus-visible:outline-offset-[-2px] pb-2 font-display text-base text-coffee focus:not-focus-visible:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest"
         />
       </Field>
 
@@ -543,7 +544,7 @@ function FormDados({ usuario, aoSalvar, aoCancelar }) {
         <button
           type="submit"
           disabled={salvando}
-          className="w-fit rounded-sm bg-gold px-10 py-3.5 font-body text-xs font-semibold uppercase tracking-[0.24em] text-cream-soft shadow-md transition-all duration-300 hover:bg-caramel disabled:opacity-60"
+          className="w-fit rounded-sm bg-gold px-10 py-3.5 font-body text-xs font-semibold uppercase tracking-[0.24em] text-forest shadow-md transition-colors duration-150 hover:bg-caramel disabled:opacity-60"
         >
           {salvando ? 'Salvando…' : 'Salvar alterações'}
         </button>
@@ -551,7 +552,7 @@ function FormDados({ usuario, aoSalvar, aoCancelar }) {
           type="button"
           onClick={aoCancelar}
           disabled={salvando}
-          className="w-fit rounded-sm border border-line-strong px-10 py-3.5 font-body text-xs font-semibold uppercase tracking-[0.24em] text-coffee-soft transition-all duration-300 hover:border-gold hover:text-gold disabled:opacity-60"
+          className="w-fit rounded-sm border border-line-strong px-10 py-3.5 font-body text-xs font-semibold uppercase tracking-[0.24em] text-coffee-soft transition-colors duration-150 hover:border-gold hover:text-gold disabled:opacity-60"
         >
           Cancelar
         </button>
@@ -580,13 +581,13 @@ function CampoSenha({ id, label, autoComplete, valor, onChange, erro, mostrar, a
           value={valor}
           onChange={onChange}
           required
-          className="w-full bg-transparent pb-2 font-display text-[1.05rem] tracking-[0.08em] text-coffee placeholder:tracking-normal focus:outline-none"
+          className="w-full bg-transparent focus-visible:outline-offset-[-2px] pb-2 font-display text-base tracking-[0.08em] text-coffee placeholder:tracking-normal focus:not-focus-visible:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest"
         />
         <button
           type="button"
           onClick={alternarMostrar}
           aria-label={mostrar ? 'Ocultar senha' : 'Mostrar senha'}
-          className="pb-2 font-body text-[0.75rem] font-medium uppercase tracking-[0.18em] text-coffee-faint transition-colors duration-300 hover:text-gold"
+          className="pb-2 font-body text-2xs font-medium uppercase tracking-[0.18em] text-coffee-faint transition-colors duration-150 hover:text-gold"
         >
           {mostrar ? 'Ocultar' : 'Mostrar'}
         </button>
@@ -674,7 +675,7 @@ function SecaoSenha({ usuario }) {
           type="button"
           onClick={() => setAberta((v) => !v)}
           aria-expanded={aberta}
-          className="w-fit rounded-sm border border-line-strong px-6 py-2.5 font-body text-[0.7rem] font-semibold uppercase tracking-[0.24em] text-coffee-soft transition-all duration-300 hover:border-gold hover:text-gold"
+          className="w-fit rounded-sm border border-line-strong px-6 py-2.5 font-body text-2xs font-semibold uppercase tracking-[0.24em] text-coffee-soft transition-colors duration-150 hover:border-gold hover:text-gold"
         >
           {aberta ? 'Fechar' : 'Alterar senha'}
         </button>
@@ -683,13 +684,13 @@ function SecaoSenha({ usuario }) {
       {aberta && (
         <>
           {sucesso && (
-            <div role="status" className="mt-6 rounded-sm border border-gold/40 bg-gold/[0.08] px-4 py-3 font-body text-[0.86rem] text-coffee">
+            <div role="status" className="mt-6 rounded-sm border border-gold/40 bg-gold/[0.08] px-4 py-3 font-body text-xs text-coffee">
               {sucesso}
             </div>
           )}
 
           {erro && !erro.details && (
-            <div role="alert" className="mt-6 rounded-sm border border-[#a4533f]/30 bg-[#a4533f]/[0.06] px-4 py-3 font-body text-[0.86rem] text-[#a4533f]">
+            <div role="alert" className="mt-6 rounded-sm border border-[#a4533f]/30 bg-[#a4533f]/[0.06] px-4 py-3 font-body text-xs text-[#a4533f]">
               {erro.message}
             </div>
           )}
@@ -731,7 +732,7 @@ function SecaoSenha({ usuario }) {
         <button
           type="submit"
           disabled={salvando}
-          className="w-fit rounded-sm bg-gold px-10 py-3.5 font-body text-xs font-semibold uppercase tracking-[0.24em] text-cream-soft shadow-md transition-all duration-300 hover:bg-caramel disabled:opacity-60"
+          className="w-fit rounded-sm bg-gold px-10 py-3.5 font-body text-xs font-semibold uppercase tracking-[0.24em] text-forest shadow-md transition-colors duration-150 hover:bg-caramel disabled:opacity-60"
         >
           {salvando ? 'Alterando…' : 'Alterar senha'}
         </button>
@@ -821,7 +822,7 @@ function AbaWishlist() {
       <h2 className="font-display text-3xl text-coffee">Lista de desejos</h2>
 
       {erro && (
-        <div role="alert" className="mt-6 rounded-sm border border-[#a4533f]/30 bg-[#a4533f]/[0.06] px-4 py-3 font-body text-[0.86rem] text-[#a4533f]">
+        <div role="alert" className="mt-6 rounded-sm border border-[#a4533f]/30 bg-[#a4533f]/[0.06] px-4 py-3 font-body text-xs text-[#a4533f]">
           {erro.message}
         </div>
       )}
@@ -855,6 +856,7 @@ function AbaWishlist() {
                     src={produto.image_url}
                     alt={produto?.title ?? ''}
                     className="h-full w-full object-cover"
+                  {...atributosCapa(produto.image_url, { larguraExibida: 48, ajuste: 'cover-retrato' })}
                   />
                 ) : (
                   <span className="font-display text-lg text-coffee-faint">¶</span>
@@ -865,7 +867,7 @@ function AbaWishlist() {
                 <p className="truncate font-display text-lg text-coffee">
                   {produto ? produto.title : `Livro #${item.product_id}`}
                 </p>
-                <p className="mt-0.5 truncate font-body text-[0.82rem] text-coffee-soft">
+                <p className="mt-0.5 truncate font-body text-xs text-coffee-soft">
                   {produto?.author ?? ''}
                 </p>
               </div>
@@ -880,7 +882,7 @@ function AbaWishlist() {
                 type="button"
                 onClick={() => setParaExcluir(item)}
                 aria-label="Remover da lista de desejos"
-                className="shrink-0 text-coffee-faint transition-colors duration-300 hover:text-[#a4533f]"
+                className="shrink-0 text-coffee-faint transition-colors duration-150 hover:text-[#a4533f]"
               >
                 <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5" aria-hidden="true">
                   <path d="M12 20s-7.5-4.9-7.5-10A4.2 4.2 0 0 1 12 7.6 4.2 4.2 0 0 1 19.5 10c0 5.1-7.5 10-7.5 10Z" />
@@ -952,7 +954,7 @@ function AbaEnderecos() {
         <button
           type="button"
           onClick={() => abrirModal({ modo: 'novo' })}
-          className="rounded-sm border border-line-strong px-5 py-2.5 font-body text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-coffee-soft transition-colors duration-300 hover:border-gold hover:text-caramel"
+          className="rounded-sm border border-line-strong px-5 py-2.5 font-body text-2xs font-semibold uppercase tracking-[0.18em] text-coffee-soft transition-colors duration-150 hover:border-gold hover:text-caramel-dark"
         >
           Novo endereço
         </button>
@@ -975,12 +977,12 @@ function AbaEnderecos() {
                 {endereco.street}, {endereco.number}
                 {endereco.complement ? ` — ${endereco.complement}` : ''}
               </p>
-              <p className="mt-1 font-body text-[0.85rem] text-coffee-soft">
+              <p className="mt-1 font-body text-xs text-coffee-soft">
                 {endereco.neighborhood}, {endereco.city} — {endereco.state} · CEP{' '}
                 {endereco.zip_code}
               </p>
               {endereco.is_default && (
-                <span className="mt-2 inline-block rounded-full border border-gold/40 bg-gold/[0.08] px-3 py-0.5 font-body text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-caramel">
+                <span className="mt-2 inline-block rounded-full border border-gold/40 bg-gold/[0.08] px-3 py-0.5 font-body text-2xs font-semibold uppercase tracking-[0.16em] text-caramel-dark">
                   Padrão
                 </span>
               )}
@@ -989,14 +991,14 @@ function AbaEnderecos() {
               <button
                 type="button"
                 onClick={() => abrirModal({ modo: 'editar', endereco })}
-                className="font-body text-[0.75rem] font-medium uppercase tracking-[0.18em] text-coffee-faint transition-colors duration-300 hover:text-caramel"
+                className="font-body text-2xs font-medium uppercase tracking-[0.18em] text-coffee-faint transition-colors duration-150 hover:text-caramel-dark"
               >
                 Editar
               </button>
               <button
                 type="button"
                 onClick={() => setParaExcluir(endereco)}
-                className="font-body text-[0.75rem] font-medium uppercase tracking-[0.18em] text-coffee-faint transition-colors duration-300 hover:text-[#a4533f]"
+                className="font-body text-2xs font-medium uppercase tracking-[0.18em] text-coffee-faint transition-colors duration-150 hover:text-[#a4533f]"
               >
                 Excluir
               </button>
@@ -1101,7 +1103,7 @@ function AbaPagamentos() {
         <h2 className="font-display text-3xl text-coffee">Pagamentos</h2>
       </div>
 
-      <p className="mt-3 max-w-2xl font-body text-[0.88rem] leading-relaxed text-coffee-soft">
+      <p className="mt-3 max-w-2xl font-body text-xs leading-relaxed text-coffee-soft">
         Seus pagamentos são processados com segurança pelo Mercado Pago. Nenhum
         dado de cartão é armazenado por nós. Abaixo está o histórico por pedido.
       </p>
@@ -1115,7 +1117,7 @@ function AbaPagamentos() {
       {!carregando && erro && (
         <p
           role="alert"
-          className="mt-8 rounded-sm border border-[#a4533f]/30 bg-[#a4533f]/[0.06] px-4 py-3 font-body text-[0.85rem] font-medium text-[#a4533f]"
+          className="mt-8 rounded-sm border border-[#a4533f]/30 bg-[#a4533f]/[0.06] px-4 py-3 font-body text-xs font-medium text-[#a4533f]"
         >
           {erro}
         </p>
@@ -1135,7 +1137,7 @@ function AbaPagamentos() {
           >
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="font-body text-[0.72rem] uppercase tracking-[0.18em] text-coffee-faint">
+                <p className="font-body text-2xs uppercase tracking-[0.18em] text-coffee-faint">
                   Pedido #{pg.order_id}
                 </p>
                 <p className="mt-2 font-display text-lg text-coffee">
@@ -1143,14 +1145,14 @@ function AbaPagamentos() {
                 </p>
               </div>
               <span
-                className={`shrink-0 rounded-full px-2.5 py-1 font-body text-[0.68rem] font-bold uppercase tracking-wider ${
+                className={`shrink-0 rounded-full px-2.5 py-1 font-body text-2xs font-bold uppercase tracking-wider ${
                   ESTILO_STATUS_PAGAMENTO[pg.status] ?? 'bg-coffee/10 text-coffee-soft'
                 }`}
               >
                 {ROTULO_STATUS_PAGAMENTO[pg.status] ?? pg.status}
               </span>
             </div>
-            <p className="mt-4 font-body text-[0.78rem] text-coffee-faint">
+            <p className="mt-4 font-body text-xs text-coffee-faint">
               {pg.provider} • {pg.currency}
             </p>
           </li>

@@ -10,7 +10,7 @@ export default function SecaoCupons({
   return (
     <fieldset disabled={desabilitado}>
       <div className="flex items-baseline justify-between gap-4">
-        <h3 className="font-display text-[1.3rem] font-normal text-coffee">
+        <h3 className="font-display text-xl font-normal text-coffee">
           Cupom de desconto
         </h3>
         {cupomSelecionado && (
@@ -18,7 +18,7 @@ export default function SecaoCupons({
             type="button"
             data-testid="btn-remover-cupom"
             onClick={() => onSelecionarCupom(null)}
-            className="font-body text-[0.72rem] font-semibold uppercase tracking-[0.16em] text-[#a4533f] transition-colors hover:text-coffee-soft"
+            className="font-body text-2xs font-semibold uppercase tracking-[0.16em] text-[#a4533f] transition-colors hover:text-coffee-soft"
           >
             Remover cupom
           </button>
@@ -26,7 +26,7 @@ export default function SecaoCupons({
       </div>
 
       {cuponsDisponiveis.length === 0 ? (
-        <p className="mt-3 font-body text-[0.82rem] text-coffee-faint">
+        <p className="mt-3 font-body text-xs text-coffee-faint">
           Nenhum cupom disponível para esta sacola no momento.
         </p>
       ) : (
@@ -55,14 +55,14 @@ export default function SecaoCupons({
                       {cupom.code}
                     </span>
                     <span
-                      className={`font-body text-[0.8rem] font-semibold ${
+                      className={`font-body text-xs font-semibold ${
                         selecionado ? 'text-forest' : 'text-gold-dark'
                       }`}
                     >
                       {rotuloDesconto}
                     </span>
                   </div>
-                  <div className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 font-body text-[0.72rem] text-coffee-faint">
+                  <div className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 font-body text-2xs text-coffee-faint">
                     <span>
                       Válido até{' '}
                       {new Date(cupom.valid_until).toLocaleDateString('pt-BR')}

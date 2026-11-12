@@ -158,14 +158,14 @@ export default function PaginaRetornoPagamento() {
             {tema.titulo}
           </h1>
 
-          <p className="mx-auto mt-3 max-w-md font-body text-[0.95rem] leading-relaxed text-coffee-soft">
+          <p className="mx-auto mt-3 max-w-md font-body text-sm leading-relaxed text-coffee-soft">
             {tema.texto}
           </p>
 
           {pagamento && (
             <dl className="mx-auto mt-8 max-w-xs space-y-2 rounded-sm border border-line bg-cream-soft/60 px-5 py-4 text-left">
               <div className="flex items-center justify-between gap-4">
-                <dt className="font-body text-[0.78rem] uppercase tracking-wider text-coffee-faint">
+                <dt className="font-body text-xs uppercase tracking-wider text-coffee-faint">
                   Pedido
                 </dt>
                 <dd className="font-body text-sm font-semibold text-coffee">
@@ -173,7 +173,7 @@ export default function PaginaRetornoPagamento() {
                 </dd>
               </div>
               <div className="flex items-center justify-between gap-4">
-                <dt className="font-body text-[0.78rem] uppercase tracking-wider text-coffee-faint">
+                <dt className="font-body text-xs uppercase tracking-wider text-coffee-faint">
                   Valor
                 </dt>
                 <dd className="font-body text-sm font-semibold text-coffee">
@@ -181,7 +181,7 @@ export default function PaginaRetornoPagamento() {
                 </dd>
               </div>
               <div className="flex items-center justify-between gap-4">
-                <dt className="font-body text-[0.78rem] uppercase tracking-wider text-coffee-faint">
+                <dt className="font-body text-xs uppercase tracking-wider text-coffee-faint">
                   Status
                 </dt>
                 <dd className="font-body text-sm font-semibold text-coffee">
@@ -192,21 +192,21 @@ export default function PaginaRetornoPagamento() {
           )}
 
           {pendente && !desistiu && (
-            <p className="mt-6 flex items-center justify-center gap-2 font-body text-[0.82rem] text-coffee-faint">
+            <p className="mt-6 flex items-center justify-center gap-2 font-body text-xs text-coffee-faint">
               <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-coffee-faint/40 border-t-forest" />
               Verificando o status automaticamente… ({tentativas}/{MAX_TENTATIVAS})
             </p>
           )}
 
           {pendente && desistiu && (
-            <p className="mt-6 font-body text-[0.82rem] text-coffee-faint">
+            <p className="mt-6 font-body text-xs text-coffee-faint">
               Ainda não recebemos a confirmação. Você pode verificar em Minha
               Conta mais tarde — o status é atualizado automaticamente.
             </p>
           )}
 
           {carregando && !pagamento && (
-            <p className="mt-6 font-body text-[0.82rem] text-coffee-faint">
+            <p className="mt-6 font-body text-xs text-coffee-faint">
               Carregando detalhes do pagamento…
             </p>
           )}
@@ -214,7 +214,7 @@ export default function PaginaRetornoPagamento() {
           {erro && (
             <p
               role="alert"
-              className="mt-6 rounded-sm border border-[#a4533f]/30 bg-[#a4533f]/[0.06] px-4 py-3 font-body text-[0.84rem] font-medium text-[#a4533f]"
+              className="mt-6 rounded-sm border border-[#a4533f]/30 bg-[#a4533f]/[0.06] px-4 py-3 font-body text-xs font-medium text-[#a4533f]"
             >
               {erro}
             </p>
@@ -224,7 +224,7 @@ export default function PaginaRetornoPagamento() {
             <button
               type="button"
               onClick={() => navigate('/', { replace: true })}
-              className="w-full rounded-sm bg-forest px-8 py-3.5 font-body text-xs font-semibold uppercase tracking-[0.2em] text-cream-soft shadow-md transition-colors duration-300 hover:bg-forest-soft sm:w-auto"
+              className="w-full rounded-sm bg-forest px-8 py-3.5 font-body text-xs font-semibold uppercase tracking-[0.2em] text-cream-soft shadow-md transition-colors duration-150 hover:bg-forest-soft sm:w-auto"
             >
               Voltar para a loja
             </button>
@@ -238,7 +238,7 @@ export default function PaginaRetornoPagamento() {
                   setCarregando(true)
                   await consultar()
                 }}
-                className="w-full rounded-sm border border-line-strong px-8 py-3.5 font-body text-xs font-semibold uppercase tracking-[0.2em] text-coffee-soft transition-colors duration-300 hover:border-gold hover:text-caramel sm:w-auto"
+                className="w-full rounded-sm border border-line-strong px-8 py-3.5 font-body text-xs font-semibold uppercase tracking-[0.2em] text-coffee-soft transition-colors duration-150 hover:border-gold hover:text-caramel-dark sm:w-auto"
               >
                 Verificar novamente
               </button>
@@ -246,7 +246,7 @@ export default function PaginaRetornoPagamento() {
           </div>
         </div>
 
-        <p className="mt-8 flex items-center justify-center gap-2 font-body text-[0.78rem] font-medium text-coffee-faint">
+        <p className="mt-8 flex items-center justify-center gap-2 font-body text-xs font-medium text-coffee-faint">
           <LockIcon className="h-4 w-4" />
           Pagamento processado com segurança pelo Mercado Pago.
         </p>

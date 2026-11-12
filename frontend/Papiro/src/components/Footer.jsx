@@ -59,13 +59,13 @@ export default function Footer() {
                 <button
                   type="button"
                   onClick={() => irPara('home')}
-                  className="font-display text-[1.7rem] leading-none text-coffee hover:text-forest transition-colors text-left"
+                  className="font-display text-2xl leading-none text-coffee hover:text-forest transition-colors text-left"
                 >
                   Papiro
                 </button>
                 <Quill className="w-[32px] text-coffee/50" />
               </div>
-              <p className="mt-2.5 max-w-[22rem] font-body text-xs font-light leading-relaxed text-coffee-soft">
+              <p className="mt-2.5 max-w-[22rem] font-body text-xs leading-relaxed text-coffee-soft">
                 Uma livraria para leitores tranquilos. Curadoria feita à mão, um
                 livro de cada vez.
               </p>
@@ -76,21 +76,21 @@ export default function Footer() {
               <a
                 href="#"
                 aria-label="Instagram"
-                className="grid h-8 w-8 place-items-center rounded-sm border border-line-strong bg-cream-tint/60 text-coffee-soft transition-colors duration-300 hover:border-gold hover:text-gold"
+                className="grid h-8 w-8 place-items-center rounded-sm border border-line-strong bg-cream-tint/60 text-coffee-soft transition-colors duration-150 hover:border-gold hover:text-gold"
               >
                 <InstagramIcon className="h-4 w-4" />
               </a>
               <a
                 href="#"
                 aria-label="Facebook"
-                className="grid h-8 w-8 place-items-center rounded-sm border border-line-strong bg-cream-tint/60 text-coffee-soft transition-colors duration-300 hover:border-gold hover:text-gold"
+                className="grid h-8 w-8 place-items-center rounded-sm border border-line-strong bg-cream-tint/60 text-coffee-soft transition-colors duration-150 hover:border-gold hover:text-gold"
               >
                 <FacebookIcon className="h-4 w-4" />
               </a>
               <a
                 href="#"
                 aria-label="YouTube"
-                className="grid h-8 w-8 place-items-center rounded-sm border border-line-strong bg-cream-tint/60 text-coffee-soft transition-colors duration-300 hover:border-gold hover:text-gold"
+                className="grid h-8 w-8 place-items-center rounded-sm border border-line-strong bg-cream-tint/60 text-coffee-soft transition-colors duration-150 hover:border-gold hover:text-gold"
               >
                 <YoutubeIcon className="h-4 w-4" />
               </a>
@@ -100,7 +100,7 @@ export default function Footer() {
           {/* Colunas de links */}
           {COLUMNS.map((column) => (
             <div key={column.title}>
-              <h3 className="label-caps text-[0.68rem] text-gold">{column.title}</h3>
+              <h3 className="label-caps text-gold">{column.title}</h3>
               <ul className="mt-3.5 flex flex-col gap-2">
                 {column.links
                   .filter((link) => !(link.page === 'admin' && !ehAdmin))
@@ -110,7 +110,7 @@ export default function Footer() {
                       <button
                         type="button"
                         onClick={() => irPara(link.page)}
-                        className="font-body text-xs text-coffee-soft transition-colors duration-300 hover:text-gold text-left"
+                        className="font-body text-xs text-coffee-soft transition-colors duration-150 hover:text-gold text-left"
                       >
                         {link.label}
                       </button>
@@ -128,7 +128,7 @@ export default function Footer() {
 
         {/* Faixa Inferior / Copyright */}
         <div className="mt-8 flex flex-col gap-3 border-t border-line/80 pt-5 sm:flex-row sm:items-center sm:justify-between">
-          <p className="font-body text-[0.72rem] tracking-wide text-coffee-faint">
+          <p className="font-body text-2xs tracking-wide text-coffee-faint">
             © {new Date().getFullYear()} Papiro Livraria. Todos os direitos reservados.
           </p>
           <p className="font-display text-xs italic text-coffee-faint">
