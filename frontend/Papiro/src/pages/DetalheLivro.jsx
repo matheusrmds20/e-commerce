@@ -119,24 +119,23 @@ export default function DetalheLivro() {
   }, [autenticado, usuario, produto])
 
   /** Adiciona o produto atual à sacola (visitante: memória; logado: API). */
+  /**
+   * Adiciona o produto atual à sacola (visitante: memória; logado: API).
+   *
+   * O sucesso e o erro do add já são anunciados pelo toast global, dentro do
+   * `CartContext.adicionar` — não repetir em `feedback`, que aqui é o canal
+   * das avaliações e apareceria como segunda mensagem na mesma ação.
+   */
   const adicionarASacola = useCallback(async () => {
     if (!produto) return
-    try {
-      await adicionar({
-        id: produto.id,
-        titulo: produto.titulo,
-        autor: produto.autor,
-        preco: produto.preco,
-        imagem: produto.imagens[0] ?? '',
-        stockQty: produto.stockQty,
-      })
-      setFeedback({ tipo: 'sucesso', texto: 'Adicionado à sacola.' })
-    } catch {
-      setFeedback({
-        tipo: 'erro',
-        texto: 'Não foi possível adicionar à sacola.',
-      })
-    }
+    await adicionar({
+      id: produto.id,
+      titulo: produto.titulo,
+      autor: produto.autor,
+      preco: produto.preco,
+      imagem: produto.imagens[0] ?? '',
+      stockQty: produto.stockQty,
+    })
   }, [adicionar, produto])
 
   /** Adiciona ou remove o produto da wishlist (toggle). */

@@ -4,7 +4,6 @@ import Estrelas from './Estrelas'
 import Quill from './Quill'
 import { formatarPreco } from '../api/adapters'
 import { useCart } from '../context/cart-context'
-import { useState } from 'react'
 import { atributosCapa } from '../lib/imagemCapa'
 
 
@@ -14,7 +13,6 @@ export default function RecomendacaoDestaque({
 }) {
  const navigate = useNavigate()
  const { adicionar } = useCart()
- const [feedback, setFeedback] = useState(null)
 
  if (carregando) {
  return (
@@ -74,10 +72,15 @@ export default function RecomendacaoDestaque({
  const nota = recomendacao?.notaMedia ?? 0
  const totalAvaliacoes = recomendacao?.avaliacoes?.length ?? 0
 
- /** Adiciona o livro recomendado à sacola. */
- const adicionarASacola = async () => {
- try {
- await adicionar({
+ /**
+ * Adiciona o livro recomendado à sacola.
+ *
+ * Sem estado local: o toast do `CartContext` já confirma o sucesso e
+ * reporta o erro, e repetir aqui geraria duas mensagens para o mesmo
+ * clique.
+ */
+ const adicionarASacola = () =>
+ adicionar({
  id: produto.id,
  titulo: produto.titulo,
  autor: produto.autor,
@@ -85,14 +88,6 @@ export default function RecomendacaoDestaque({
  imagem: produto.imagem,
  stockQty: produto.estoque,
  })
- setFeedback({ tipo: 'sucesso', texto: 'Adicionado à sacola.' })
- } catch {
- setFeedback({
- tipo: 'erro',
- texto: 'Não foi possível adicionar à sacola.',
- })
- }
- }
 
  return (
  <section id="recomendacao" className="bg-cream-deep py-16 sm:py-24">
@@ -252,18 +247,6 @@ export default function RecomendacaoDestaque({
  </button>
  </div>
  </div>
-
- {feedback && (
- <p
- className={`mt-3 font-body text-xs ${
- feedback.tipo === 'sucesso'
- ? 'text-forest'
- : 'text-caramel-dark'
- }`}
- >
- {feedback.texto}
- </p>
- )}
  </div>
  </div>
  </div>
