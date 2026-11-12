@@ -82,3 +82,12 @@ def _get(item, campo):
     if isinstance(item, dict):
         return item.get(campo)
     return getattr(item, campo, None)
+
+def preco_com_desconto_produto(preco_base: Decimal, discount_pct: int | None) -> Decimal:
+    """Calcula o preço final do produto aplicando o percentual de desconto se houver."""
+    base = to_decimal(preco_base)
+    pct = int(discount_pct or 0)
+    if pct <= 0:
+        return quantize(base)
+    fator = Decimal("1") - (to_decimal(pct) / Decimal("100"))
+    return quantize(base * fator)
