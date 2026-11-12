@@ -9,7 +9,7 @@ ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
 
 class Settings(BaseSettings):
     APP_NAME: str = "E-commerce"
-    DEBUG: bool = True
+    DEBUG: bool = False
 
     FRONTEND_URL: str
     BACKEND_URL: str
