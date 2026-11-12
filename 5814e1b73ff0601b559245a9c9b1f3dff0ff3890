@@ -1,0 +1,16 @@
+Correção da mensagem (ver 97e5b5d e 4a4b699):
+
+Esta mensagem afirma que o Checkout "passa a guardar um snapshot no
+momento do submit (snapshotResumo)" e que "checkoutUrl isola o link do
+Mercado Pago". Nada disso foi implementado neste commit: os dois eram
+apenas declarações de useState, sem uso, e nenhuma das duas corrigia o
+problema descrito.
+
+- O snapshot real só veio em 97e5b5d (resumoEnviado, alimentando o
+  ResumoPedido antes do recarregar() esvaziar a sacola).
+- checkoutUrl nunca foi usado; foi removido em 97e5b5d.
+
+Também a jusante deste commit: a migração de tokens de c92151e gravou
+`text-$1$2` literal em 9 elementos, restaurado em 4a4b699.
+
+(Nota reanexada após o rebase em origin/main, que reescreveu os hashes.)
