@@ -21,16 +21,26 @@ test.describe('Carrinho', () => {
     const titulo = (await card.locator('h3').innerText()).trim()
     await card.locator('img').click()
 
-    // Adiciona à sacola.
+    // Adiciona à sacola. A espera pela resposta é registrada ANTES do clique:
+    // se o toast de uma ação anterior ainda estiver na tela, asserir primeiro
+    // consumiria o quadro errado e o `waitForResponse` perderia o evento.
     await expect(page.getByTestId('btn-add-carrinho')).toBeVisible({
       timeout: 15_000,
     })
-    await page.getByTestId('btn-add-carrinho').click()
-    // Aguarda o add ser persistido antes de ler o badge (evitar flaky).
-    await page.waitForResponse(
+    const gravouItem = page.waitForResponse(
       (res) => res.url().includes('/items/add') && res.ok(),
       { timeout: 15_000 },
     )
+    await page.getByTestId('btn-add-carrinho').click()
+    await gravouItem
+
+    // O toast confirma com o TÍTULO do livro. Já quebrou uma vez: o
+    // CartContext lia `produto.title` (inglês) enquanto quem chama passa
+    // `titulo`, então a mensagem saía "undefined adicionado à sacola".
+    const toast = page.getByRole('status').filter({ hasText: 'adicionado à sacola' })
+    await expect(toast).toBeVisible({ timeout: 15_000 })
+    await expect(toast).toContainText(titulo)
+    await expect(toast).not.toContainText('undefined')
 
     // Badge da navbar reflete 1 exemplar.
     await expect(page.getByTestId('navbar-sacola')).toContainText('1')

@@ -116,6 +116,15 @@ desktop.ini
 *.sw?
 
 test.py
+
+# ===== Artefatos de ferramentas locais (não versionar) =====
+# Config local do agente de código
+.pi/
+# Capturas de console/DOM do Playwright MCP usadas em depuração
+.playwright-mcp/
+# Scripts avulsos de screenshot deixados na raiz do frontend
+frontend/Papiro/shot*.mjs
+
 # ===== Restos de instalação do pip (tmp dirs na raiz) =====
 pip-build-tracker-*/
 pip-ephem-wheel-cache-*/
