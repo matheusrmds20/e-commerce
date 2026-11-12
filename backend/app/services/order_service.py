@@ -25,7 +25,7 @@ from app.repositories.product_repo import ProductRepository
 from app.repositories.user_coupon_repo import UserCouponRepository
 from app.repositories.user_repo import UserRepository
 from app.services.order_state_machine import assert_client_transition
-from app.services.pricing import calcular_totais
+from app.services.pricing import calcular_totais, preco_com_desconto_produto
 from app.utils.email import build_order_details, send_order_confirmation_email
 
 
@@ -82,10 +82,11 @@ class OrderService:
 
             baixas_de_estoque.append((product, item.quantity))
 
+            unit_price = float(preco_com_desconto_produto(product.price, product.discount_pct))
             order_item = self.order_item_repo.create_order_item(
                 product_id=item.product_id,
                 quantity=item.quantity,
-                price=product.price,
+                price=unit_price,
             )
 
             order_item.order_id = order.id
@@ -231,11 +232,12 @@ class OrderService:
 
                 baixas_de_estoque.append((product, item.quantity))
 
+                unit_price = float(preco_com_desconto_produto(product.price, product.discount_pct))
                 itens_validados.append(
                     {
                         "product_id": item.product_id,
                         "quantity": item.quantity,
-                        "price": product.price,
+                        "price": unit_price,
                     }
                 )
 
