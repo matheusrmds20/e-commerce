@@ -186,8 +186,12 @@ function ModalEnderecoDialog({
     setModo('formulario')
   }
 
-  const handleExcluir = async (id, e) => {
-    e.stopPropagation()
+  /**
+   * Exclui um endereço. Chamado a partir do ConfirmDialog, então não há
+   * evento de clique para parar — o `stopPropagation` continua sendo
+   * aplicado ao botão da lista, não aqui.
+   */
+  const handleExcluir = async (id) => {
     if (excluindoId) return
     try {
       setExcluindoId(id)
@@ -552,7 +556,10 @@ function ModalEnderecoDialog({
       </div>
 
       {/* Confirmação de exclusão */}
+      {/* A key remonta o diálogo a cada abertura, zerando o `processando`
+          de uma tentativa anterior que falhou. */}
       <ConfirmDialog
+        key={enderecoAExcluir?.id ?? 'fechado'}
         aberto={Boolean(enderecoAExcluir)}
         titulo="Excluir endereço"
         mensagem={`Tem certeza que deseja excluir ${enderecoAExcluir ? `${enderecoAExcluir.street}, ${enderecoAExcluir.number}` : 'este endereço'}? Essa ação não pode ser desfeita.`}
@@ -560,9 +567,12 @@ function ModalEnderecoDialog({
         cancelarTexto="Cancelar"
         perigo
         onCancelar={() => setEnderecoAExcluir(null)}
-        onConfirmar={() => {
-          if (enderecoAExcluir) handleExcluir(enderecoAExcluir.id)
+        onConfirmar={async () => {
+          // Fecha o diálogo primeiro (feedback imediato) e executa a exclusão
+          // em seguida. O erro, se houver, é tratado dentro de handleExcluir.
+          const alvo = enderecoAExcluir
           setEnderecoAExcluir(null)
+          if (alvo) await handleExcluir(alvo.id)
         }}
       />
     </div>

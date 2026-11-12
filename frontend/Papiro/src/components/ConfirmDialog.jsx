@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { CloseIcon } from './Icons'
 
 /**
@@ -16,7 +16,7 @@ import { CloseIcon } from './Icons'
  * - confirmarTexto / cancelarTexto: rótulos dos botões.
  * - perigo: `true` deixa o botão de confirmar no tom de erro (exclusões).
  * - onConfirmar / onCancelar: callbacks. `onConfirmar` pode ser async — nesse
- *   caso o botão mostra estado de carregamento.
+ *   caso o botão mostra estado de carregamento e ignora cliques repetidos.
  */
 export default function ConfirmDialog({
   aberto,
@@ -29,6 +29,21 @@ export default function ConfirmDialog({
   onCancelar,
 }) {
   const botaoConfirmarRef = useRef(null)
+  const [processando, setProcessando] = useState(false)
+
+  // O reset de `processando` é feito pela `key` no pai, não aqui. Chamar
+  // setState dentro de um efeito re-renderiza em cascata (e o lint barra).
+
+  /** Espera a promise do `onConfirmar`, bloqueando cliques durante a espera. */
+  const confirmar = async () => {
+    if (processando) return
+    setProcessando(true)
+    try {
+      await onConfirmar?.()
+    } finally {
+      setProcessando(false)
+    }
+  }
 
   // Focus no botão de confirmar e fecha com ESC.
   useEffect(() => {
@@ -36,11 +51,13 @@ export default function ConfirmDialog({
     botaoConfirmarRef.current?.focus()
 
     const handleKeyDown = (e) => {
-      if (e.key === 'Escape' && onCancelar) onCancelar()
+      // ESC não fecha no meio de uma ação em andamento: o usuário perderia
+      // o retorno visual de uma exclusão que já está em curso.
+      if (e.key === 'Escape' && onCancelar && !processando) onCancelar()
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [aberto, onCancelar])
+  }, [aberto, onCancelar, processando])
 
   if (!aberto) return null
 
@@ -52,8 +69,10 @@ export default function ConfirmDialog({
       aria-describedby="confirm-dialog-mensagem"
       className="fixed inset-0 z-[90] flex items-center justify-center p-4 bg-coffee/60 backdrop-blur-sm"
       onClick={(e) => {
-        // Clique no backdrop = cancelar.
-        if (e.target === e.currentTarget && onCancelar) onCancelar()
+        // Clique no backdrop = cancelar (exceto durante o processamento).
+        if (e.target === e.currentTarget && onCancelar && !processando) {
+          onCancelar()
+        }
       }}
     >
       <div className="w-full max-w-md rounded-md border border-line bg-cream-soft shadow-xl overflow-hidden">
@@ -90,21 +109,24 @@ export default function ConfirmDialog({
           <button
             type="button"
             onClick={onCancelar}
-            className="rounded-sm border border-line-strong px-4 py-2.5 font-body text-xs font-semibold uppercase tracking-wider text-coffee-soft hover:bg-cream-deep transition-colors"
+            disabled={processando}
+            className="rounded-sm border border-line-strong px-4 py-2.5 font-body text-xs font-semibold uppercase tracking-wider text-coffee-soft hover:bg-cream-deep transition-colors disabled:cursor-not-allowed disabled:opacity-50"
           >
             {cancelarTexto}
           </button>
           <button
             type="button"
             ref={botaoConfirmarRef}
-            onClick={onConfirmar}
-            className={`rounded-sm px-6 py-2.5 font-body text-xs font-semibold uppercase tracking-wider text-cream-soft transition-colors shadow-sm ${
+            onClick={confirmar}
+            disabled={processando}
+            aria-busy={processando}
+            className={`rounded-sm px-6 py-2.5 font-body text-xs font-semibold uppercase tracking-wider text-cream-soft transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-60 ${
               perigo
                 ? 'bg-[#a4533f] hover:bg-[#823d2d]'
                 : 'bg-forest hover:bg-forest-soft'
             }`}
           >
-            {confirmarTexto}
+            {processando ? 'Aguarde…' : confirmarTexto}
           </button>
         </div>
       </div>
