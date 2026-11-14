@@ -92,9 +92,17 @@ export default function Navbar({ simples = false }) {
  return () => window.removeEventListener('scroll', onScroll)
  }, [])
 
- return (
+  return (
+    <div className="sticky top-0 z-40">
+      {/* Faixa editorial e discreta de Demonstração */}
+      <aside aria-label="Aviso de demonstração" className="border-b border-line/60 bg-cream-tint/95 px-4 py-1 text-center">
+        <p className="font-body text-[11px] font-medium tracking-wide text-coffee-faint">
+          <span className="mr-1.5 inline-block text-gold">✦</span>
+          <strong className="font-semibold text-coffee-soft">Ambiente de Demonstração:</strong> projeto de portfólio. Livros e pedidos são simulados.
+        </p>
+      </aside>
  <header
- className={`sticky top-0 z-40 border-b bg-cream-soft/95 backdrop-blur-sm transition-colors duration-500 ease-[var(--ease-cozy)] ${
+ className={`border-b bg-cream-soft/95 backdrop-blur-sm transition-colors duration-500 ease-[var(--ease-cozy)] ${
  scrolled ? 'border-line' : 'border-transparent'
  }`}
  >
@@ -282,5 +290,6 @@ export default function Navbar({ simples = false }) {
  </form>
  </div>
  </header>
+    </div>
  )
 }

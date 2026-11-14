@@ -353,6 +353,13 @@ export default function Checkout() {
  <h1 className="font-display text-3xl leading-tight font-normal text-coffee sm:text-4xl">
  Finalizar compra
  </h1>
+        {/* Aviso de Demonstração / Dados Não Reais */}
+        <div className="mt-4 flex items-center gap-3 rounded-md border border-line-strong/60 bg-cream-soft px-4 py-3 shadow-xs">
+          <span className="text-gold text-base">✦</span>
+          <p className="font-body text-xs leading-relaxed text-coffee-soft">
+            <strong className="font-semibold text-coffee">Ambiente de Demonstração:</strong> Esta loja é um projeto de demonstração e portfólio. <strong className="font-semibold text-coffee">Não utilize dados reais</strong> de cartão de crédito ou pessoais.
+          </p>
+        </div>
 
  <div className="mt-10 grid gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] lg:gap-16">
  <ResumoPedido
@@ -508,6 +515,9 @@ export default function Checkout() {
  <LockIcon className="h-4 w-4" />
  Pagamento processado com segurança pelo Mercado Pago.
  </p>
+                <p className="mt-2 text-center font-body text-2xs font-normal tracking-wide text-coffee-faint">
+                  Ambiente simulado para testes. Não insira dados financeiros reais.
+                </p>
  </div>
  </form>
  )}

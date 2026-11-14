@@ -132,6 +132,9 @@ export default function Footer() {
           <p className="font-body text-2xs tracking-wide text-coffee-faint">
             © {new Date().getFullYear()} Papiro Livraria. Todos os direitos reservados.
           </p>
+          <p className="font-body text-2xs tracking-wide text-coffee-faint/80 sm:text-center">
+            Projeto de demonstração técnica e portfólio (sem fins comerciais).
+          </p>
           <p className="font-display text-xs italic text-coffee-faint">
             Livros para dias lentos.
           </p>

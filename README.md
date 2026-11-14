@@ -11,6 +11,13 @@
 Loja virtual completa de livraria — catálogo, carrinho, cupons, wishlist, checkout,
 frete real e pagamento — com **API REST em FastAPI** e **SPA em React + Vite**.
 
+> [!IMPORTANT]
+> **Ambiente Demonstrativo (Portfólio & Demonstração Técnica)**
+> Este projeto foi desenvolvido exclusivamente para fins de estudo, portfólio e demonstração técnica.
+> - **NÃO UTILIZE DADOS REAIS**: Nunca insira senhas pessoais críticas, números de cartão de crédito válidos ou dados bancários/pessoais reais durante testes no formulário de checkout ou cadastro.
+> - As operações financeiras e de logística utilizam ambientes Sandbox / Simulação.
+
+
 - 🛍️ **Frontend (demo):** <https://papiro.matheuslab.xyz>
 - ⚙️ **API (demo):** <https://api-e-commerce.matheuslab.xyz>
 - 📖 **Docs interativas (Swagger/ReDoc):** só com `DEBUG=true` — em produção ficam desligadas (ver [Segurança](#-segurança))
