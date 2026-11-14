@@ -44,7 +44,8 @@ export default function Footer() {
 
   const irPara = (page) => {
     navigate(URL_DA_PAGINA[page] ?? '/')
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+    const prefereReduzido = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches
+    window.scrollTo({ top: 0, behavior: prefereReduzido ? 'instant' : 'smooth' })
   }
 
 

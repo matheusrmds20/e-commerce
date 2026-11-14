@@ -138,10 +138,11 @@ export default function Acervo() {
     atualizarUrl({ termo: null, page: null })
   }
 
-  /** Troca de página e volta ao topo da listagem. */
+  /** Troca de página e volta ao topo da listagem com rolagem suave (motion-safe). */
   const trocarPagina = (destino) => {
     if (destino !== pagina) atualizarUrl({ page: destino })
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+    const prefereReduzido = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches
+    window.scrollTo({ top: 0, behavior: prefereReduzido ? 'instant' : 'smooth' })
   }
 
   /**

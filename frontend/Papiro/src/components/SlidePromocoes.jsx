@@ -25,12 +25,13 @@ export default function SlidePromocoes({ ofertas = [], carregando = false }) {
  }, [])
 
  const rolar = (direcao) => {
- if (!scrollRef.current) return
- const larguraCard = scrollRef.current.clientWidth * 0.75
- scrollRef.current.scrollBy({
- left: direcao === 'dir' ? larguraCard : -larguraCard,
- behavior: 'smooth',
- })
+   if (!scrollRef.current) return
+   const larguraCard = scrollRef.current.clientWidth * 0.75
+   const prefereReduzido = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches
+   scrollRef.current.scrollBy({
+     left: direcao === 'dir' ? larguraCard : -larguraCard,
+     behavior: prefereReduzido ? 'instant' : 'smooth',
+   })
  }
 
  return (
@@ -93,7 +94,7 @@ export default function SlidePromocoes({ ofertas = [], carregando = false }) {
  <div
  ref={scrollRef}
  onScroll={verificarBotoes}
- className="mt-10 flex gap-6 overflow-x-auto pb-6 pt-2 scroll-smooth [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+ className="mt-10 flex gap-6 overflow-x-auto pb-6 pt-2 motion-safe:scroll-smooth [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
  >
  {carregando &&
  Array.from({ length: 4 }).map((_, i) => (

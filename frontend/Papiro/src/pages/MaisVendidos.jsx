@@ -105,7 +105,8 @@ export default function MaisVendidos() {
 
   const trocarPagina = (destino) => {
     setPagina(destino)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+    const prefereReduzido = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches
+    window.scrollTo({ top: 0, behavior: prefereReduzido ? 'instant' : 'smooth' })
   }
 
   const nomeDoFiltro =

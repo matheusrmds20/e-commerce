@@ -120,6 +120,12 @@
 }
 
 @layer base {
+  @media (prefers-reduced-motion: no-preference) {
+    html {
+      scroll-behavior: smooth;
+    }
+  }
+
   body {
     @apply bg-cream-deep font-body text-base font-normal text-coffee antialiased;
   }
@@ -186,6 +192,42 @@
  * site inteiro (rótulo de seção). Botão e selo usam a escala direto. */
 @utility label-caps {
   @apply font-body text-xs font-semibold uppercase tracking-[0.24em];
+}
+
+/* Animação Ink Fade & Stagger (Transição Login / Registro) */
+@keyframes inkFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-ink-fade {
+  animation: inkFadeIn 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.animate-ink-stagger-1 {
+  animation: inkFadeIn 0.38s cubic-bezier(0.22, 1, 0.36, 1) 0.04s both;
+}
+
+.animate-ink-stagger-2 {
+  animation: inkFadeIn 0.40s cubic-bezier(0.22, 1, 0.36, 1) 0.08s both;
+}
+
+.animate-ink-stagger-3 {
+  animation: inkFadeIn 0.42s cubic-bezier(0.22, 1, 0.36, 1) 0.12s both;
+}
+
+.animate-ink-stagger-4 {
+  animation: inkFadeIn 0.44s cubic-bezier(0.22, 1, 0.36, 1) 0.16s both;
+}
+
+.animate-ink-stagger-5 {
+  animation: inkFadeIn 0.46s cubic-bezier(0.22, 1, 0.36, 1) 0.20s both;
 }
 
 /* Campos de formulário — mesma aparência em todo o site */
